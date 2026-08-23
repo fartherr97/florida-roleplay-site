@@ -200,6 +200,32 @@ domain. `server/src/lib/tenant.js` also resolves from the `Host` header — an
 explicit `DEPARTMENT_MAP` entry, then the first label of a real subdomain — so
 pointing `fhp.floridarp.gg` at this deployment later needs no code change.
 
+### One roster layout
+
+The Staff Hub, the Civilian Hub and every department site render their roster
+through the same components in `client/src/components/roster/`:
+
+| Component | What it is |
+| --- | --- |
+| `RosterHeader` | Title strip: mark, views, refresh, total and the per-status counts |
+| `RosterFilters` | Search plus the dropdowns that roster filters by |
+| `RosterTable` | The grouped table — bands as full-width rows inside **one** table |
+| `RosterStats` | The breakdown beside it, with percentages |
+
+`RosterTable` is one table rather than one per band on purpose. A stack of
+separate tables lets each band size its own columns, so "Callsign" lands
+somewhere different in every group and the roster stops reading as a single
+list. Columns declare `hideBelow` so the low-priority ones (Discord UID, notes)
+drop at narrow widths instead of pushing the status column into a horizontal
+scroll, and the two roster pages get a wider container than the rest of the hub
+(`client/src/lib/hubLayout.js`) because a dense table with a sidebar beside it
+does not fit the site's usual measure.
+
+The staff roster is structured around **positions**, not people: a team shows the
+seats it is meant to have, and a seat nobody holds renders greyed out rather than
+being filtered away — an empty Junior Administrator slot is exactly the sort of
+thing a roster exists to surface.
+
 ## Community roster and the Discord bot
 
 `/civilian-hub/roster` lists everyone across every department — civilians, law

@@ -120,7 +120,14 @@ function DeptShellInner() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+            className={
+              // A roster is a dense table with a sidebar beside it; at the
+              // site's usual measure the two together leave the table too
+              // little room. Every other page type reads better narrow.
+              named?.type === "roster"
+                ? "mx-auto w-full max-w-[1700px] px-4 py-10 sm:px-6 lg:px-8"
+                : "mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+            }
           >
             {Component ? (
               <Suspense fallback={<Loading />}>

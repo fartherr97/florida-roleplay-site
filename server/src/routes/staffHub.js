@@ -116,22 +116,57 @@ router.get("/roster", requirePermission("staff.view"), (_req, res) =>
     res,
     async () => {
       const rows = await query(
-        "SELECT * FROM hub_roster ORDER BY rank_order DESC, name",
+        "SELECT * FROM hub_roster ORDER BY rank_order DESC, callsign, name",
       );
       return rows.map((row) => ({
         id: row.id,
+        callsign: row.callsign,
         name: row.name,
         handle: row.handle,
+        discordId: row.discord_id,
         rank: row.rank_label,
         rankId: row.rank_id,
         team: row.team,
-        joined: isoDate(row.joined),
+        position: row.position,
+        positionNote: row.position_note,
+        hired: isoDate(row.hired),
+        lastMove: isoDate(row.last_move),
         claims: row.claims,
         vestHours: row.vest_hours,
         status: row.status,
+        loaUntil: isoDate(row.loa_until),
+        online: Boolean(row.online),
+        notes: row.notes,
+        // A structured position nobody holds. Rendering the gap is the point,
+        // so vacancies come back with the roster rather than being filtered out.
+        vacant: Boolean(row.vacant),
       }));
     },
     seed.roster,
+  ),
+);
+
+/**
+ * Trial moderators still on probation and the administrator signing off on
+ * them. Its own endpoint rather than a field on the roster: it is read beside
+ * the roster but it is a different list, and folding it in would mean every
+ * roster read carried it whether or not the page showed it.
+ */
+router.get("/training", requirePermission("staff.view"), (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query(
+        "SELECT * FROM hub_training ORDER BY since DESC",
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        trainee: row.trainee,
+        admin: row.admin_name,
+        since: isoDate(row.since),
+      }));
+    },
+    seed.training,
   ),
 );
 

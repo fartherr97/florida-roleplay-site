@@ -118,12 +118,18 @@ export const SPECIAL_ROLES = [
  * label someone with `roster.edit_status` can set.
  */
 export const ACTIVITY_STATUSES = [
-  { id: "Active", label: "Active", tone: "green", detail: "Playing and taking calls as normal." },
-  { id: "Semi-Active", label: "Semi-Active", tone: "brand", detail: "Around, but not meeting full activity requirements." },
-  { id: "LOA", label: "LOA", tone: "amber", detail: "On leave with an agreed return date.", requiresDate: true },
-  { id: "Inactive", label: "Inactive", tone: "slate", detail: "Not currently playing. Subject to removal after 30 days." },
-  { id: "Suspended", label: "Suspended", tone: "rose", detail: "Access withheld pending a staff decision." },
+  { id: "Active", label: "Active", tone: "green", color: "#10b981", detail: "Playing and taking calls as normal." },
+  { id: "Semi-Active", label: "Semi-Active", tone: "brand", color: "#3b82f6", detail: "Around, but not meeting full activity requirements." },
+  { id: "Training", label: "Training", tone: "primary", color: "#f2800d", detail: "In their probationary period, shadowing a supervisor." },
+  { id: "LOA", label: "LOA", tone: "amber", color: "#f59e0b", detail: "On leave with an agreed return date.", requiresDate: true },
+  { id: "Inactive", label: "Inactive", tone: "slate", color: "#94a3b8", detail: "Not currently playing. Subject to removal after 30 days." },
+  { id: "Suspended", label: "Suspended", tone: "rose", color: "#f43f5e", detail: "Access withheld pending a staff decision." },
 ];
+
+/** The colour a status renders as in count strips and statistics bars. */
+export function statusColor(id) {
+  return ACTIVITY_STATUSES.find((status) => status.id === id)?.color ?? "#94a3b8";
+}
 
 /**
  * The Discord role the bot applies while someone is on leave. Its snowflake is

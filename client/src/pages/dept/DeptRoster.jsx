@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
-import Button from "../../components/ui/Button";
-import DeptPageHeader from "../../components/dept/DeptPageHeader";
+import DeptBrandMark from "../../components/dept/DeptBrandMark";
+import RosterFilters from "../../components/roster/RosterFilters";
+import RosterHeader from "../../components/roster/RosterHeader";
+import RosterStats from "../../components/roster/RosterStats";
+import RosterTable from "../../components/roster/RosterTable";
 import StatusEditor, { StatusPill } from "../../components/hub/StatusEditor";
 import { useAuth } from "../../context/useAuth";
 import { useDeptConfig } from "../../context/useDeptConfig";
 import { statValue } from "../../lib/deptRoster";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { cn } from "../../lib/cn";
+import { ACTIVITY_STATUSES, statusColor } from "../../data/rosterData";
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  ...ACTIVITY_STATUSES.map((s) => ({ value: s.id, label: s.label })),
+];
 
 /**
  * A department's personnel.
@@ -32,6 +40,8 @@ export default function DeptRoster({ page, config }) {
   const { id } = useDeptConfig();
   const [loaded, setLoaded] = useState({ id: null, subdivisions: [] });
   const [activeId, setActiveId] = useState(null);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -47,14 +57,36 @@ export default function DeptRoster({ page, config }) {
 
   const subdivisions = loaded.id === id ? loaded.subdivisions : [];
   // Derived rather than reset in an effect, so switching department renders the
-  // new department's first tab instead of the old department's selection.
-  const active =
-    subdivisions.find((sub) => sub.id === activeId) ?? subdivisions[0] ?? null;
+  // new department's first unit instead of the old department's selection.
+  const active = subdivisions.find((sub) => sub.id === activeId) ?? subdivisions[0] ?? null;
 
   const canEditStatus = hasPermission("roster.edit_status");
   const canManageLoa = hasPermission("roster.manage_loa");
   const fields = config.roster.memberFields ?? [];
   const stats = config.roster.stats;
+
+  const everyone = useMemo(
+    () => (active?.categories ?? []).flatMap((category) => category.members),
+    [active],
+  );
+
+  const groups = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return (active?.categories ?? [])
+      .map((category) => ({
+        id: category.id,
+        label: category.name,
+        color: category.color,
+        rows: category.members.filter((member) => {
+          if (status !== "all" && member.status !== status) return false;
+          if (!needle) return true;
+          return [member.characterName, member.rank, member.rankFull, member.callsign]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(needle));
+        }),
+      }))
+      .filter((group) => group.rows.length > 0);
+  }, [active, query, status]);
 
   const totals = useMemo(
     () =>
@@ -64,6 +96,61 @@ export default function DeptRoster({ page, config }) {
     [active, stats],
   );
 
+  const counts = useMemo(
+    () =>
+      ACTIVITY_STATUSES.map((entry) => ({
+        label: entry.label,
+        value: everyone.filter((member) => member.status === entry.id).length,
+        color: entry.color,
+      })).filter((entry) => entry.value > 0),
+    [everyone],
+  );
+
+  const columns = [
+    {
+      key: "callsign",
+      label: "Callsign",
+      width: "w-24",
+      render: (member) =>
+        member.callsign ? (
+          <span className="dept-accent-text font-bold">{member.callsign}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "name",
+      label: "Name",
+      render: (member) => (
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-white">{member.characterName}</p>
+          <p className="truncate text-xs text-slate-500">{member.displayName}</p>
+        </div>
+      ),
+    },
+    {
+      key: "rank",
+      label: "Rank",
+      render: (member) => (
+        <span className="text-sm font-semibold text-slate-300">
+          {member.rankFull || member.rank}
+        </span>
+      ),
+    },
+    // The columns beyond rank are the department's own, so they come from its
+    // config rather than being fixed here.
+    ...fields
+      .filter((field) => field.id !== "callsign")
+      .map((field) => ({
+        key: field.id,
+        label: field.label,
+        hideBelow: field.id === "status" ? undefined : "lg",
+        render: (member) => (
+          <MemberCell field={field} member={member} editable={canEditStatus} onEdit={setEditing} />
+        ),
+      })),
+  ];
+
   const saveStatus = async (payload) => {
     await api.updateRosterStatus(payload.id, payload);
     setReloadKey((key) => key + 1);
@@ -71,59 +158,31 @@ export default function DeptRoster({ page, config }) {
 
   return (
     <>
-      <DeptPageHeader
-        icon={page.icon}
-        eyebrow={config.branding.shortName}
-        title={page.label}
+      <RosterHeader
+        mark={<DeptBrandMark config={config} className="size-10" />}
+        title={`${config.branding.shortName} · ${page.label}`}
         subtitle={
           active?.banner?.subtitle ||
-          "Personnel are added and promoted through Discord — this page follows the roles."
+          "Personnel follow Discord roles — promote someone there and they move here."
         }
-        actions={
-          <Button variant="ghost" size="sm" onClick={() => setReloadKey((key) => key + 1)}>
-            <RefreshCw className="size-4" />
-            Refresh
-          </Button>
-        }
+        views={subdivisions.map((sub) => ({ id: sub.id, label: sub.name }))}
+        activeView={active?.id}
+        onView={setActiveId}
+        onRefresh={() => setReloadKey((key) => key + 1)}
+        total={everyone.length}
+        counts={counts}
       />
 
-      {totals.length > 0 && (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {totals.map((item) => (
-            <Card key={item.id} className="p-5">
-              <div className="dept-accent-text text-2xl font-extrabold tracking-tight">
-                {item.value}
-              </div>
-              <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                {item.label}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+      <RosterFilters
+        query={query}
+        onQuery={setQuery}
+        placeholder="Search name, rank or callsign…"
+        filters={[
+          { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS_OPTIONS },
+        ]}
+      />
 
-      {subdivisions.length > 1 && (
-        <div className="mb-5 flex flex-wrap gap-2">
-          {subdivisions.map((sub) => (
-            <button
-              key={sub.id}
-              type="button"
-              onClick={() => setActiveId(sub.id)}
-              className={cn(
-                "rounded-xl px-4 py-2 text-sm font-semibold transition ring-1 ring-inset",
-                sub.id === active?.id
-                  ? "dept-accent-tile"
-                  : "bg-white/[0.02] text-slate-300 ring-white/[0.06] hover:bg-white/[0.06] hover:text-white",
-              )}
-            >
-              {sub.name}
-              <span className="ml-2 text-xs font-normal text-slate-500">{sub.total}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!active || active.categories.every((category) => category.members.length === 0) ? (
+      {everyone.length === 0 ? (
         <Card className="p-10 text-center">
           <Users className="mx-auto size-8 text-slate-600" />
           <p className="mt-3 text-sm text-slate-400">
@@ -139,70 +198,47 @@ export default function DeptRoster({ page, config }) {
           </p>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {active.categories
-            .filter((category) => category.members.length > 0)
-            .map((category) => (
-              <Card key={category.id} className="overflow-hidden">
-                <div
-                  className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-3"
-                  style={{
-                    backgroundColor: `color-mix(in srgb, ${category.color} 12%, transparent)`,
-                  }}
-                >
-                  <span
-                    className="size-2.5 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                    aria-hidden="true"
-                  />
-                  <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
-                    {category.name}
-                  </h2>
-                  <span className="ml-auto text-xs text-slate-400">
-                    {category.members.length}
-                  </span>
-                  {category.unassigned && (
-                    <Badge tone="amber">Rank not in a band</Badge>
-                  )}
-                </div>
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem]">
+          <RosterTable
+            columns={columns}
+            groups={groups}
+            empty={`Nobody in ${config.branding.shortName} matches that search.`}
+          />
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[40rem] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.16em] text-slate-500">
-                        <th className="px-5 py-3 font-bold">Rank</th>
-                        <th className="px-5 py-3 font-bold">Name</th>
-                        {fields.map((field) => (
-                          <th key={field.id} className="px-5 py-3 font-bold">
-                            {field.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.06]">
-                      {category.members.map((member) => (
-                        <tr key={member.id} className="transition hover:bg-white/[0.02]">
-                          <td className="whitespace-nowrap px-5 py-3.5 font-semibold text-white">
-                            {member.rankFull || member.rank}
-                          </td>
-                          <td className="px-5 py-3.5 text-slate-300">{member.characterName}</td>
-                          {fields.map((field) => (
-                            <td key={field.id} className="px-5 py-3.5 text-slate-400">
-                              <MemberCell
-                                field={field}
-                                member={member}
-                                editable={canEditStatus}
-                                onEdit={setEditing}
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          <aside className="space-y-5">
+            {totals.length > 0 && (
+              <Card className="p-5">
+                <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  {active?.name ?? config.branding.shortName}
+                </h2>
+                <div className="grid grid-cols-2 gap-3">
+                  {totals.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
+                    >
+                      <div className="dept-accent-text text-xl font-extrabold tracking-tight">
+                        {item.value}
+                      </div>
+                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        {item.label}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </Card>
-            ))}
+            )}
+
+            <RosterStats
+              title="By status"
+              rows={ACTIVITY_STATUSES.map((entry) => ({
+                label: entry.label,
+                value: everyone.filter((member) => member.status === entry.id).length,
+                color: statusColor(entry.id),
+              })).filter((row) => row.value > 0)}
+              total={everyone.length}
+            />
+          </aside>
         </div>
       )}
 
@@ -227,15 +263,21 @@ function MemberCell({ field, member, editable, onEdit }) {
   if (field.id === "status" || field.type === "status") {
     return <StatusPill member={member} editable={editable} onEdit={onEdit} />;
   }
-  if (field.type === "date") return value ? formatDate(value) : "—";
+  if (field.type === "date") {
+    return value ? (
+      <span className="whitespace-nowrap text-slate-400">{formatDate(value)}</span>
+    ) : (
+      <span className="text-slate-600">—</span>
+    );
+  }
   if (field.type === "checkbox") {
-    return value ? <span className="dept-accent-text font-bold">✓</span> : "—";
+    return value ? <span className="dept-accent-text font-bold">✓</span> : <span className="text-slate-600">—</span>;
   }
   if (field.type === "cert") {
     return value ? <Badge tone="green">Certified</Badge> : <Badge tone="slate">N/A</Badge>;
   }
   if (field.type === "select" && field.pill) {
-    return value ? <Badge tone="slate">{value}</Badge> : "—";
+    return value ? <Badge tone="slate">{value}</Badge> : <span className="text-slate-600">—</span>;
   }
-  return value || "—";
+  return value ? <span className="text-slate-400">{value}</span> : <span className="text-slate-600">—</span>;
 }

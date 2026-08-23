@@ -5,6 +5,7 @@ import Footer from "../layout/Footer";
 import HubTopBar from "./HubTopBar";
 import RequireRole from "../auth/RequireRole";
 import { guardFor } from "../../lib/guards";
+import { hubContainer } from "../../lib/hubLayout";
 
 /**
  * Shell for every page inside a hub. It mirrors the public site's layout — glow,
@@ -33,7 +34,7 @@ export default function HubShell({ hub }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-              className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+              className={hubContainer(location.pathname)}
             >
               {outlet}
             </motion.div>

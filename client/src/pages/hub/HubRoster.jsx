@@ -1,143 +1,296 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
-import HubPageHeader from "../../components/hub/HubPageHeader";
-import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
-import Select from "../../components/ui/Select";
-import { TextInput } from "../../components/ui/TextInput";
+import Card from "../../components/ui/Card";
+import Logo from "../../components/layout/Logo";
+import RosterFilters from "../../components/roster/RosterFilters";
+import RosterHeader from "../../components/roster/RosterHeader";
+import RosterStats from "../../components/roster/RosterStats";
+import RosterTable from "../../components/roster/RosterTable";
+import StatusEditor, { StatusPill } from "../../components/hub/StatusEditor";
+import { useAuth } from "../../context/useAuth";
 import { api } from "../../lib/api";
-import { roster as seedRoster } from "../../data/staffHubData";
-import { STAFF_RANKS } from "../../data/mockData";
+import { roster as seedRoster, STAFF_TEAMS, training as seedTraining } from "../../data/staffHubData";
+import { ACTIVITY_STATUSES, statusColor } from "../../data/rosterData";
+import { SITE } from "../../data/mockData";
 import { formatDate } from "../../lib/format";
 
-const RANK_TONES = {
-  trial_mod: "slate",
-  mod: "brand",
-  senior_mod: "green",
-  junior_admin: "primary",
-  admin: "primary",
-  senior_admin: "amber",
-  head_admin: "rose",
-};
-
-const RANK_OPTIONS = [
-  { value: "all", label: "All ranks" },
-  ...STAFF_RANKS.map((rank) => ({ value: rank.id, label: rank.label })),
+const TEAM_OPTIONS = [
+  { value: "all", label: "All teams" },
+  ...STAFF_TEAMS.map((team) => ({ value: team.id, label: team.label })),
 ];
 
-/** The full staff roster — searchable, filterable by rank. */
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  ...ACTIVITY_STATUSES.map((status) => ({ value: status.id, label: status.label })),
+];
+
+/**
+ * The staff roster, grouped by team.
+ *
+ * Structured around positions rather than people: every team shows the seats it
+ * is meant to have, including the ones nobody holds. A vacant Junior
+ * Administrator slot is the sort of thing a roster exists to surface, so it
+ * renders greyed out rather than being filtered away.
+ */
 export default function HubRoster() {
+  const { hasPermission } = useAuth();
   const [members, setMembers] = useState(seedRoster);
+  const [training, setTraining] = useState(seedTraining);
   const [query, setQuery] = useState("");
-  const [rank, setRank] = useState("all");
+  const [team, setTeam] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [editing, setEditing] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const canEditStatus = hasPermission("roster.edit_status");
+  const canManageLoa = hasPermission("roster.manage_loa");
 
   useEffect(() => {
     let active = true;
-    api.hubRoster().then((next) => {
-      if (active && next?.length) setMembers(next);
+    Promise.all([api.hubRoster(), api.hubTraining()]).then(([next, nextTraining]) => {
+      if (!active) return;
+      if (next?.length) setMembers(next);
+      if (nextTraining?.length) setTraining(nextTraining);
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
-  const filtered = useMemo(() => {
+  const staffed = useMemo(() => members.filter((member) => !member.vacant), [members]);
+
+  const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return members.filter((member) => {
-      if (rank !== "all" && member.rankId !== rank) return false;
+      if (team !== "all" && member.team !== team) return false;
+      // A vacancy has no status to match, so any status filter hides it — the
+      // filtered view is about people, and an unfiltered view is about seats.
+      if (status !== "all" && member.status !== status) return false;
       if (!needle) return true;
-      return (
-        member.name.toLowerCase().includes(needle) ||
-        member.handle.toLowerCase().includes(needle) ||
-        member.team.toLowerCase().includes(needle)
-      );
+      return [member.name, member.handle, member.callsign, member.position, member.discordId]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle));
     });
-  }, [members, query, rank]);
+  }, [members, query, status, team]);
+
+  const groups = useMemo(
+    () =>
+      STAFF_TEAMS.map((entry) => ({
+        id: entry.id,
+        label: entry.label,
+        color: entry.color,
+        rows: matches.filter((member) => member.team === entry.id),
+      })).filter((group) => group.rows.length > 0),
+    [matches],
+  );
+
+  const counts = useMemo(
+    () =>
+      ACTIVITY_STATUSES.map((entry) => ({
+        label: entry.label,
+        value: staffed.filter((member) => member.status === entry.id).length,
+        color: entry.color,
+      })).filter((entry) => entry.value > 0),
+    [staffed],
+  );
+
+  const online = useMemo(() => staffed.filter((member) => member.online), [staffed]);
+
+  const columns = [
+    {
+      key: "callsign",
+      label: "Callsign",
+      width: "w-24",
+      render: (row) => (
+        <span className={row.vacant ? "text-slate-500" : "font-bold text-primary-400"}>
+          {row.callsign || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "name",
+      label: "Name",
+      render: (row) =>
+        row.vacant ? (
+          <span className="italic text-slate-500">Vacant</span>
+        ) : (
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-white">{row.name}</p>
+            <p className="truncate text-xs text-slate-500">@{row.handle}</p>
+          </div>
+        ),
+    },
+    {
+      key: "position",
+      label: "Position",
+      render: (row) => (
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-brand-300">{row.position}</p>
+          {row.positionNote && (
+            <p className="truncate text-xs text-slate-500">{row.positionNote}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "discordId",
+      label: "Discord UID",
+      hideBelow: "2xl",
+      render: (row) =>
+        row.discordId ? (
+          <code className="text-[11px] text-slate-500">{row.discordId}</code>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "hired",
+      label: "Hired",
+      hideBelow: "lg",
+      render: (row) =>
+        row.hired ? (
+          <span className="whitespace-nowrap text-slate-400">{formatDate(row.hired)}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "lastMove",
+      label: "Last move",
+      hideBelow: "xl",
+      render: (row) =>
+        row.lastMove ? (
+          <span className="whitespace-nowrap text-slate-400">{formatDate(row.lastMove)}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) =>
+        row.vacant ? (
+          <span className="text-slate-600">—</span>
+        ) : (
+          <StatusPill member={row} editable={canEditStatus} onEdit={setEditing} />
+        ),
+    },
+    {
+      key: "notes",
+      label: "Notes",
+      hideBelow: "2xl",
+      render: (row) =>
+        row.notes ? (
+          <span className="block max-w-56 truncate text-xs text-slate-400" title={row.notes}>
+            {row.notes}
+          </span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+  ];
+
+  const saveStatus = async (payload) => {
+    await api.updateRosterStatus(payload.id, payload);
+    setReloadKey((key) => key + 1);
+  };
 
   return (
     <>
-      <HubPageHeader
-        icon="Users"
-        title="Staff Roster"
-        subtitle="Everyone on the team, their rank, and their activity since joining."
-        actions={<Badge tone="brand">{filtered.length} shown</Badge>}
+      <RosterHeader
+        mark={<Logo size="size-10" />}
+        title={`${SITE.name} · Staff Roster`}
+        subtitle="Every seat on the team, and who holds it."
+        onRefresh={() => setReloadKey((key) => key + 1)}
+        total={staffed.length}
+        counts={counts}
+        live={{ count: online.length, names: online.map((member) => member.name) }}
       />
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-          <TextInput
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, handle or team"
-            aria-label="Search the roster"
-            className="pl-11"
-          />
-        </div>
-        <Select
-          value={rank}
-          onChange={setRank}
-          options={RANK_OPTIONS}
-          className="sm:w-56"
+      <RosterFilters
+        query={query}
+        onQuery={setQuery}
+        placeholder="Search name, handle, callsign or Discord ID…"
+        filters={[
+          { id: "team", label: "Team", value: team, onChange: setTeam, options: TEAM_OPTIONS },
+          {
+            id: "status",
+            label: "Status",
+            value: status,
+            onChange: setStatus,
+            options: STATUS_OPTIONS,
+          },
+        ]}
+      />
+
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <RosterTable
+          columns={columns}
+          groups={groups}
+          empty="No staff match that search."
         />
+
+        <aside className="space-y-5">
+          <Card className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                Training
+              </h2>
+              {training.length > 0 && (
+                <Badge tone="primary" className="ml-auto">
+                  {training.length} pending
+                </Badge>
+              )}
+            </div>
+            {training.length === 0 ? (
+              <p className="text-sm text-slate-400">Nobody is in training right now.</p>
+            ) : (
+              <ul className="space-y-2">
+                {training.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="rounded-xl bg-white/[0.02] px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]"
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        Trainee
+                      </span>
+                      <span className="truncate text-sm font-semibold text-white">
+                        {entry.trainee}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        Admin
+                      </span>
+                      <span className="truncate text-sm text-slate-300">{entry.admin}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <RosterStats
+            rows={ACTIVITY_STATUSES.map((entry) => ({
+              label: entry.label,
+              value: staffed.filter((member) => member.status === entry.id).length,
+              color: statusColor(entry.id),
+            })).filter((row) => row.value > 0)}
+            total={staffed.length}
+          />
+        </aside>
       </div>
 
-      {filtered.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-sm text-slate-400">No staff match that search.</p>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-left text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.16em] text-slate-500">
-                  <th className="px-5 py-3 font-bold">Member</th>
-                  <th className="px-5 py-3 font-bold">Rank</th>
-                  <th className="px-5 py-3 font-bold">Team</th>
-                  <th className="px-5 py-3 font-bold">Joined</th>
-                  <th className="px-5 py-3 text-right font-bold">Claims</th>
-                  <th className="px-5 py-3 text-right font-bold">Vest hrs</th>
-                  <th className="px-5 py-3 font-bold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.06]">
-                {filtered.map((member) => (
-                  <tr key={member.id} className="transition hover:bg-white/[0.02]">
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-white">{member.name}</p>
-                      <p className="text-xs text-slate-500">@{member.handle}</p>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <Badge tone={RANK_TONES[member.rankId] ?? "slate"}>
-                        {member.rank}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-400">{member.team}</td>
-                    <td className="px-5 py-3.5 text-slate-400">
-                      {formatDate(member.joined)}
-                    </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-white">
-                      {member.claims}
-                    </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-white">
-                      {member.vestHours}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <Badge
-                        tone={member.status === "Active" ? "green" : "amber"}
-                        dot={member.status === "Active"}
-                      >
-                        {member.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      {editing && (
+        <StatusEditor
+          key={editing.id}
+          member={editing}
+          open
+          onClose={() => setEditing(null)}
+          onSave={saveStatus}
+          canManageLoa={canManageLoa}
+        />
       )}
     </>
   );

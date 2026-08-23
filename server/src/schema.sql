@@ -565,3 +565,29 @@ CREATE TABLE IF NOT EXISTS department_audit_log (
   PRIMARY KEY (id),
   KEY idx_dept_audit_dept (department_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The staff roster grew an operational view: a callsign, the position someone
+-- holds (which is not the same as their rank), when they were hired and last
+-- moved, free-text notes, and rows for positions nobody currently holds.
+ALTER TABLE hub_roster
+  ADD COLUMN IF NOT EXISTS callsign      VARCHAR(16)  NULL,
+  ADD COLUMN IF NOT EXISTS position      VARCHAR(96)  NULL,
+  ADD COLUMN IF NOT EXISTS position_note VARCHAR(96)  NULL,
+  ADD COLUMN IF NOT EXISTS hired         DATE         NULL,
+  ADD COLUMN IF NOT EXISTS last_move     DATE         NULL,
+  ADD COLUMN IF NOT EXISTS loa_until     DATE         NULL,
+  ADD COLUMN IF NOT EXISTS online        TINYINT(1)   NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS notes         TEXT         NULL,
+  ADD COLUMN IF NOT EXISTS vacant        TINYINT(1)   NOT NULL DEFAULT 0;
+
+-- Who is on probation and which administrator is signing off on them. Read
+-- beside the staff roster but kept apart from it: it is a different list, and a
+-- join would make every roster read carry it.
+CREATE TABLE IF NOT EXISTS hub_training (
+  id          VARCHAR(32)  NOT NULL,
+  trainee     VARCHAR(128) NOT NULL,
+  admin_name  VARCHAR(128) NOT NULL,
+  since       DATE         NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

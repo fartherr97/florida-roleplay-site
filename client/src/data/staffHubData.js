@@ -56,21 +56,65 @@ export const portalLinks = {
  * Staff roster
  * ------------------------------------------------------------------ */
 
+export const STAFF_TEAMS = [
+  { id: "directorship", label: "Directorship", color: "#f59e0b", rankIds: ["directorship"] },
+  { id: "head-admin", label: "Head Administration Team", color: "#22d3ee", rankIds: ["head_admin"] },
+  { id: "senior-admin", label: "Senior Administration Team", color: "#f43f5e", rankIds: ["senior_admin"] },
+  { id: "admin", label: "Administration Team", color: "#f2800d", rankIds: ["admin"] },
+  { id: "junior-admin", label: "Junior Administration Team", color: "#8b5cf6", rankIds: ["junior_admin"] },
+  { id: "senior-mod", label: "Senior Moderation Team", color: "#10b981", rankIds: ["senior_mod"] },
+  { id: "mod", label: "Moderation Team", color: "#3b82f6", rankIds: ["mod"] },
+  { id: "trial-mod", label: "Trial Moderation Team", color: "#64748b", rankIds: ["trial_mod"] },
+];
+
+/**
+ * The staff roster.
+ *
+ * Callsigns, names and Discord ids deliberately match the same people in
+ * src/data/rosterData.js — the community roster is where the Discord bot writes,
+ * and this is the operational view of the staff slice of it, carrying the fields
+ * that only matter internally (position, hire date, last rank move, notes).
+ *
+ * A `vacant` entry is a position the team is structured around but nobody holds.
+ * Rendering the gap is the point: an empty Assistant Staff Manager slot is
+ * information, and dropping it would hide it.
+ */
 export const roster = [
-  { id: "r-1", name: "Marcus Reyes", handle: "reyes", rank: "Head Admin", rankId: "head_admin", team: "Management", joined: "2024-03-04", claims: 88, vestHours: 21, status: "Active" },
-  { id: "r-2", name: "Dana Whitfield", handle: "dwhitfield", rank: "Head Admin", rankId: "head_admin", team: "Management", joined: "2024-05-19", claims: 74, vestHours: 18, status: "Active" },
-  { id: "r-3", name: "Alex Duarte", handle: "aduarte", rank: "Sr. Admin", rankId: "senior_admin", team: "Staff Team", joined: "2024-06-02", claims: 341, vestHours: 96, status: "Active" },
-  { id: "r-4", name: "Priya Raman", handle: "praman", rank: "Sr. Admin", rankId: "senior_admin", team: "Development", joined: "2024-07-11", claims: 129, vestHours: 34, status: "Active" },
-  { id: "r-5", name: "Sam Bennett", handle: "sbennett", rank: "Admin", rankId: "admin", team: "Support", joined: "2024-09-23", claims: 268, vestHours: 71, status: "Active" },
-  { id: "r-6", name: "Noor Haddad", handle: "nhaddad", rank: "Admin", rankId: "admin", team: "Staff Team", joined: "2024-11-08", claims: 254, vestHours: 68, status: "Active" },
-  { id: "r-7", name: "Jamie Okonkwo", handle: "jokonkwo", rank: "Sr. Mod", rankId: "senior_mod", team: "Staff Team", joined: "2025-01-16", claims: 212, vestHours: 46, status: "Active" },
-  { id: "r-8", name: "Ellis Prator", handle: "eprator", rank: "Sr. Mod", rankId: "senior_mod", team: "Staff Team", joined: "2025-02-27", claims: 197, vestHours: 41, status: "Active" },
-  { id: "r-9", name: "Kai Lindqvist", handle: "klindqvist", rank: "Mod", rankId: "mod", team: "Staff Team", joined: "2025-04-30", claims: 143, vestHours: 33, status: "Active" },
-  { id: "r-10", name: "Rosa Delgado", handle: "rdelgado", rank: "Mod", rankId: "mod", team: "Support", joined: "2025-06-14", claims: 118, vestHours: 29, status: "Active" },
-  { id: "r-11", name: "Toby Marsh", handle: "tmarsh", rank: "Mod", rankId: "mod", team: "Staff Team", joined: "2025-08-01", claims: 96, vestHours: 24, status: "Leave" },
-  { id: "r-12", name: "Wren Castellano", handle: "wcastellano", rank: "Trial Mod", rankId: "trial_mod", team: "Staff Team", joined: "2026-06-20", claims: 41, vestHours: 12, status: "Active" },
-  { id: "r-13", name: "Iggy Salas", handle: "isalas", rank: "Trial Mod", rankId: "trial_mod", team: "Staff Team", joined: "2026-07-09", claims: 28, vestHours: 9, status: "Active" },
-  { id: "r-14", name: "Bex Ferreira", handle: "bferreira", rank: "Trial Mod", rankId: "trial_mod", team: "Support", joined: "2026-08-02", claims: 12, vestHours: 4, status: "Active" },
+  { id: "r-1", callsign: "101", name: "Marcus Reyes", handle: "reyes", discordId: "402118844500000900", rank: "Head Admin", rankId: "head_admin", team: "head-admin", position: "Head Administrator", positionNote: "Administrative Head", hired: "2024-03-04", lastMove: "2026-05-26", claims: 88, vestHours: 21, status: "Active", online: true, notes: "" },
+  { id: "r-2", callsign: "102", name: "Dana Whitfield", handle: "dwhitfield", discordId: "402118844500000901", rank: "Head Admin", rankId: "head_admin", team: "head-admin", position: "Head Administrator", positionNote: "Operations Head", hired: "2024-05-19", lastMove: "2026-05-28", claims: 74, vestHours: 18, status: "Active", online: false, notes: "" },
+  { id: "r-3", callsign: "122", name: "Alex Duarte", handle: "aduarte", discordId: "402118844500000902", rank: "Sr. Admin", rankId: "senior_admin", team: "senior-admin", position: "Senior Administrator", positionNote: "Administrative Coordinator", hired: "2024-06-02", lastMove: "2026-03-29", claims: 341, vestHours: 96, status: "Active", online: true, notes: "" },
+  { id: "r-4", callsign: "124", name: "Priya Raman", handle: "praman", discordId: "402118844500000903", rank: "Sr. Admin", rankId: "senior_admin", team: "senior-admin", position: "Senior Administrator", positionNote: "Development Liaison", hired: "2024-07-11", lastMove: "2026-02-14", claims: 129, vestHours: 34, status: "Semi-Active", online: false, notes: "Reduced hours through the semester." },
+  { id: "r-5", callsign: "126", name: "Ines Okafor", handle: "iokafor", discordId: "402118844500000904", rank: "Sr. Admin", rankId: "senior_admin", team: "senior-admin", position: "Senior Administrator", positionNote: "Recruitment", hired: "2024-08-30", lastMove: "2026-04-02", claims: 203, vestHours: 58, status: "Active", online: false, notes: "" },
+  { id: "r-6", callsign: "140", name: "Sam Bennett", handle: "sbennett", discordId: "402118844500000905", rank: "Admin", rankId: "admin", team: "admin", position: "Administrator", positionNote: "Support", hired: "2024-09-23", lastMove: "2026-01-19", claims: 268, vestHours: 71, status: "Active", online: true, notes: "" },
+  { id: "r-7", callsign: "142", name: "Noor Haddad", handle: "nhaddad", discordId: "402118844500000906", rank: "Admin", rankId: "admin", team: "admin", position: "Administrator", positionNote: "Appeals", hired: "2024-11-08", lastMove: "2026-01-19", claims: 254, vestHours: 68, status: "Active", online: false, notes: "" },
+  { id: "r-8", callsign: "144", name: "Theo Marchetti", handle: "tmarchetti", discordId: "402118844500000907", rank: "Admin", rankId: "admin", team: "admin", position: "Administrator", positionNote: "Evaluations", hired: "2025-01-05", lastMove: "2026-06-11", claims: 176, vestHours: 49, status: "LOA", loaUntil: "2026-09-30", online: false, notes: "Back on the 30th." },
+  { id: "r-9", callsign: "151", name: "Rowan Estes", handle: "restes", discordId: "402118844500000908", rank: "Jr. Admin", rankId: "junior_admin", team: "junior-admin", position: "Junior Administrator", positionNote: "", hired: "2025-02-11", lastMove: "2026-06-11", claims: 141, vestHours: 38, status: "Active", online: false, notes: "" },
+  { id: "r-10", callsign: "153", name: "Mira Solberg", handle: "msolberg", discordId: "402118844500000909", rank: "Jr. Admin", rankId: "junior_admin", team: "junior-admin", position: "Junior Administrator", positionNote: "", hired: "2025-03-19", lastMove: "2026-07-04", claims: 122, vestHours: 31, status: "Active", online: true, notes: "" },
+  { id: "r-11", callsign: "160", name: "Jamie Okonkwo", handle: "jokonkwo", discordId: "402118844500000910", rank: "Sr. Mod", rankId: "senior_mod", team: "senior-mod", position: "Senior Moderator", positionNote: "", hired: "2025-01-16", lastMove: "2026-04-21", claims: 212, vestHours: 46, status: "Active", online: false, notes: "" },
+  { id: "r-12", callsign: "162", name: "Ellis Prator", handle: "eprator", discordId: "402118844500000911", rank: "Sr. Mod", rankId: "senior_mod", team: "senior-mod", position: "Senior Moderator", positionNote: "", hired: "2025-02-27", lastMove: "2026-04-21", claims: 197, vestHours: 41, status: "Active", online: false, notes: "" },
+  { id: "r-13", callsign: "167", name: "Jacob Reyna", handle: "jreyna", discordId: "402118844500000912", rank: "Mod", rankId: "mod", team: "mod", position: "Moderator", positionNote: "", hired: "2025-03-22", lastMove: "2026-08-22", claims: 158, vestHours: 37, status: "Active", online: true, notes: "" },
+  { id: "r-14", callsign: "169", name: "Kai Lindqvist", handle: "klindqvist", discordId: "402118844500000913", rank: "Mod", rankId: "mod", team: "mod", position: "Moderator", positionNote: "", hired: "2025-04-30", lastMove: "2026-05-30", claims: 143, vestHours: 33, status: "Active", online: false, notes: "" },
+  { id: "r-15", callsign: "171", name: "Rosa Delgado", handle: "rdelgado", discordId: "402118844500000914", rank: "Mod", rankId: "mod", team: "mod", position: "Moderator", positionNote: "", hired: "2025-06-14", lastMove: "2026-05-30", claims: 118, vestHours: 29, status: "Active", online: false, notes: "" },
+  { id: "r-16", callsign: "173", name: "Toby Marsh", handle: "tmarsh", discordId: "402118844500000915", rank: "Mod", rankId: "mod", team: "mod", position: "Moderator", positionNote: "", hired: "2025-08-01", lastMove: "2026-06-27", claims: 96, vestHours: 24, status: "Inactive", online: false, notes: "No sessions logged since June." },
+  { id: "r-17", callsign: "181", name: "Wren Castellano", handle: "wcastellano", discordId: "402118844500000916", rank: "Trial Mod", rankId: "trial_mod", team: "trial-mod", position: "Trial Moderator", positionNote: "", hired: "2026-06-20", lastMove: "2026-06-20", claims: 41, vestHours: 12, status: "Active", online: false, notes: "Off probation: 09/20/2026" },
+  { id: "r-18", callsign: "183", name: "Iggy Salas", handle: "isalas", discordId: "402118844500000917", rank: "Trial Mod", rankId: "trial_mod", team: "trial-mod", position: "Trial Moderator", positionNote: "", hired: "2026-07-09", lastMove: "2026-07-09", claims: 28, vestHours: 9, status: "Active", online: false, notes: "Off probation: 10/09/2026" },
+  { id: "r-19", callsign: "185", name: "Bex Ferreira", handle: "bferreira", discordId: "402118844500000918", rank: "Trial Mod", rankId: "trial_mod", team: "trial-mod", position: "Trial Moderator", positionNote: "", hired: "2026-08-02", lastMove: "2026-08-02", claims: 12, vestHours: 4, status: "Training", online: true, notes: "Shadowing 160." },
+
+  // Structured positions nobody currently holds.
+  { id: "v-1", vacant: true, callsign: "111", team: "senior-admin", position: "Senior Administrator", positionNote: "Community Oversight", notes: "Position unoccupied" },
+  { id: "v-2", vacant: true, callsign: "155", team: "junior-admin", position: "Junior Administrator", positionNote: "", notes: "Position unoccupied" },
+];
+
+/**
+ * Trial moderators currently in training and the administrator signing off on
+ * them. Rendered beside the roster, because "who is still on probation" is the
+ * question the roster prompts most often.
+ */
+export const training = [
+  { id: "t-1", trainee: "Bex Ferreira", admin: "Jamie Okonkwo", since: "2026-08-02" },
+  { id: "t-2", trainee: "Iggy Salas", admin: "Ellis Prator", since: "2026-07-09" },
+  { id: "t-3", trainee: "Wren Castellano", admin: "Sam Bennett", since: "2026-06-20" },
+  { id: "t-4", trainee: "Mira Solberg", admin: "Alex Duarte", since: "2026-07-04" },
 ];
 
 /* ------------------------------------------------------------------ *

@@ -11,3 +11,21 @@ export const TONE_TILES = {
 export function toneTile(tone) {
   return TONE_TILES[tone] ?? TONE_TILES.brand;
 }
+
+/**
+ * The hex behind each tone, for the places a class cannot reach — inline SVG,
+ * a chart bar, a table band tinted with color-mix. Kept next to TONE_TILES so
+ * the two never drift into meaning different colours.
+ */
+export const TONE_HEX = {
+  primary: "#f2800d",
+  brand: "#3b82f6",
+  green: "#10b981",
+  amber: "#f59e0b",
+  rose: "#f43f5e",
+  slate: "#94a3b8",
+};
+
+export function toneHex(tone) {
+  return TONE_HEX[tone] ?? TONE_HEX.brand;
+}

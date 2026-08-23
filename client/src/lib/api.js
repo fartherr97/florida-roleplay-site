@@ -198,6 +198,7 @@ export const api = {
     })),
 
   hubRoster: () => get("/staff-hub/roster", hub.roster),
+  hubTraining: () => get("/staff-hub/training", hub.training),
   hubDashboard: () => get("/staff-hub/dashboard", hub.dashboard),
   hubChecklist: () => get("/staff-hub/checklist", hub.checklist),
   hubDisciplinary: () => get("/staff-hub/disciplinary", hub.disciplinaryActions),

@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { RefreshCw, Search } from "lucide-react";
-import HubPageHeader from "../../components/hub/HubPageHeader";
-import DataTable from "../../components/hub/DataTable";
-import StatTile from "../../components/hub/StatTile";
+import { RefreshCw } from "lucide-react";
 import Card from "../../components/ui/Card";
-import Badge from "../../components/ui/Badge";
-import Select from "../../components/ui/Select";
-import { TextInput } from "../../components/ui/TextInput";
+import Logo from "../../components/layout/Logo";
+import RosterFilters from "../../components/roster/RosterFilters";
+import RosterHeader from "../../components/roster/RosterHeader";
+import RosterStats from "../../components/roster/RosterStats";
+import RosterTable from "../../components/roster/RosterTable";
 import StatusEditor, { StatusPill } from "../../components/hub/StatusEditor";
 import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { formatDate } from "../../lib/format";
+import { toneHex } from "../../lib/tones";
+import { SITE } from "../../data/mockData";
 import {
   ACTIVITY_STATUSES,
   DEPARTMENTS,
   DIVISIONS,
   roster as seedRoster,
+  statusColor,
 } from "../../data/rosterData";
 
 const DIVISION_OPTIONS = [
@@ -42,8 +43,13 @@ function sinceLabel(iso) {
 
 /**
  * The community roster: every member across every department, kept current by
- * the Discord bot. Entries here are written by the sync API — the ops-focused
- * staff roster in the Staff Hub is a different view for a different job.
+ * the Discord bot.
+ *
+ * Grouped by department rather than listed flat, using the same table the Staff
+ * Hub and the department sites use — one roster layout across the whole
+ * community, so moving between them needs no relearning. Entries here are
+ * written by the sync API; the Staff Hub's roster is the operational view of the
+ * staff slice, carrying fields that only matter internally.
  */
 export default function CivRoster() {
   const { hasPermission } = useAuth();
@@ -54,6 +60,7 @@ export default function CivRoster() {
   const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const canEditStatus = hasPermission("roster.edit_status");
   const canManageLoa = hasPermission("roster.manage_loa");
@@ -66,7 +73,7 @@ export default function CivRoster() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const departmentOptions = useMemo(() => {
     const inDivision =
@@ -87,78 +94,95 @@ export default function CivRoster() {
       if (department !== "all" && entry.department !== department) return false;
       if (status !== "all" && entry.status !== status) return false;
       if (!needle) return true;
-      return [entry.characterName, entry.displayName, entry.rank, entry.callsign]
-        .concat(" ", entry.rankFull ?? "")
-        .toLowerCase()
-        .includes(needle);
+      return [entry.characterName, entry.displayName, entry.rank, entry.rankFull, entry.callsign]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle));
     });
   }, [entries, query, division, department, status]);
+
+  // Departments in the order they are declared, so the roster always reads
+  // civilian → law → fire → federal → staff → management.
+  const groups = useMemo(
+    () =>
+      DEPARTMENTS.map((dept) => ({
+        id: dept.id,
+        label: dept.label,
+        color: toneHex(dept.tone),
+        rows: rows.filter((entry) => entry.department === dept.id),
+      })).filter((group) => group.rows.length > 0),
+    [rows],
+  );
+
+  const counts = useMemo(
+    () =>
+      ACTIVITY_STATUSES.map((entry) => ({
+        label: entry.label,
+        value: entries.filter((member) => member.status === entry.id).length,
+        color: entry.color,
+      })).filter((entry) => entry.value > 0),
+    [entries],
+  );
 
   const byDivision = useMemo(
     () =>
       DIVISIONS.map((d) => ({
-        ...d,
-        count: entries.filter(
+        label: d.label,
+        color: toneHex(d.tone),
+        value: entries.filter(
           (e) => DEPARTMENTS.find((x) => x.id === e.department)?.division === d.id,
         ).length,
-      })).filter((d) => d.count > 0),
+      })).filter((d) => d.value > 0),
     [entries],
   );
 
   const lastSync = useMemo(
-    () =>
-      entries
-        .map((e) => e.syncedAt)
-        .filter(Boolean)
-        .sort()
-        .at(-1),
+    () => entries.map((e) => e.syncedAt).filter(Boolean).sort().at(-1),
     [entries],
   );
 
   const columns = [
     {
+      key: "callsign",
+      label: "Callsign",
+      width: "w-24",
+      render: (e) =>
+        e.callsign ? (
+          <span className="font-bold text-primary-400">{e.callsign}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
       key: "member",
       label: "Member",
       render: (e) => (
-        <>
-          <p className="font-semibold text-white">{e.characterName}</p>
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-white">{e.characterName}</p>
           <p className="truncate text-xs text-slate-500">{e.displayName}</p>
-        </>
+        </div>
       ),
-    },
-    {
-      key: "department",
-      label: "Department",
-      render: (e) => {
-        const dept = DEPARTMENTS.find((d) => d.id === e.department);
-        return <Badge tone={dept?.tone ?? "slate"}>{dept?.abbr ?? e.department}</Badge>;
-      },
     },
     {
       key: "rank",
       label: "Rank",
       render: (e) => (
-        <span className="text-slate-300">{e.rankFull ?? e.rank}</span>
+        <span className="text-sm font-semibold text-brand-300">{e.rankFull ?? e.rank}</span>
       ),
     },
     {
-      key: "callsign",
-      label: "Callsign",
-      render: (e) =>
-        e.callsign ? (
-          <code className="rounded-lg bg-black/30 px-2.5 py-1 text-xs text-slate-300 ring-1 ring-inset ring-white/10">
-            {e.callsign}
-          </code>
-        ) : (
-          <span className="text-slate-600">—</span>
-        ),
+      key: "joined",
+      label: "Joined",
+      hideBelow: "lg",
+      render: (e) => (
+        <span className="whitespace-nowrap text-slate-400">{formatDate(e.joinedAt)}</span>
+      ),
     },
-    { key: "joined", label: "Joined", render: (e) => <span className="text-slate-400">{formatDate(e.joinedAt)}</span> },
     {
       key: "synced",
       label: "Synced",
+      hideBelow: "xl",
       render: (e) => (
-        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+        <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
           {sinceLabel(e.syncedAt)}
           {e.source === "manual" && " · manual"}
         </span>
@@ -167,39 +191,70 @@ export default function CivRoster() {
     {
       key: "status",
       label: "Status",
-      render: (e) => (
-        <StatusPill member={e} editable={canEditStatus} onEdit={setEditing} />
-      ),
+      render: (e) => <StatusPill member={e} editable={canEditStatus} onEdit={setEditing} />,
     },
   ];
 
+  const saveStatus = async (payload) => {
+    const result = await api.updateRosterStatus(payload.id, payload);
+    setEntries((current) =>
+      current.map((entry) =>
+        entry.id === payload.id
+          ? { ...entry, status: payload.status, loaUntil: payload.loaUntil, loaReason: payload.loaReason }
+          : entry,
+      ),
+    );
+    setNotice(
+      result?.message
+        ? { tone: "amber", text: result.message }
+        : { tone: "green", text: `${payload.characterName ?? "Status"} updated.` },
+    );
+  };
+
   return (
     <>
-      <HubPageHeader
-        icon="Users"
-        eyebrow="Civilian Hub"
-        title="Community Roster"
-        subtitle="Everyone in the community and the department they serve in — civilians, law enforcement, fire and EMS, staff and management."
-        actions={<Badge tone="brand">{rows.length} shown</Badge>}
+      <RosterHeader
+        mark={<Logo size="size-10" />}
+        title={`${SITE.name} · Community Roster`}
+        subtitle="Everyone in the community and the department they serve in."
+        onRefresh={() => setReloadKey((key) => key + 1)}
+        total={entries.length}
+        counts={counts}
       />
 
-      <Card className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-3 p-5">
-        <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-          <RefreshCw className="size-3.5 text-emerald-400" />
-          Synced from Discord · {sinceLabel(lastSync)}
-        </span>
-        <p className="min-w-0 flex-1 text-xs text-slate-500">
-          Ranks and display names are maintained by the roster bot. If yours is
-          wrong, your Discord roles are the thing to fix — the roster follows them.
-          {canEditStatus && " Activity status is set here, and the bot mirrors LOA into Discord."}
-        </p>
-      </Card>
+      <RosterFilters
+        query={query}
+        onQuery={setQuery}
+        placeholder="Search by name, rank or callsign…"
+        filters={[
+          {
+            id: "division",
+            label: "Division",
+            value: division,
+            onChange: (value) => {
+              setDivision(value);
+              setDepartment("all");
+            },
+            options: DIVISION_OPTIONS,
+          },
+          {
+            id: "department",
+            label: "Department",
+            value: department,
+            onChange: setDepartment,
+            options: departmentOptions,
+          },
+          { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS_OPTIONS },
+        ]}
+      />
 
       {notice && (
-        <Card className="mb-6 p-4">
+        <Card className="mb-5 p-4">
           <p
             className={
-              notice.tone === "green" ? "text-sm font-semibold text-emerald-300" : "text-sm font-semibold text-amber-300"
+              notice.tone === "green"
+                ? "text-sm font-semibold text-emerald-300"
+                : "text-sm font-semibold text-amber-300"
             }
           >
             {notice.text}
@@ -207,88 +262,46 @@ export default function CivRoster() {
         </Card>
       )}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
-        {byDivision.map((d) => (
-          <StatTile
-            key={d.id}
-            label={d.label}
-            value={d.count}
-            tone={d.tone === "slate" ? "white" : d.tone}
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <RosterTable columns={columns} groups={groups} empty="No members match that search." />
+
+        <aside className="space-y-5">
+          <Card className="p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <RefreshCw className="size-3.5 text-emerald-400" />
+              Synced {sinceLabel(lastSync)}
+            </h2>
+            <p className="text-xs leading-relaxed text-slate-500">
+              Ranks and display names are maintained by the roster bot. If yours is wrong, your
+              Discord roles are the thing to fix — the roster follows them.
+              {canEditStatus && " Activity status is set here, and the bot mirrors LOA into Discord."}
+            </p>
+          </Card>
+
+          <RosterStats title="By division" rows={byDivision} total={entries.length} />
+
+          <RosterStats
+            title="By status"
+            rows={ACTIVITY_STATUSES.map((entry) => ({
+              label: entry.label,
+              value: entries.filter((member) => member.status === entry.id).length,
+              color: statusColor(entry.id),
+            })).filter((row) => row.value > 0)}
+            total={entries.length}
           />
-        ))}
+        </aside>
       </div>
 
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-          <TextInput
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, rank or callsign"
-            aria-label="Search the roster"
-            className="pl-11"
-          />
-        </div>
-        <Select
-          value={division}
-          onChange={(value) => {
-            setDivision(value);
-            setDepartment("all");
-          }}
-          options={DIVISION_OPTIONS}
-          className="lg:w-52"
+      {editing && (
+        <StatusEditor
+          key={editing.id}
+          member={editing}
+          open
+          onClose={() => setEditing(null)}
+          onSave={saveStatus}
+          canManageLoa={canManageLoa}
         />
-        <Select
-          value={department}
-          onChange={setDepartment}
-          options={departmentOptions}
-          className="lg:w-56"
-        />
-        <Select
-          value={status}
-          onChange={setStatus}
-          options={STATUS_OPTIONS}
-          className="lg:w-44"
-        />
-      </div>
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(e) => e.id}
-        empty="No members match that search."
-      />
-
-      <StatusEditor
-        key={editing?.id}
-        member={editing}
-        open={Boolean(editing)}
-        canManageLoa={canManageLoa}
-        onClose={() => setEditing(null)}
-        onSave={async (payload) => {
-          const result = await api.updateRosterStatus(editing.id, payload);
-          setEntries((prev) =>
-            prev.map((entry) =>
-              entry.id === editing.id ? { ...entry, ...payload } : entry,
-            ),
-          );
-          setNotice({
-            tone: result?.message ? "amber" : "green",
-            text:
-              result?.message ??
-              `${editing.characterName} set to ${payload.status}.`,
-          });
-        }}
-      />
-
-      <p className="mt-6 text-center text-xs text-slate-500">
-        Staff looking for claim counts and vest hours want the{" "}
-        <Link to="/staff-hub/roster" className="font-semibold text-primary-400 hover:underline">
-          Staff Hub roster
-        </Link>{" "}
-        instead.
-      </p>
+      )}
     </>
   );
 }
