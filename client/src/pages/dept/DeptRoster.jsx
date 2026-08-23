@@ -43,6 +43,7 @@ export default function DeptRoster({ page, config }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState(null);
+  const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -152,7 +153,11 @@ export default function DeptRoster({ page, config }) {
   ];
 
   const saveStatus = async (payload) => {
-    await api.updateRosterStatus(payload.id, payload);
+    // The API answers with a message when the write did not land — a member who
+    // has never been synced has no record to update. Discarding it would show
+    // the new status until the next reload and then quietly revert.
+    const result = await api.updateRosterStatus(payload.id, payload);
+    setNotice(result?.message ?? "");
     setReloadKey((key) => key + 1);
   };
 
@@ -181,6 +186,12 @@ export default function DeptRoster({ page, config }) {
           { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS_OPTIONS },
         ]}
       />
+
+      {notice && (
+        <Card className="mb-5 p-4">
+          <p className="text-sm font-semibold text-amber-300">{notice}</p>
+        </Card>
+      )}
 
       {everyone.length === 0 ? (
         <Card className="p-10 text-center">

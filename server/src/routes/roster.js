@@ -11,7 +11,7 @@
  * keeps the site, the roster and Discord from ever disagreeing.
  */
 import { Router } from "express";
-import { query } from "../db.js";
+import { query, changedRows } from "../db.js";
 import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { requireBot } from "../middleware/requireBot.js";
@@ -305,19 +305,37 @@ function validateStatus(body) {
   };
 }
 
-async function writeStatus(id, value, actor) {
+/**
+ * Writes the status and reports what actually happened.
+ *
+ * Three outcomes, not two. "no-record" is the one that is easy to miss: the
+ * roster falls back to seed data when `roster_members` is empty, so a member
+ * plainly visible on the page may have no row to update until the bot has
+ * synced them. MariaDB reports that as a successful UPDATE affecting zero rows,
+ * and calling it saved would show the new status until the next reload and then
+ * quietly revert it.
+ */
+async function writeStatus(id, value) {
   try {
-    await query(
+    const result = await query(
       `UPDATE roster_members
           SET status = ?, loa_until = ?, loa_reason = ?, synced_at = CURRENT_TIMESTAMP
         WHERE id = ? OR discord_id = ?`,
       [value.status, value.loaUntil, value.loaReason, id, id],
     );
-    return true;
+    return changedRows(result) ? "saved" : "no-record";
   } catch {
-    return false;
+    return "no-database";
   }
 }
+
+const STATUS_WRITE_MESSAGES = {
+  "no-record":
+    "Not saved: this member has no roster record yet, so there was nothing to update. " +
+    "They get one the first time the Discord bot syncs them.",
+  "no-database":
+    "Not saved: the database is unreachable, so this will revert on reload.",
+};
 
 /**
  * PATCH-by-POST of one member's activity status. LOA carries a return date,
@@ -344,7 +362,7 @@ router.post("/:id/status", requirePermission("roster.edit_status"), async (req, 
     }
   }
 
-  const persisted = await writeStatus(req.params.id, value, req.user?.id);
+  const outcome = await writeStatus(req.params.id, value);
   await logSync({
     discordId: req.params.id,
     characterName: str(req.body?.characterName),
@@ -359,12 +377,8 @@ router.post("/:id/status", requirePermission("roster.edit_status"), async (req, 
     // The bot applies this role while someone is on leave and removes it when
     // the sweep reports the LOA expired.
     loaRole: value.status === "LOA" ? await loaRoleId() : null,
-    ...(persisted
-      ? {}
-      : {
-          message:
-            "Accepted, but not persisted — no database is configured, so this will reset on reload.",
-        }),
+    persisted: outcome === "saved",
+    ...(outcome === "saved" ? {} : { message: STATUS_WRITE_MESSAGES[outcome] }),
   });
 });
 

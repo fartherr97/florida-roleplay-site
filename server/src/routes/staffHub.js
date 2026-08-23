@@ -9,7 +9,7 @@
  * cannot disagree. Hiding a link is a convenience; this file is the boundary.
  */
 import { Router } from "express";
-import { query } from "../db.js";
+import { query, changedRows } from "../db.js";
 import * as seed from "../staffHubSeed.js";
 import { requirePermission } from "../middleware/requirePermission.js";
 import { collect, str } from "../validate.js";
@@ -342,20 +342,15 @@ router.post(
       timestamp: new Date().toISOString(),
     };
 
+    // The attempt is updated FIRST, and the append-only audit row is written
+    // only if that landed. The other order leaves the two disagreeing: an audit
+    // entry saying the score was changed to 29/30 beside an attempt still
+    // reading 28/30, which is worse than either outcome on its own. Attempts
+    // exist only as seed data until something inserts them, so a zero-row
+    // update here is the normal case rather than an error.
+    let persisted = false;
     try {
-      await query(
-        `INSERT INTO hub_overrides
-           (attempt_id, discord_id, staff_name, exam_type, original_score,
-            original_status, override_score, override_status, reviewer, reason)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          override.attemptId, override.discordId, override.staffName,
-          override.examType, override.originalScore, override.originalStatus,
-          override.overrideScore, override.overrideStatus, override.reviewer,
-          override.reason,
-        ],
-      );
-      await query(
+      const result = await query(
         `UPDATE hub_attempts
             SET score = ?, status = ?, override_payload = ?
           WHERE attempt_id = ?`,
@@ -366,11 +361,37 @@ router.post(
           override.attemptId,
         ],
       );
+      persisted = changedRows(result);
+      if (persisted) {
+        await query(
+          `INSERT INTO hub_overrides
+             (attempt_id, discord_id, staff_name, exam_type, original_score,
+              original_status, override_score, override_status, reviewer, reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            override.attemptId, override.discordId, override.staffName,
+            override.examType, override.originalScore, override.originalStatus,
+            override.overrideScore, override.overrideStatus, override.reviewer,
+            override.reason,
+          ],
+        );
+      }
     } catch {
       // No database yet — the override is still echoed so the flow completes.
     }
 
-    return res.status(201).json({ ok: true, data: override });
+    return res.status(201).json({
+      ok: true,
+      data: override,
+      persisted,
+      ...(persisted
+        ? {}
+        : {
+            message:
+              "Not saved: this attempt has no stored record, so the score was left " +
+              "unchanged and no audit entry was written.",
+          }),
+    });
   },
 );
 
@@ -545,12 +566,20 @@ router.post(
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
     try {
-      await query(
+      const result = await query(
         `UPDATE hub_questions
             SET question_text = ?, points = ?, correct_answer = ?
           WHERE id = ?`,
         [questionText, points, correctAnswer, rowNumber],
       );
+      if (!changedRows(result)) {
+        return res.json({
+          ok: false,
+          message:
+            "Not saved: the question catalog is running on seed data with no stored " +
+            "rows, so there was nothing to update.",
+        });
+      }
       return res.json({ ok: true });
     } catch {
       return res.json({

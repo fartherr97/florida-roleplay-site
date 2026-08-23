@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ExternalLink, Info } from "lucide-react";
 import Card from "../ui/Card";
 import { hubIcon } from "../../lib/hubIcons";
+import { safeUrl } from "../../lib/safeUrl";
 import { cn } from "../../lib/cn";
 
 /**
@@ -14,22 +15,8 @@ import { cn } from "../../lib/cn";
  * here and a form in src/pages/dept/builder/BlockEditor.jsx.
  *
  * Every URL a block carries came out of a config someone edited, so links are
- * filtered through safeUrl before they reach an href — a stored `javascript:`
- * URL should render as nothing, not as a working link.
+ * filtered through src/lib/safeUrl.js before they reach an href.
  */
-
-/** http(s) and site-relative links only. */
-function safeUrl(raw) {
-  const value = String(raw || "").trim();
-  if (!value) return "";
-  if (value.startsWith("/")) return value;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
-  } catch {
-    return "";
-  }
-}
 
 function BlockHeading({ kicker, title, action }) {
   if (!kicker && !title && !action) return null;

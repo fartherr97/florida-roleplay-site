@@ -116,16 +116,22 @@ export function DeptConfigProvider({ id, children }) {
     [config, flush, id],
   );
 
+  /**
+   * Step back one change.
+   *
+   * The side effects deliberately sit outside the state updater: React calls
+   * updaters twice under StrictMode to surface impure ones, which turned a
+   * single Undo into two saves and two version-history rows. Reading the stack
+   * from state here and updating it separately keeps the updater pure.
+   */
   const undo = useCallback(() => {
-    setHistory((stack) => {
-      const [previous, ...rest] = stack;
-      if (!previous) return stack;
-      setDraft({ id, config: previous });
-      clearTimeout(timer.current);
-      flush(previous);
-      return rest;
-    });
-  }, [flush, id]);
+    const previous = history[0];
+    if (!previous) return;
+    setHistory((stack) => stack.slice(1));
+    setDraft({ id, config: previous });
+    clearTimeout(timer.current);
+    flush(previous);
+  }, [flush, history, id]);
 
   /** Write one page's own data. Used by the roster, fleet, calendar and log editors. */
   const savePage = useCallback(
@@ -183,7 +189,7 @@ export function DeptConfigProvider({ id, children }) {
       capabilities,
       config,
       fresh,
-      history.length,
+      history,
       id,
       loaded.error,
       mutate,

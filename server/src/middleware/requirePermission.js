@@ -21,20 +21,40 @@ export function invalidateGrantCache() {
   cache = { at: 0, grants: null };
 }
 
+/**
+ * Marks a permission as deliberately configured, so "granted to nobody" is
+ * distinguishable from "never touched".
+ *
+ * Without it, a permission with no rows is ambiguous, and reading that as
+ * "granted to nobody" breaks every deploy that adds one: an install whose
+ * grants were saved before the permission existed would deny it to everyone,
+ * Directorship included, with nothing in the UI to explain why. Rows carrying
+ * this sentinel say "this permission was saved, and the roles listed alongside
+ * it — possibly none — are the whole answer".
+ *
+ * It is never a grantable role: the save endpoint validates incoming roles
+ * against GRANTABLE, which does not contain it, and it is filtered out here
+ * before any permission check sees it.
+ */
+export const CONFIGURED = "__configured__";
+
 export async function loadGrants() {
   if (cache.grants && Date.now() - cache.at < CACHE_MS) return cache.grants;
 
+  // Start from the shipped defaults so a permission this install has never
+  // configured keeps them, then let stored rows override the ones it has.
   let grants = DEFAULT_GRANTS;
   try {
     const rows = await query(
       "SELECT permission_key, role_key FROM permission_grants",
     );
     if (rows.length) {
-      const next = {};
+      const stored = {};
       rows.forEach((row) => {
-        (next[row.permission_key] ??= []).push(row.role_key);
+        stored[row.permission_key] ??= [];
+        if (row.role_key !== CONFIGURED) stored[row.permission_key].push(row.role_key);
       });
-      grants = next;
+      grants = { ...DEFAULT_GRANTS, ...stored };
     }
   } catch {
     // No database — the defaults stand.

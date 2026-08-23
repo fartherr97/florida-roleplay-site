@@ -11,7 +11,7 @@
  *     countdown in the UI is a courtesy; this is the deadline.
  */
 import { Router } from "express";
-import { query } from "../db.js";
+import { query, changedRows } from "../db.js";
 import * as seed from "../promotionSeed.js";
 import { ROLE_MAP } from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
@@ -296,12 +296,23 @@ function resolveAction(publish) {
     }
 
     try {
-      await query(
+      const result = await query(
         publish
           ? "UPDATE promotion_votes SET published = 1, published_at = CURRENT_TIMESTAMP WHERE id = ?"
           : "UPDATE promotion_votes SET cancelled = 1 WHERE id = ?",
         [vote.id],
       );
+      // A seeded nomination has no row of its own, so the update matches
+      // nothing. Saying "done" there would leave the board unchanged with no
+      // explanation of why.
+      if (!changedRows(result)) {
+        return res.json({
+          ok: false,
+          message:
+            "Not saved: this is a seeded example nomination with no stored record, " +
+            "so there was nothing to change. Nominations opened here can be published.",
+        });
+      }
     } catch {
       return res.json({ ok: true, message: NOT_PERSISTED });
     }

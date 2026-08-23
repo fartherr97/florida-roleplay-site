@@ -9,6 +9,7 @@ import Select from "../ui/Select";
 import { TextArea, TextInput } from "../ui/TextInput";
 import { useDeptConfig } from "../../context/useDeptConfig";
 import { formatDate } from "../../lib/format";
+import { isExternal, safeUrl } from "../../lib/safeUrl";
 
 /**
  * The editable table behind most of a department's tracking pages — the fleet,
@@ -188,10 +189,14 @@ function Cell({ field, value }) {
     return <span className="block max-w-md whitespace-pre-line text-slate-400">{value}</span>;
   }
   if (field.type === "url") {
+    const href = safeUrl(value);
+    // An address that is not a usable link reads as plain text, so it is
+    // obvious something needs correcting rather than looking clickable.
+    if (!href) return <span className="text-slate-500">{String(value)}</span>;
     return (
       <a
-        href={String(value)}
-        target="_blank"
+        href={href}
+        target={isExternal(href) ? "_blank" : undefined}
         rel="noreferrer noopener"
         className="dept-accent-text underline-offset-2 hover:underline"
       >

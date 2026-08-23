@@ -50,7 +50,12 @@ export default function StatusEditor({ member, open, onClose, onSave, canManageL
     }
     setSaving(true);
     try {
+      // The member's identity has to ride along: every caller addresses the
+      // write by id, and the server logs the change under their name.
       await onSave({
+        id: member.id,
+        discordId: member.discordId,
+        characterName: member.characterName ?? member.name,
         status,
         loaUntil: needsDate ? until : null,
         loaReason: needsDate ? note.trim() : "",

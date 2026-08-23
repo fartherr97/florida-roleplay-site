@@ -42,6 +42,19 @@ class DatabaseUnavailableError extends Error {
 }
 
 /** Runs a parameterised query and always returns the connection to the pool. */
+/**
+ * Whether a write actually changed a row.
+ *
+ * Reads fall back to seed data when a table is empty, which means an UPDATE can
+ * target a record the caller can plainly see on the page but that has never been
+ * inserted — the seeds are not in the database. MariaDB reports that as success
+ * with zero affected rows, so without this check the API would answer "saved" to
+ * a write that did nothing. Callers use it to say so instead.
+ */
+export function changedRows(result) {
+  return Number(result?.affectedRows ?? 0) > 0;
+}
+
 export async function query(sql, params = []) {
   if (Date.now() < unavailableUntil) throw new DatabaseUnavailableError();
 

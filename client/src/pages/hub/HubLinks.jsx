@@ -5,6 +5,7 @@ import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import { api } from "../../lib/api";
 import { portalLinks as seedLinks } from "../../data/staffHubData";
+import { isExternal, safeUrl } from "../../lib/safeUrl";
 
 /**
  * Rank-scoped link collection. One component serves Resources, Administrators
@@ -45,8 +46,10 @@ export default function HubLinks({ section, icon, title, subtitle, badge, badgeT
             <Card
               key={link.url}
               as="a"
-              href={link.url}
-              target="_blank"
+              // Portal links are editable, so the address is whatever an author
+              // typed; safeUrl keeps an unusable one from rendering as a live link.
+              href={safeUrl(link.url) || undefined}
+              target={isExternal(safeUrl(link.url)) ? "_blank" : undefined}
               rel="noreferrer noopener"
               hover
               className="group flex items-center gap-4 p-5"

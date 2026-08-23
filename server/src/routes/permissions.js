@@ -16,7 +16,12 @@ import {
   PERMISSION_GROUPS,
 } from "../permissions.js";
 import { DEPARTMENTS, ROLE_MAP } from "../rosterSeed.js";
-import { requirePermission, invalidateGrantCache, loadGrants } from "../middleware/requirePermission.js";
+import {
+  requirePermission,
+  invalidateGrantCache,
+  loadGrants,
+  CONFIGURED,
+} from "../middleware/requirePermission.js";
 import { attachUser } from "../middleware/requireRole.js";
 
 const router = Router();
@@ -90,6 +95,15 @@ router.post("/grants", requirePermission("permissions.manage"), async (req, res)
   try {
     await query("DELETE FROM permission_grants");
     for (const [permission, roles] of Object.entries(clean)) {
+      // A sentinel row per permission records that this install configured it,
+      // so a permission saved with no roles stays granted to nobody instead of
+      // falling back to its shipped default — and, just as importantly, a
+      // permission added by a later deploy keeps its default rather than being
+      // denied to everyone. See CONFIGURED in middleware/requirePermission.js.
+      await query(
+        "INSERT INTO permission_grants (permission_key, role_key) VALUES (?, ?)",
+        [permission, CONFIGURED],
+      );
       for (const role of roles) {
         await query(
           "INSERT INTO permission_grants (permission_key, role_key) VALUES (?, ?)",

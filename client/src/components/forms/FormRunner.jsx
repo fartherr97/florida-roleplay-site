@@ -6,6 +6,7 @@ import Button from "../ui/Button";
 import QuestionInput from "./QuestionInput";
 import { api } from "../../lib/api";
 import { missingRequired } from "../../lib/forms";
+import { isExternal, safeUrl } from "../../lib/safeUrl";
 import { cn } from "../../lib/cn";
 
 /**
@@ -95,20 +96,27 @@ export default function FormRunner({ form, onBack }) {
 
         {form.resourceLinks?.length > 0 && (
           <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.06] pt-5">
-            {form.resourceLinks.map((link) => (
-              <Button
-                key={link.url}
-                as="a"
-                href={link.url}
-                target={link.url.startsWith("/") ? undefined : "_blank"}
-                rel="noreferrer noopener"
-                variant="ghost"
-                size="sm"
-              >
-                {link.label}
-                <ExternalLink className="size-3.5" />
-              </Button>
-            ))}
+            {form.resourceLinks.map((link) => {
+              // Author-supplied, so it goes through the same filter as every
+              // other stored URL; an unusable one is dropped rather than
+              // rendered as a link that does nothing.
+              const href = safeUrl(link.url);
+              if (!href) return null;
+              return (
+                <Button
+                  key={link.url}
+                  as="a"
+                  href={href}
+                  target={isExternal(href) ? "_blank" : undefined}
+                  rel="noreferrer noopener"
+                  variant="ghost"
+                  size="sm"
+                >
+                  {link.label}
+                  <ExternalLink className="size-3.5" />
+                </Button>
+              );
+            })}
           </div>
         )}
 
