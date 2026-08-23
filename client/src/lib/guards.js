@@ -27,6 +27,7 @@ export const GUARDS = [
   { path: "/staff-hub/home", permission: "staff.view" },
   { path: "/staff-hub/roster", permission: "staff.view" },
   { path: "/staff-hub/forms", permission: "forms.view" },
+  { path: "/staff-hub/promotion-board", permission: "promotions.view" },
   { path: "/staff-hub/dashboard", permission: "staff.view" },
   { path: "/staff-hub/trial-checklist", permission: "staff.view" },
   { path: "/staff-hub/resources", permission: "staff.view" },

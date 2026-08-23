@@ -637,3 +637,48 @@ CREATE TABLE IF NOT EXISTS form_reviews (
   reviewed_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (submission_id, question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Promotion board
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS promotion_votes (
+  id                  VARCHAR(64)  NOT NULL,
+  nominee_name        VARCHAR(128) NOT NULL,
+  nominee_discord_id  VARCHAR(20)  NULL,
+  current_role_key    VARCHAR(64)  NULL,
+  proposed_role_key   VARCHAR(64)  NOT NULL,
+  reason              TEXT         NOT NULL,
+  created_by          VARCHAR(20)  NULL,
+  created_by_name     VARCHAR(128) NULL,
+  opens_at            DATETIME     NOT NULL,
+  closes_at           DATETIME     NOT NULL,
+  published           TINYINT(1)   NOT NULL DEFAULT 0,
+  published_at        TIMESTAMP    NULL,
+  cancelled           TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_promotion_votes_closes (closes_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One ballot per voter per vote, so changing your mind updates rather than
+-- appends. Ballots are their own table because voting is the concurrent
+-- operation here — two people voting at once on a single JSON document would
+-- lose one of them.
+CREATE TABLE IF NOT EXISTS promotion_ballots (
+  vote_id           VARCHAR(64)  NOT NULL,
+  voter_discord_id  VARCHAR(20)  NOT NULL,
+  voter_name        VARCHAR(128) NULL,
+  choice            VARCHAR(16)  NOT NULL,
+  reason            VARCHAR(512) NULL,
+  cast_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (vote_id, voter_discord_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Board settings, currently just the live-result visibility rules.
+CREATE TABLE IF NOT EXISTS promotion_settings (
+  name        VARCHAR(64) NOT NULL,
+  value       JSON        NOT NULL,
+  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

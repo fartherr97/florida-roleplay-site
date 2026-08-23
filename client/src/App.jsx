@@ -41,6 +41,7 @@ import HubManagement from "./pages/hub/HubManagement";
 import HubPermissions from "./pages/hub/HubPermissions";
 import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
 import HubForms from "./pages/hub/HubForms";
+import HubPromotionBoard from "./pages/hub/HubPromotionBoard";
 import CivHome from "./pages/civ/CivHome";
 import CivCharacters from "./pages/civ/CivCharacters";
 import CivVehicles from "./pages/civ/CivVehicles";
@@ -141,6 +142,7 @@ export default function App() {
             <Route path="/staff-hub/home" element={<HubHome />} />
             <Route path="/staff-hub/roster" element={<HubRoster />} />
             <Route path="/staff-hub/forms" element={<HubForms />} />
+            <Route path="/staff-hub/promotion-board" element={<HubPromotionBoard />} />
             <Route path="/staff-hub/dashboard" element={<HubDashboard />} />
             <Route path="/staff-hub/trial-checklist" element={<HubChecklist />} />
             <Route path="/staff-hub/da-database" element={<HubDaDatabase />} />

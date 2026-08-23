@@ -9,6 +9,7 @@ import * as civ from "../data/civilianHubData";
 import * as rosterMock from "../data/rosterData";
 import { DEPARTMENT_CONFIGS } from "../data/departmentConfigs";
 import * as formsMock from "../data/formsData";
+import * as promotionMock from "../data/promotionData";
 import { gradeSubmission } from "./forms";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { projectRoster } from "./deptRoster";
@@ -431,6 +432,41 @@ export const api = {
       form,
       message: NOT_PERSISTED,
     })),
+
+  /* --------------------------- Promotion board --------------------------- */
+
+  /**
+   * The board. The server decides which votes the caller may see results for
+   * and strips the ballots from the rest — the fallback below shows every vote
+   * with its ballots because there is no caller to gate against without an API,
+   * and the gating that matters is the server's.
+   */
+  promotions: () =>
+    get("/promotions", { votes: promotionMock.votes, rules: promotionMock.visibilityRules }),
+
+  nominate: (payload) =>
+    post("/promotions", payload, () => ({ ok: true, message: NOT_PERSISTED })),
+
+  castBallot: (voteId, choice, reason) =>
+    post(`/promotions/${encodeURIComponent(voteId)}/ballot`, { choice, reason }, () => ({
+      ok: true,
+      message: NOT_PERSISTED,
+    })),
+
+  publishVote: (voteId) =>
+    post(`/promotions/${encodeURIComponent(voteId)}/publish`, {}, () => ({
+      ok: true,
+      message: NOT_PERSISTED,
+    })),
+
+  withdrawVote: (voteId) =>
+    post(`/promotions/${encodeURIComponent(voteId)}/withdraw`, {}, () => ({
+      ok: true,
+      message: NOT_PERSISTED,
+    })),
+
+  savePromotionRules: (rules) =>
+    put("/promotions/rules", { rules }, () => ({ ok: true, rules, message: NOT_PERSISTED })),
 
   assistant: (message) =>
     post("/assistant", { message }, () => ({

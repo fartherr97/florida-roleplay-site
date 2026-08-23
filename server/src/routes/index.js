@@ -14,6 +14,7 @@ import rosterRouter from "./roster.js";
 import permissionsRouter from "./permissions.js";
 import departmentHubRouter from "./departmentHub.js";
 import formsRouter from "./forms.js";
+import promotionsRouter from "./promotions.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -40,6 +41,9 @@ router.use("/dept", departmentHubRouter);
 // Forms and exams are one engine serving both hubs, so the router sits beside
 // them rather than inside either.
 router.use("/forms", formsRouter);
+// The promotion board spans the staff ladder rather than one hub, so it sits
+// beside them too.
+router.use("/promotions", promotionsRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

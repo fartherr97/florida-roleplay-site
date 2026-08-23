@@ -275,6 +275,37 @@ community-wide: `forms.review` grades anything, `forms.manage` authors. An
 anonymous form records no name and no Discord id — the identity is not stored
 rather than stored and hidden.
 
+## Promotion board
+
+`/staff-hub/promotion-board`. Someone nominates a member for a rank, a timed
+vote opens, and the nomination carries when approval clears 50% of the
+**decisive** ballots — abstentions count toward turnout but not the outcome,
+because declaring you have no view should not drag a nomination down the way a
+deny would. A voter can change their ballot until the window closes; a board
+where a misclick is permanent gets fewer honest votes, not more.
+
+### Results stay hidden until publication
+
+This is the part worth preserving from the reference implementation. Live
+tallies and ballots are withheld until a nomination is published, so people vote
+on the merits rather than piling onto whichever way it is already going. Two
+exceptions:
+
+- anyone holding `promotions.manage` always sees live;
+- a configurable rule grants a role live sight **up to a rank ceiling** —
+  Senior Admin can watch moderator votes without seeing the vote on their own
+  peers.
+
+The server enforces it. `GET /api/promotions` strips the ballots and the tally
+from any vote the caller may not watch, and reports an unpublished vote's status
+as open even after it closes, so the outcome cannot leak from a badge. Turnout is
+still shown: "12 have voted" says nothing about which way, and it is what tells
+someone whether the board is engaged.
+
+Ballots live in their own table rather than inside the vote document, because
+voting is the concurrent operation here — two people voting at once on one JSON
+blob would lose a ballot.
+
 ## Community roster and the Discord bot
 
 `/civilian-hub/roster` lists everyone across every department — civilians, law

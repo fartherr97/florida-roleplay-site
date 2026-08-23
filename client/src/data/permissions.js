@@ -107,6 +107,24 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "promotions",
+    label: "Promotion board",
+    description:
+      "Nominations, the timed vote behind them, and who may watch a result before it is published.",
+    permissions: [
+      { key: "promotions.view", label: "See the board", detail: "Read open nominations and published outcomes." },
+      { key: "promotions.vote", label: "Vote", detail: "Cast and change a ballot while a nomination is open." },
+      { key: "promotions.nominate", label: "Nominate", detail: "Open a nomination and set its voting window." },
+      {
+        key: "promotions.manage",
+        label: "Manage the board",
+        detail:
+          "Publish or withdraw a nomination, and decide which roles may watch live results. Anyone with it sees every ballot as it is cast.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "site",
     label: "Public site",
     description: "Gated areas of the main community site.",
@@ -233,6 +251,11 @@ export const DEFAULT_GRANTS = {
   "forms.submit": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "forms.review": staffFrom("senior_mod"),
   "forms.manage": ["head_admin", "directorship"],
+
+  "promotions.view": STAFF_LADDER,
+  "promotions.vote": staffFrom("mod"),
+  "promotions.nominate": staffFrom("senior_mod"),
+  "promotions.manage": ["head_admin", "directorship"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),
