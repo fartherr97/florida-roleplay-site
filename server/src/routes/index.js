@@ -1,0 +1,469 @@
+/**
+ * The /api router. Every read follows the seed-fallback pattern so the whole
+ * site works end-to-end before a database is provisioned: try the query, and on
+ * any failure (or an empty result) serve the seed shape instead.
+ */
+import { Router } from "express";
+import { query } from "../db.js";
+import * as seed from "../seed.js";
+import { attachUser, requireRole } from "../middleware/requireRole.js";
+import {
+  validateApplication,
+  validateAssistantMessage,
+  validateReport,
+} from "../validate.js";
+
+const router = Router();
+const STAFF_ROLES = [
+  seed.ROLES.STAFF,
+  seed.ROLES.MODERATOR,
+  seed.ROLES.ADMIN,
+  seed.ROLES.MANAGEMENT,
+];
+
+router.use(attachUser);
+
+/** Try the DB query; on any failure, return the seed fallback. */
+async function safe(res, dbFn, fallback) {
+  try {
+    const rows = await dbFn();
+    res.json(rows && rows.length ? rows : fallback);
+  } catch {
+    res.json(fallback);
+  }
+}
+
+/** Same contract as safe(), for endpoints returning a single object. */
+async function safeOne(res, dbFn, fallback) {
+  try {
+    const row = await dbFn();
+    res.json(row ?? fallback);
+  } catch {
+    res.json(fallback);
+  }
+}
+
+/** MariaDB returns JSON columns as strings on some driver versions. */
+function parseJson(value, fallback = []) {
+  if (Array.isArray(value) || (value && typeof value === "object")) return value;
+  if (typeof value !== "string") return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+/** Reference ids are human-quotable in a Discord ticket. */
+function reference(prefix) {
+  const year = new Date().getFullYear();
+  const n = Math.floor(Math.random() * 90000) + 10000;
+  return `${prefix}-${year}-${n}`;
+}
+
+/* ---------------------------------------------------------------- health */
+
+router.get("/health", (_req, res) => res.json({ ok: true }));
+
+/* --------------------------------------------------------- server status */
+
+router.get("/server-status", async (_req, res) => {
+  // TODO: poll the live FiveM server endpoint instead of serving seed numbers.
+  res.json(seed.serverStatus);
+});
+
+/* ----------------------------------------------------------- departments */
+
+function mapDepartment(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    abbr: row.abbr,
+    tone: row.tone,
+    icon: row.icon,
+    tagline: row.tagline,
+    mission: row.mission,
+    roster: row.roster,
+    hiring: Boolean(row.hiring),
+    ranks: parseJson(row.ranks),
+    fleet: parseJson(row.fleet),
+    applicationType: row.application_type,
+  };
+}
+
+router.get("/departments", (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM departments ORDER BY sort_order, name");
+      return rows.map(mapDepartment);
+    },
+    seed.departments,
+  ),
+);
+
+router.get("/departments/:id", (req, res) =>
+  safeOne(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM departments WHERE id = ? LIMIT 1", [
+        req.params.id,
+      ]);
+      return rows.length ? mapDepartment(rows[0]) : null;
+    },
+    seed.departments.find((d) => d.id === req.params.id) ?? null,
+  ),
+);
+
+/* ----------------------------------------------------------------- rules */
+
+/** Groups flat rule rows back into the category shape the client renders. */
+function groupRules(rows) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    if (!groups.has(row.category_id)) {
+      groups.set(row.category_id, {
+        id: row.category_id,
+        category: row.category,
+        description: row.category_description,
+        items: [],
+      });
+    }
+    groups.get(row.category_id).items.push({
+      id: row.id,
+      number: row.number,
+      title: row.title,
+      body: row.body,
+    });
+  });
+  return [...groups.values()];
+}
+
+/** Mirrors the client's fallback filter so both paths behave identically. */
+function filterSeedRules(q) {
+  const needle = q.toLowerCase();
+  return seed.rules
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          item.title.toLowerCase().includes(needle) ||
+          item.body.toLowerCase().includes(needle) ||
+          item.number.includes(needle) ||
+          group.category.toLowerCase().includes(needle),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+router.get("/rules", (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const fallback = q ? filterSeedRules(q) : seed.rules;
+
+  safe(
+    res,
+    async () => {
+      if (!q) {
+        const rows = await query("SELECT * FROM rules ORDER BY category_id, sort_order, number");
+        return groupRules(rows);
+      }
+      const like = `%${q}%`;
+      const rows = await query(
+        `SELECT * FROM rules
+          WHERE title LIKE ? OR body LIKE ? OR number LIKE ? OR category LIKE ?
+          ORDER BY category_id, sort_order, number`,
+        [like, like, like, like],
+      );
+      return groupRules(rows);
+    },
+    fallback,
+  );
+});
+
+/* ----------------------------------------------------------------- staff */
+
+/**
+ * The staff roster is staff-only: it lists internal team structure. A caller
+ * without a staff role gets a 403 carrying the code the client's AccessDenied
+ * page renders.
+ */
+router.get("/staff", requireRole(STAFF_ROLES), (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM staff ORDER BY sort_order, name");
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        handle: row.handle,
+        role: row.role,
+        group: row.team,
+        department: row.department,
+        tone: row.tone,
+        online: Boolean(row.online),
+      }));
+    },
+    seed.staff,
+  ),
+);
+
+/* ----------------------------------------------------------- patch notes */
+
+function mapPatchNote(row) {
+  return {
+    id: row.id,
+    version: row.version,
+    title: row.title,
+    tag: row.tag,
+    tone: row.tone,
+    releasedAt:
+      row.released_at instanceof Date
+        ? row.released_at.toISOString().slice(0, 10)
+        : row.released_at,
+    changes: parseJson(row.changes),
+  };
+}
+
+router.get("/patch-notes", (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM patch_notes ORDER BY released_at DESC");
+      return rows.map(mapPatchNote);
+    },
+    seed.patchNotes,
+  ),
+);
+
+router.get("/patch-notes/latest", (_req, res) =>
+  safeOne(
+    res,
+    async () => {
+      const rows = await query(
+        "SELECT * FROM patch_notes ORDER BY released_at DESC LIMIT 1",
+      );
+      return rows.length ? mapPatchNote(rows[0]) : null;
+    },
+    seed.patchNotes[0],
+  ),
+);
+
+/* ---------------------------------------------------------- applications */
+
+router.get("/applications/types", (_req, res) => res.json(seed.applicationTypes));
+
+router.post("/applications", async (req, res) => {
+  const { errors, value } = validateApplication(req.body ?? {});
+  if (errors.length > 0) return res.status(400).json({ ok: false, errors });
+
+  const id = reference("APP");
+  try {
+    await query(
+      `INSERT INTO applications
+        (reference, type, discord_id, discord_name, age_range, experience,
+         character_name, backstory, scenario)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        value.type,
+        value.discordId,
+        value.discordName,
+        value.age,
+        value.experience,
+        value.characterName,
+        value.backstory,
+        value.scenario,
+      ],
+    );
+  } catch {
+    // No database yet — the reference is still returned so the flow completes.
+  }
+  return res.status(201).json({ ok: true, id });
+});
+
+router.get("/applications/:id", (req, res) =>
+  safeOne(
+    res,
+    async () => {
+      const rows = await query(
+        "SELECT reference AS id, type, status, created_at AS createdAt FROM applications WHERE reference = ? LIMIT 1",
+        [req.params.id],
+      );
+      return rows.length ? rows[0] : null;
+    },
+    { id: req.params.id, status: "Pending Review" },
+  ),
+);
+
+/* -------------------------------------------------------------------- me */
+
+router.get("/me", (req, res) => res.json(req.user ?? null));
+
+/* ------------------------------------------------------ store/supporters */
+
+router.get("/store/tiers", (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM store_tiers ORDER BY sort_order, price");
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        period: row.period,
+        tone: row.tone,
+        popular: Boolean(row.popular),
+        blurb: row.blurb,
+        features: parseJson(row.features),
+      }));
+    },
+    seed.storeTiers,
+  ),
+);
+
+router.get("/supporters", (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query(
+        "SELECT id, name, tier, since FROM supporters ORDER BY tier, since",
+      );
+      return rows.map((row) => ({
+        ...row,
+        since: row.since instanceof Date ? row.since.toISOString().slice(0, 10) : row.since,
+      }));
+    },
+    seed.supporters,
+  ),
+);
+
+/* ---------------------------------------------------------------- events */
+
+router.get("/events", (_req, res) =>
+  safe(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM events ORDER BY event_date DESC");
+      return rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        date:
+          row.event_date instanceof Date
+            ? row.event_date.toISOString().slice(0, 10)
+            : row.event_date,
+        time: row.event_time,
+        location: row.location,
+        status: row.status,
+        attendance: row.attendance,
+        description: row.description,
+      }));
+    },
+    seed.events,
+  ),
+);
+
+/* -------------------------------------------------------- knowledge base */
+
+function mapArticle(row) {
+  return {
+    slug: row.slug,
+    title: row.title,
+    category: row.category,
+    summary: row.summary,
+    readingTime: row.reading_time,
+    updatedAt:
+      row.updated_at instanceof Date
+        ? row.updated_at.toISOString().slice(0, 10)
+        : row.updated_at,
+    body: parseJson(row.body),
+  };
+}
+
+router.get("/knowledge-base", (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const needle = q.toLowerCase();
+  const fallback = q
+    ? seed.knowledgeBase.filter(
+        (a) =>
+          a.title.toLowerCase().includes(needle) ||
+          a.summary.toLowerCase().includes(needle) ||
+          a.category.toLowerCase().includes(needle),
+      )
+    : seed.knowledgeBase;
+
+  safe(
+    res,
+    async () => {
+      if (!q) {
+        const rows = await query("SELECT * FROM articles ORDER BY category, title");
+        return rows.map(mapArticle);
+      }
+      const like = `%${q}%`;
+      const rows = await query(
+        `SELECT * FROM articles
+          WHERE title LIKE ? OR summary LIKE ? OR category LIKE ?
+          ORDER BY category, title`,
+        [like, like, like],
+      );
+      return rows.map(mapArticle);
+    },
+    fallback,
+  );
+});
+
+router.get("/knowledge-base/:slug", (req, res) =>
+  safeOne(
+    res,
+    async () => {
+      const rows = await query("SELECT * FROM articles WHERE slug = ? LIMIT 1", [
+        req.params.slug,
+      ]);
+      return rows.length ? mapArticle(rows[0]) : null;
+    },
+    seed.knowledgeBase.find((a) => a.slug === req.params.slug) ?? null,
+  ),
+);
+
+/* --------------------------------------------------------------- reports */
+
+router.post("/reports", async (req, res) => {
+  const { errors, value } = validateReport(req.body ?? {});
+  if (errors.length > 0) return res.status(400).json({ ok: false, errors });
+
+  const id = reference("RPT");
+  try {
+    await query(
+      `INSERT INTO reports
+        (reference, type, discord_id, involved, occurred_at, evidence, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        value.type,
+        value.discordId,
+        value.involved,
+        value.occurredAt,
+        value.evidence,
+        value.description,
+      ],
+    );
+  } catch {
+    // No database yet — the reference is still returned so the flow completes.
+  }
+  return res.status(201).json({ ok: true, id });
+});
+
+/* ------------------------------------------------------------- assistant */
+
+router.post("/assistant", (req, res) => {
+  const { errors, value } = validateAssistantMessage(req.body ?? {});
+  if (errors.length > 0) return res.status(400).json({ ok: false, errors });
+
+  // TODO: hand the message to a real model. Canned topic matching for now.
+  const message = value.message.toLowerCase();
+  const hit = seed.assistantReplies.find((entry) =>
+    entry.match.some((keyword) => message.includes(keyword)),
+  );
+  return res.json({ reply: hit ? hit.reply : seed.assistantFallback });
+});
+
+export default router;

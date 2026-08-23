@@ -1,0 +1,17 @@
+{
+  "name": "florida-roleplay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Florida Roleplay — public community site and API for a FiveM roleplay server.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "install:all": "npm install --prefix client --include=dev && npm install --prefix server",
+    "build": "npm install --prefix client --include=dev && npm run build --prefix client && npm install --prefix server --omit=dev",
+    "start": "node server/src/index.js",
+    "lint": "npm --prefix client run lint",
+    "db:init": "npm --prefix server run db:init"
+  }
+}
