@@ -4,7 +4,7 @@
  * stable: AUTH_SIGNED_OUT, AUTH_ROLE_MISSING, AUTH_DEPT_MISMATCH.
  */
 import { query } from "../db.js";
-import { devUser } from "../seed.js";
+import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
 
 const DEV_MODE = process.env.NODE_ENV !== "production";
 
@@ -15,6 +15,23 @@ const DEV_MODE = process.env.NODE_ENV !== "production";
  */
 export async function resolveUser(req) {
   // TODO: replace with the Discord OAuth session lookup once the flow is live.
+
+  // The Staff Hub's preview switcher browses as any rank while OAuth is stubbed.
+  // Honouring it here is what makes the previewed rank's data load rather than
+  // 403 — and like every other dev path it is disabled outright in production.
+  const previewRank = DEV_MODE ? req.get("x-preview-rank") : null;
+  if (previewRank && STAFF_RANKS[previewRank]) {
+    return {
+      id: "preview",
+      username: "preview",
+      displayName: "Preview User",
+      avatar: null,
+      preview: true,
+      rank: RANK_LABELS[previewRank],
+      roles: STAFF_RANKS[previewRank],
+    };
+  }
+
   const headerId = req.get("x-discord-id");
   const devId = DEV_MODE ? headerId || process.env.DEV_USER_ID : null;
   if (!devId) return null;

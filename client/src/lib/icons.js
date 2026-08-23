@@ -3,15 +3,17 @@
  * records can reference an icon by string without importing React components.
  */
 import {
-  Anchor, Bot, Building2, Calendar, Car, ClipboardList, Crown, Flame, Gavel,
-  Heart, LifeBuoy, Mail, Newspaper, Radio, ScrollText, Shield, Siren,
-  Stethoscope, Store, Users, UserCog, Wrench,
+  Anchor, BookOpen, Bot, Building2, Calendar, Car, ChartColumn, ClipboardList,
+  Crown, Flame, Gavel, Heart, LayoutGrid, LifeBuoy, ListChecks, Mail, Newspaper,
+  Radio, Scale, ScrollText, Shield, Siren, Stethoscope, Store, Users, UserCog,
+  Wrench,
 } from "lucide-react";
 
 const ICONS = {
-  Anchor, Bot, Building2, Calendar, Car, ClipboardList, Crown, Flame, Gavel,
-  Heart, LifeBuoy, Mail, Newspaper, Radio, ScrollText, Shield, Siren,
-  Stethoscope, Store, Users, UserCog, Wrench,
+  Anchor, BookOpen, Bot, Building2, Calendar, Car, ChartColumn, ClipboardList,
+  Crown, Flame, Gavel, Heart, LayoutGrid, LifeBuoy, ListChecks, Mail, Newspaper,
+  Radio, Scale, ScrollText, Shield, Siren, Stethoscope, Store, Users, UserCog,
+  Wrench,
 };
 
 export function iconFor(name, fallback = Shield) {

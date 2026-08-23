@@ -48,8 +48,12 @@ export const ROLES = {
   MEMBER: "member",
   WHITELISTED: "whitelisted",
   STAFF: "staff",
+  TRIAL_MOD: "trial_mod",
   MODERATOR: "moderator",
+  SENIOR_MOD: "senior_mod",
   ADMIN: "admin",
+  SENIOR_ADMIN: "senior_admin",
+  DIRECTOR: "director",
   MANAGEMENT: "management",
   DEPT_HEAD: "department_head",
 };
@@ -58,11 +62,75 @@ export const ROLE_LABELS = {
   member: "Member",
   whitelisted: "Whitelisted",
   staff: "Staff",
+  trial_mod: "Trial Moderator",
   moderator: "Moderator",
+  senior_mod: "Senior Moderator",
   admin: "Administrator",
+  senior_admin: "Senior Administrator",
+  director: "Director",
   management: "Management",
   department_head: "Department Head",
 };
+
+/**
+ * Staff ranks in ascending order, used by the hub's preview switcher and by the
+ * rank chips on its landing page. Each rank carries the roles it grants, so
+ * previewing a rank behaves exactly like holding those Discord roles.
+ */
+export const STAFF_RANKS = [
+  {
+    id: "trial_mod",
+    label: "Trial Mod",
+    tone: "slate",
+    roles: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD],
+  },
+  {
+    id: "moderator",
+    label: "Moderator",
+    tone: "brand",
+    roles: [
+      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+      ROLES.MODERATOR,
+    ],
+  },
+  {
+    id: "senior_mod",
+    label: "Senior Mod",
+    tone: "green",
+    roles: [
+      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+      ROLES.MODERATOR, ROLES.SENIOR_MOD,
+    ],
+  },
+  {
+    id: "admin",
+    label: "Administrator",
+    tone: "primary",
+    roles: [
+      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+      ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN,
+    ],
+  },
+  {
+    id: "senior_admin",
+    label: "Senior Admin",
+    tone: "amber",
+    roles: [
+      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+      ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
+    ],
+  },
+  {
+    id: "director",
+    label: "Director",
+    tone: "rose",
+    roles: [
+      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+      ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
+      ROLES.DIRECTOR, ROLES.MANAGEMENT,
+    ],
+  },
+];
 
 /** Mock signed-in user. Set to null to preview the signed-out experience. */
 export const mockUser = {
@@ -70,7 +138,8 @@ export const mockUser = {
   username: "sunshine.dev",
   displayName: "Sunshine Dev",
   avatar: null,
-  roles: ["member", "whitelisted", "staff", "moderator"],
+  rank: "Senior Moderator",
+  roles: ["member", "whitelisted", "staff", "trial_mod", "moderator", "senior_mod"],
 };
 
 /* ------------------------------------------------------------------ *

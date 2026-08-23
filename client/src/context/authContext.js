@@ -11,6 +11,9 @@ const AuthContext = createContext({
   hasRole: () => false,
   signOut: () => {},
   refresh: () => {},
+  previewAvailable: false,
+  previewRank: null,
+  setPreviewRank: () => {},
 });
 
 export default AuthContext;

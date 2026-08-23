@@ -7,6 +7,7 @@ import { Router } from "express";
 import { query } from "../db.js";
 import * as seed from "../seed.js";
 import { attachUser, requireRole } from "../middleware/requireRole.js";
+import staffHubRouter from "./staffHub.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -22,6 +23,10 @@ const STAFF_ROLES = [
 ];
 
 router.use(attachUser);
+
+// The Staff Hub is a rank-gated sub-application; its routes live in their own
+// router so the gating for each stays next to the query it protects.
+router.use("/staff-hub", staffHubRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

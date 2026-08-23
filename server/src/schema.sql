@@ -181,3 +181,123 @@ CREATE TABLE IF NOT EXISTS store_tiers (
   updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Staff Hub
+-- ---------------------------------------------------------------------------
+
+-- Portal content, one row per editable section (featured, reminders,
+-- quickNotes, links). JSON keeps the shapes flexible without a migration each
+-- time the Director panel gains a field.
+CREATE TABLE IF NOT EXISTS hub_portal (
+  section     VARCHAR(32) NOT NULL,
+  payload     JSON        NOT NULL,
+  updated_by  VARCHAR(20) NULL,
+  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (section)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_roster (
+  id          VARCHAR(64)  NOT NULL,
+  name        VARCHAR(128) NOT NULL,
+  handle      VARCHAR(64)  NOT NULL,
+  rank_id     VARCHAR(32)  NOT NULL,
+  rank_label  VARCHAR(64)  NOT NULL,
+  rank_order  INT          NOT NULL DEFAULT 0,
+  team        VARCHAR(64)  NULL,
+  joined      DATE         NULL,
+  claims      INT          NOT NULL DEFAULT 0,
+  vest_hours  INT          NOT NULL DEFAULT 0,
+  status      VARCHAR(32)  NOT NULL DEFAULT 'Active',
+  discord_id  VARCHAR(20)  NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_hub_roster_rank (rank_id),
+  KEY idx_hub_roster_discord (discord_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_disciplinary (
+  id           VARCHAR(32)  NOT NULL,
+  staff_name   VARCHAR(128) NOT NULL,
+  rank_label   VARCHAR(64)  NULL,
+  action_type  VARCHAR(64)  NOT NULL,
+  tone         VARCHAR(16)  NOT NULL DEFAULT 'slate',
+  issued_by    VARCHAR(128) NOT NULL,
+  issued_at    DATE         NOT NULL,
+  status       VARCHAR(32)  NOT NULL DEFAULT 'Active',
+  summary      TEXT         NULL,
+  discord_id   VARCHAR(20)  NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_hub_da_discord (discord_id),
+  KEY idx_hub_da_issued (issued_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One row per staff exam attempt. `override_payload` caches the latest override
+-- so listing attempts never needs to join the full history.
+CREATE TABLE IF NOT EXISTS hub_attempts (
+  attempt_id       VARCHAR(64)  NOT NULL,
+  staff_name       VARCHAR(128) NOT NULL,
+  discord_id       VARCHAR(20)  NULL,
+  exam_type        VARCHAR(16)  NOT NULL,
+  submitted_at     DATETIME     NOT NULL,
+  score            VARCHAR(32)  NULL,
+  status           VARCHAR(32)  NOT NULL DEFAULT 'Needs Review',
+  original_score   VARCHAR(32)  NULL,
+  original_status  VARCHAR(32)  NULL,
+  override_payload JSON         NULL,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id),
+  KEY idx_hub_attempts_discord (discord_id),
+  KEY idx_hub_attempts_exam (exam_type),
+  KEY idx_hub_attempts_submitted (submitted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Append-only: every override ever applied. Rows are never updated or deleted,
+-- which is what makes the audit log trustworthy.
+CREATE TABLE IF NOT EXISTS hub_overrides (
+  id               INT          NOT NULL AUTO_INCREMENT,
+  attempt_id       VARCHAR(64)  NOT NULL,
+  discord_id       VARCHAR(20)  NULL,
+  staff_name       VARCHAR(128) NULL,
+  exam_type        VARCHAR(16)  NULL,
+  original_score   VARCHAR(32)  NULL,
+  original_status  VARCHAR(32)  NULL,
+  override_score   VARCHAR(32)  NOT NULL,
+  override_status  VARCHAR(32)  NOT NULL,
+  reviewer         VARCHAR(128) NOT NULL,
+  reason           TEXT         NOT NULL,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_hub_overrides_attempt (attempt_id),
+  KEY idx_hub_overrides_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_exam_settings (
+  exam_type   VARCHAR(16) NOT NULL,
+  pass_score  INT         NOT NULL,
+  review_min  INT         NOT NULL,
+  review_max  INT         NOT NULL,
+  max_score   INT         NOT NULL,
+  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (exam_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_questions (
+  id               INT          NOT NULL AUTO_INCREMENT,
+  exam_type        VARCHAR(16)  NOT NULL,
+  question_id      VARCHAR(32)  NOT NULL,
+  question_number  VARCHAR(16)  NOT NULL,
+  question_text    TEXT         NOT NULL,
+  question_type    VARCHAR(32)  NULL,
+  points           INT          NOT NULL DEFAULT 1,
+  correct_answer   TEXT         NULL,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hub_questions_qid (question_id),
+  KEY idx_hub_questions_exam (exam_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

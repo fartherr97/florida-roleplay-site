@@ -13,10 +13,66 @@ export const ROLES = {
   MEMBER: "member",
   WHITELISTED: "whitelisted",
   STAFF: "staff",
+  TRIAL_MOD: "trial_mod",
   MODERATOR: "moderator",
+  SENIOR_MOD: "senior_mod",
   ADMIN: "admin",
+  SENIOR_ADMIN: "senior_admin",
+  DIRECTOR: "director",
   MANAGEMENT: "management",
   DEPT_HEAD: "department_head",
+};
+
+/** Role bundles the hub gates on, mirrored in client/src/data/hubNavigation.js. */
+export const STAFF_ANY = [
+  ROLES.STAFF, ROLES.TRIAL_MOD, ROLES.MODERATOR, ROLES.SENIOR_MOD,
+  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.DIRECTOR, ROLES.MANAGEMENT,
+];
+export const ADMIN_PLUS = [
+  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.DIRECTOR, ROLES.MANAGEMENT,
+];
+export const SENIOR_ADMIN_PLUS = [
+  ROLES.SENIOR_ADMIN, ROLES.DIRECTOR, ROLES.MANAGEMENT,
+];
+export const DIRECTOR_ONLY = [ROLES.DIRECTOR, ROLES.MANAGEMENT];
+
+/**
+ * Staff ranks and the roles each grants, mirroring STAFF_RANKS in
+ * client/src/data/mockData.js. Used only by the development preview path in
+ * middleware/requireRole.js, which is hard-disabled in production.
+ */
+export const STAFF_RANKS = {
+  trial_mod: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD],
+  moderator: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+    ROLES.MODERATOR,
+  ],
+  senior_mod: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+    ROLES.MODERATOR, ROLES.SENIOR_MOD,
+  ],
+  admin: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+    ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN,
+  ],
+  senior_admin: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+    ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
+  ],
+  director: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+    ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
+    ROLES.DIRECTOR, ROLES.MANAGEMENT,
+  ],
+};
+
+export const RANK_LABELS = {
+  trial_mod: "Trial Mod",
+  moderator: "Moderator",
+  senior_mod: "Senior Mod",
+  admin: "Administrator",
+  senior_admin: "Senior Admin",
+  director: "Director",
 };
 
 /** Every role the middleware will accept, for validation at the edges. */
@@ -28,7 +84,11 @@ export const devUser = {
   username: "sunshine.dev",
   displayName: "Sunshine Dev",
   avatar: null,
-  roles: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.MODERATOR],
+  rank: "Senior Moderator",
+  roles: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
+    ROLES.MODERATOR, ROLES.SENIOR_MOD,
+  ],
 };
 
 export const serverStatus = {

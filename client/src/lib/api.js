@@ -4,10 +4,28 @@
  * Flip USE_API to false to develop entirely against src/data/mockData.js.
  */
 import * as mock from "../data/mockData";
+import * as hub from "../data/staffHubData";
 
 export const USE_API = true;
 
 const BASE = "/api";
+
+/**
+ * While Discord OAuth is stubbed, the Staff Hub can browse as any rank. The
+ * chosen rank rides along on every request so the API resolves the same rank the
+ * UI is rendering — otherwise a previewed Director would see the page and then a
+ * 403 for its data. The server only honours this outside production.
+ */
+const PREVIEW_KEY = "flrp.previewRank";
+
+function previewHeaders() {
+  try {
+    const rank = sessionStorage.getItem(PREVIEW_KEY);
+    return rank ? { "x-preview-rank": rank } : {};
+  } catch {
+    return {};
+  }
+}
 
 /** Raised when the API answers 403 so callers can surface the denial code. */
 export class ApiForbiddenError extends Error {
@@ -21,7 +39,11 @@ export class ApiForbiddenError extends Error {
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...previewHeaders(),
+      ...(options.headers || {}),
+    },
     ...options,
   });
 
@@ -133,12 +155,138 @@ export const api = {
   submitReport: (payload) =>
     post("/reports", payload, () => ({ ok: true, id: localReference("RPT") })),
 
+  /* ----------------------------- Staff Hub ----------------------------- */
+
+  hubPortal: () =>
+    get("/staff-hub/portal", { ...hub.portal, links: hub.portalLinks }),
+  saveHubPortal: (section, payload) =>
+    post(`/staff-hub/portal/${section}`, payload, () => ({
+      ok: true,
+      message: "Saved locally — the API is unreachable, so this will not persist.",
+    })),
+
+  hubRoster: () => get("/staff-hub/roster", hub.roster),
+  hubDashboard: () => get("/staff-hub/dashboard", hub.dashboard),
+  hubChecklist: () => get("/staff-hub/checklist", hub.checklist),
+  hubDisciplinary: () => get("/staff-hub/disciplinary", hub.disciplinaryActions),
+
+  hubExamDashboard: () =>
+    get("/staff-hub/exams/dashboard", buildExamDashboard(hub.attempts)),
+  hubAttempt: (attemptId) =>
+    get(`/staff-hub/exams/attempts/${encodeURIComponent(attemptId)}`, {
+      ...(hub.attempts.find((a) => a.attemptId === attemptId) ?? null),
+      questions: hub.attemptQuestions[attemptId] ?? [],
+    }),
+  hubSaveOverride: (attemptId, payload) =>
+    post(`/staff-hub/exams/attempts/${encodeURIComponent(attemptId)}/override`, payload, () => ({
+      ok: true,
+      data: { attemptId, ...payload },
+    })),
+  hubExamMembers: (query = "") => {
+    const trimmed = query.trim();
+    const fallback = filterMembers(buildMembers(hub.attempts), trimmed);
+    return get(
+      `/staff-hub/exams/members${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ""}`,
+      fallback,
+    );
+  },
+  hubExamMember: (identifier) =>
+    get(
+      `/staff-hub/exams/members/${encodeURIComponent(identifier)}`,
+      buildMembers(hub.attempts).find(
+        (m) => m.memberKey === identifier || m.discordId === identifier,
+      ) ?? null,
+    ),
+  hubAuditLog: () => get("/staff-hub/exams/audit-log", hub.auditLog),
+  hubExamSettings: () => get("/staff-hub/exams/settings", hub.examSettings),
+  hubSaveExamSettings: (payload) =>
+    post("/staff-hub/exams/settings", payload, () => ({ ok: true })),
+  hubQuestionCatalog: () =>
+    get("/staff-hub/exams/question-catalog", hub.questionCatalog),
+  hubSaveQuestion: (rowNumber, payload) =>
+    post(`/staff-hub/exams/question-catalog/${rowNumber}`, payload, () => ({
+      ok: true,
+    })),
+
   assistant: (message) =>
     post("/assistant", { message }, () => ({
       reply:
         "I'm offline right now, but the rules page has the answer to most questions — or open a ticket in Discord and a staff member will help.",
     })),
 };
+
+/**
+ * Exam rollups. The server computes these from stored attempts; these mirrors
+ * keep the fallback path identical rather than shipping a second set of numbers
+ * that could drift from the attempt list.
+ */
+export function buildExamDashboard(list) {
+  const totals = {
+    totalProfiles: new Set(list.map((a) => a.discordId || a.name)).size,
+    totalAttempts: list.length,
+    pass: list.filter((a) => a.status === "Pass").length,
+    needsReview: list.filter((a) => a.status === "Needs Review").length,
+    fail: list.filter((a) => a.status === "Fail").length,
+  };
+  const recent = [...list].sort(
+    (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt),
+  );
+  return {
+    totals,
+    recentSubmissions: recent,
+    recentByExam: Object.fromEntries(
+      hub.EXAMS.map((exam) => [
+        exam.key,
+        recent.filter((a) => a.examType === exam.key).slice(0, 5),
+      ]),
+    ),
+  };
+}
+
+/** Collapses attempts into one profile per person, newest attempt first. */
+export function buildMembers(list) {
+  const map = new Map();
+  list.forEach((attempt) => {
+    const key = attempt.discordId || attempt.name.toLowerCase();
+    if (!map.has(key)) {
+      map.set(key, {
+        memberKey: key,
+        name: attempt.name,
+        discordId: attempt.discordId,
+        attemptsByExam: { trial: [], senior: [], admin: [] },
+      });
+    }
+    map.get(key).attemptsByExam[attempt.examType]?.push(attempt);
+  });
+  return [...map.values()].map((member) => {
+    const all = Object.values(member.attemptsByExam).flat();
+    return {
+      ...member,
+      totalAttempts: all.length,
+      latestAt: all
+        .map((a) => a.submittedAt)
+        .sort()
+        .at(-1),
+      // The highest exam this member has passed decides the badge on their row.
+      highestPass:
+        [...hub.EXAMS]
+          .reverse()
+          .find((exam) =>
+            member.attemptsByExam[exam.key]?.some((a) => a.status === "Pass"),
+          )?.short ?? null,
+    };
+  });
+}
+
+function filterMembers(members, q) {
+  if (!q) return members;
+  const needle = q.toLowerCase();
+  return members.filter(
+    (m) =>
+      m.name.toLowerCase().includes(needle) ||
+      String(m.discordId).includes(needle),
+  );
+}
 
 /** Mirrors the server-side `?q=` filter so the fallback behaves identically. */
 function filterRules(groups, q) {

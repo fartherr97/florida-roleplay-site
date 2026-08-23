@@ -21,6 +21,19 @@ import Join from "./pages/Join";
 import PatchNotes from "./pages/PatchNotes";
 import SignIn from "./pages/SignIn";
 import CreateAccount from "./pages/CreateAccount";
+import HubLayout from "./components/hub/HubLayout";
+import HubLanding from "./pages/hub/HubLanding";
+import HubHome from "./pages/hub/HubHome";
+import HubRoster from "./pages/hub/HubRoster";
+import HubDashboard from "./pages/hub/HubDashboard";
+import HubChecklist from "./pages/hub/HubChecklist";
+import HubDaDatabase from "./pages/hub/HubDaDatabase";
+import HubLinks from "./pages/hub/HubLinks";
+import HubDirector from "./pages/hub/HubDirector";
+import HubSubmissions from "./pages/hub/HubSubmissions";
+import HubExamMembers from "./pages/hub/HubExamMembers";
+import HubAuditLog from "./pages/hub/HubAuditLog";
+import HubManagement from "./pages/hub/HubManagement";
 import Moderation from "./pages/staff/Moderation";
 import Support from "./pages/staff/Support";
 import Leadership from "./pages/management/Leadership";
@@ -82,9 +95,74 @@ export default function App() {
             <Route path="updates" element={<Navigate to="/patch-notes" replace />} />
             <Route path="complaints" element={<Navigate to="/reports" replace />} />
             <Route path="team" element={<Navigate to="/staff" replace />} />
+            <Route path="staff-portal" element={<Navigate to="/staff-hub" replace />} />
+            <Route path="staff-roster" element={<Navigate to="/staff-hub/roster" replace />} />
+            <Route path="trial-mod-checklist" element={<Navigate to="/staff-hub/trial-checklist" replace />} />
+            <Route path="staff-da-database" element={<Navigate to="/staff-hub/da-database" replace />} />
             <Route path="connect" element={<Navigate to="/join" replace />} />
             <Route path="login" element={<Navigate to="/sign-in" replace />} />
             <Route path="register" element={<Navigate to="/create-account" replace />} />
+          </Route>
+
+          {/* Staff Hub — its own shell, so neither the public TopBar nor the
+              Footer wraps it. The landing page is public (it is the sign-in
+              entry point); every inner route is rank-gated by src/lib/guards.js
+              alongside the sidebar that lists it. */}
+          <Route path="/staff-hub" element={<HubLanding />} />
+          {/* A pathless layout route, so the landing above can own /staff-hub
+              itself without two siblings competing for the same path. */}
+          <Route element={<HubLayout />}>
+            <Route path="/staff-hub/home" element={<HubHome />} />
+            <Route path="/staff-hub/roster" element={<HubRoster />} />
+            <Route path="/staff-hub/dashboard" element={<HubDashboard />} />
+            <Route path="/staff-hub/trial-checklist" element={<HubChecklist />} />
+            <Route path="/staff-hub/da-database" element={<HubDaDatabase />} />
+
+            <Route
+              path="/staff-hub/resources"
+              element={
+                <HubLinks
+                  section="allStaff"
+                  icon="BookOpen"
+                  title="Resources"
+                  subtitle="Handbook, templates and policy every staff member needs to hand."
+                  badge="All staff"
+                  badgeTone="brand"
+                />
+              }
+            />
+            <Route
+              path="/staff-hub/administrators"
+              element={
+                <HubLinks
+                  section="administrators"
+                  icon="Shield"
+                  title="Administrators"
+                  subtitle="Appeal queues, escalation tooling and evaluation paperwork."
+                  badge="Administrator+"
+                  badgeTone="primary"
+                />
+              }
+            />
+            <Route
+              path="/staff-hub/senior-admins"
+              element={
+                <HubLinks
+                  section="seniorAdmins"
+                  icon="ShieldCheck"
+                  title="Senior Admins+"
+                  subtitle="Team administration, permanent records and recruitment planning."
+                  badge="Senior Admin+"
+                  badgeTone="amber"
+                />
+              }
+            />
+            <Route path="/staff-hub/director" element={<HubDirector />} />
+
+            <Route path="/staff-hub/submissions" element={<HubSubmissions />} />
+            <Route path="/staff-hub/exam-members" element={<HubExamMembers />} />
+            <Route path="/staff-hub/audit-log" element={<HubAuditLog />} />
+            <Route path="/staff-hub/management" element={<HubManagement />} />
           </Route>
 
           {/* Registered for direct hits; guards render 403 in place instead. */}
