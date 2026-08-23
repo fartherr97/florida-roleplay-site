@@ -519,3 +519,49 @@ CREATE TABLE IF NOT EXISTS permission_grants (
 ALTER TABLE roster_members
   ADD COLUMN IF NOT EXISTS loa_until  DATE NULL,
   ADD COLUMN IF NOT EXISTS loa_reason TEXT NULL;
+
+-- ---------------------------------------------------------------------------
+-- Department sites (the department hub engine)
+-- ---------------------------------------------------------------------------
+
+-- One row per department site. The whole site — branding, navigation, pages,
+-- roster layout and its access table — is the config document, which is why a
+-- new department needs no migration and no deploy. An empty table means the
+-- seeds in server/src/departmentSeed.js apply, so the hub works before anything
+-- has ever been saved.
+CREATE TABLE IF NOT EXISTS department_configs (
+  id          VARCHAR(64) NOT NULL,
+  config      JSON        NOT NULL,
+  updated_by  VARCHAR(20) NULL,
+  created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The config each save replaced, so a department that breaks its own site can
+-- restore the previous version from the Builder Portal instead of filing a
+-- ticket. Trimmed to the newest 50 per department on every write — Builder
+-- sessions auto-save far more often than anyone reads back.
+CREATE TABLE IF NOT EXISTS department_config_versions (
+  id             INT          NOT NULL AUTO_INCREMENT,
+  department_id  VARCHAR(64)  NOT NULL,
+  config         JSON         NOT NULL,
+  label          VARCHAR(160) NULL,
+  actor          VARCHAR(20)  NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_dept_versions_dept (department_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Append-only record of who changed what on a department site.
+CREATE TABLE IF NOT EXISTS department_audit_log (
+  id             INT          NOT NULL AUTO_INCREMENT,
+  department_id  VARCHAR(64)  NOT NULL,
+  actor          VARCHAR(20)  NULL,
+  actor_name     VARCHAR(128) NULL,
+  action         VARCHAR(64)  NOT NULL,
+  summary        VARCHAR(512) NULL,
+  at             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_dept_audit_dept (department_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

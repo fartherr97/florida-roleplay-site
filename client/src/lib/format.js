@@ -21,3 +21,22 @@ export function dateParts(value) {
     year: String(date.getUTCFullYear()),
   };
 }
+
+/**
+ * A timestamp with the time of day, for log and audit rows where "which day"
+ * is not precise enough. Rendered in UTC like every other date on the site, so
+ * two people comparing entries never see different times.
+ */
+export function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  });
+}

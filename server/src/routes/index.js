@@ -12,6 +12,7 @@ import staffHubRouter from "./staffHub.js";
 import civilianHubRouter from "./civilianHub.js";
 import rosterRouter from "./roster.js";
 import permissionsRouter from "./permissions.js";
+import departmentHubRouter from "./departmentHub.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -31,6 +32,10 @@ router.use("/civilian-hub", civilianHubRouter);
 router.use("/roster", rosterRouter);
 // Access control is itself configurable, so it gets its own router.
 router.use("/permissions", permissionsRouter);
+// The department sites. Mounted at /dept rather than /departments because the
+// public site already owns that path for its department directory — this one
+// serves the config documents behind each department's own hub.
+router.use("/dept", departmentHubRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

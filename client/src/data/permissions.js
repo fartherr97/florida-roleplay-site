@@ -51,6 +51,33 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "departments",
+    label: "Department hubs",
+    description:
+      "The per-department sites. Each department also grants these capabilities to its own command roles on its Access page; the permissions here reach every department at once.",
+    permissions: [
+      { key: "departments.view", label: "Open a department hub", detail: "See a department's site — roster, fleet, uniforms and resources." },
+      { key: "departments.roster.edit", label: "Arrange any department roster", detail: "Decide which rank sits in which band and which columns show, in every department. Membership itself comes from the community roster." },
+      { key: "departments.structure.edit", label: "Edit fleet and uniforms", detail: "Maintain vehicle rosters, uniform kits and chains of command community-wide." },
+      { key: "departments.log.manage", label: "Write any admin log", detail: "File disciplinary entries, commendations and rank actions in every department." },
+      { key: "departments.audit.view", label: "View department audit logs", detail: "Read every config change and restore an earlier version of a department site." },
+      {
+        key: "departments.access.manage",
+        label: "Manage department access",
+        detail:
+          "Decide which Discord role holds which capability inside a department, overriding its own command staff.",
+        sensitive: true,
+      },
+      {
+        key: "departments.manage",
+        label: "Manage every department site",
+        detail:
+          "Open any department's Builder Portal and create new departments. This is the way back into a department whose own access table locks everyone out, so it belongs with the top of the ladder.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "exams",
     label: "Staff exams",
     description: "The exam backend behind staff promotion.",
@@ -170,6 +197,14 @@ export const DEFAULT_GRANTS = {
   "staff.links.admin": staffFrom("junior_admin"),
   "staff.links.senior": staffFrom("senior_admin"),
   "staff.portal.manage": ["head_admin", "directorship"],
+
+  "departments.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
+  "departments.roster.edit": staffFrom("admin"),
+  "departments.structure.edit": staffFrom("admin"),
+  "departments.log.manage": staffFrom("senior_admin"),
+  "departments.audit.view": staffFrom("senior_admin"),
+  "departments.access.manage": ["head_admin", "directorship"],
+  "departments.manage": ["head_admin", "directorship"],
 
   "exams.view": staffFrom("junior_admin"),
   "exams.override": staffFrom("senior_admin"),

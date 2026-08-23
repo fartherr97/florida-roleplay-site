@@ -107,3 +107,19 @@ button:disabled { cursor: not-allowed; }
 @theme {
   --breakpoint-hub: 1120px;
 }
+
+/* A department site's accent. DeptShell sets --dept-accent on its wrapper from
+   the department's config, so the same markup renders in FHP blue, HCFR red or
+   whatever a department picks in the Builder Portal — and the public site's
+   orange is untouched the moment you navigate back out of the hub. */
+.dept-accent-text { color: var(--dept-accent-soft, #60a5fa); }
+
+.dept-accent-tile {
+  background-color: color-mix(in srgb, var(--dept-accent, #3b82f6) 15%, transparent);
+  color: var(--dept-accent-soft, #60a5fa);
+  --tw-ring-color: color-mix(in srgb, var(--dept-accent, #3b82f6) 25%, transparent);
+}
+
+.dept-accent-bg { background-color: var(--dept-accent, #3b82f6); }
+
+.dept-accent-ring { --tw-ring-color: color-mix(in srgb, var(--dept-accent, #3b82f6) 30%, transparent); }

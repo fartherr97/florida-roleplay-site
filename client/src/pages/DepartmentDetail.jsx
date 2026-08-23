@@ -1,6 +1,6 @@
 import { createElement, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Car, Users } from "lucide-react";
+import { ArrowRight, Car, Users } from "lucide-react";
 import Section from "../components/layout/Section";
 import PageHeader from "../components/layout/PageHeader";
 import Card from "../components/ui/Card";
@@ -8,6 +8,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import NotFound from "../components/auth/NotFound";
 import { api } from "../lib/api";
+import { useAuth } from "../context/useAuth";
 import { iconFor } from "../lib/icons";
 import { toneTile } from "../lib/tones";
 import { departments as seedDepartments } from "../data/mockData";
@@ -15,6 +16,7 @@ import { departments as seedDepartments } from "../data/mockData";
 /** Detail page for one agency — banner, mission, ranks, fleet and recruitment. */
 export default function DepartmentDetail() {
   const { id } = useParams();
+  const { hasPermission } = useAuth();
   // Render from seed data immediately, then swap in the API record for this id.
   // Stamping the result with its id keeps a stale response from a previous param
   // out of the render without an extra reset effect.
@@ -54,9 +56,20 @@ export default function DepartmentDetail() {
         backTo="/departments"
         backLabel="All departments"
         actions={
-          <Badge tone={department.hiring ? "green" : "slate"} dot={department.hiring}>
-            {department.hiring ? "Now hiring" : "Recruitment closed"}
-          </Badge>
+          <>
+            {/* The hub is the department's internal site. Hidden from anyone who
+                cannot open it — the server gates it too, so this is only about
+                not offering a dead end. */}
+            {hasPermission("departments.view") && (
+              <Button as={Link} to={`/departments/${department.id}/hub`} size="sm">
+                {department.abbr} Hub
+                <ArrowRight className="size-4" />
+              </Button>
+            )}
+            <Badge tone={department.hiring ? "green" : "slate"} dot={department.hiring}>
+              {department.hiring ? "Now hiring" : "Recruitment closed"}
+            </Badge>
+          </>
         }
       />
 

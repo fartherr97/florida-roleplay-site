@@ -22,6 +22,7 @@ import PatchNotes from "./pages/PatchNotes";
 import SignIn from "./pages/SignIn";
 import CreateAccount from "./pages/CreateAccount";
 import HubShell from "./components/hub/HubShell";
+import DeptShell from "./components/dept/DeptShell";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -206,6 +207,12 @@ export default function App() {
             <Route path="/civilian-hub/penal-code" element={<CivPenalCode />} />
             <Route path="/civilian-hub/guides" element={<CivGuides />} />
           </Route>
+
+          {/* Department sites. One route serves every department: the :deptId
+              segment picks which saved config loads, and the pages inside come
+              out of that config rather than out of this table. */}
+          <Route path="/departments/:deptId/hub" element={<DeptShell />} />
+          <Route path="/departments/:deptId/hub/:pageId" element={<DeptShell />} />
 
           {/* Registered for direct hits; guards render 403 in place instead. */}
           <Route path="/403" element={<AccessDenied reason="role" />} />

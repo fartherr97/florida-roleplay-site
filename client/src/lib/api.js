@@ -7,6 +7,9 @@ import * as mock from "../data/mockData";
 import * as hub from "../data/staffHubData";
 import * as civ from "../data/civilianHubData";
 import * as rosterMock from "../data/rosterData";
+import { DEPARTMENT_CONFIGS } from "../data/departmentConfigs";
+import { normalizeConfig, summarize } from "./departmentConfig";
+import { projectRoster } from "./deptRoster";
 import { BASE_ROLES, DEFAULT_GRANTS, PERMISSION_GROUPS } from "../data/permissions";
 
 export const USE_API = true;
@@ -90,6 +93,32 @@ async function post(path, body, fallback) {
     if (err instanceof ApiForbiddenError || err.status === 400) throw err;
     return fallback();
   }
+}
+
+/** Shown wherever a write is accepted but the API could not persist it. */
+const NOT_PERSISTED =
+  "Accepted, but not persisted — no database is configured, so this will reset on reload.";
+
+/** PUT with the same contract as post(): validation and denials surface. */
+async function put(path, body, fallback) {
+  if (!USE_API) return fallback();
+  try {
+    return await request(path, { method: "PUT", body: JSON.stringify(body) });
+  } catch (err) {
+    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    return fallback();
+  }
+}
+
+/**
+ * The shape GET /dept/:id/config returns, computed locally. Capabilities are
+ * left empty in the fallback: without the API there is nothing to authorise
+ * against, and an empty set renders the read-only view rather than offering
+ * edit controls that would have nowhere to save to.
+ */
+function deptFallback(id) {
+  const config = DEPARTMENT_CONFIGS[id];
+  return config ? { config: normalizeConfig(config, id), capabilities: [] } : null;
 }
 
 /** Reference ids are generated client-side only when the API is unreachable. */
@@ -273,6 +302,67 @@ export const api = {
     );
   },
   civGuides: () => get("/civilian-hub/guides", civ.guides),
+
+  /* -------------------------- Department hubs -------------------------- */
+
+  /**
+   * The department sites. Each id loads a different saved config through the
+   * same engine, which is what lets one repo serve every department.
+   *
+   * The fallback shapes mirror what the server computes so a department hub is
+   * fully browsable with no database — including the roster projection, which is
+   * derived from the same mock roster the community roster page renders.
+   */
+  deptList: () =>
+    get(
+      "/dept",
+      Object.values(DEPARTMENT_CONFIGS).map((config) => summarize(normalizeConfig(config))),
+    ),
+
+  deptConfig: (id) => get(`/dept/${encodeURIComponent(id)}/config`, deptFallback(id)),
+
+  deptRoster: (id) => {
+    const config = DEPARTMENT_CONFIGS[id];
+    return get(`/dept/${encodeURIComponent(id)}/roster`, {
+      subdivisions: config
+        ? projectRoster(normalizeConfig(config, id), rosterMock.roster, rosterMock.ROLE_MAP)
+        : [],
+    });
+  },
+
+  deptVersions: (id) => get(`/dept/${encodeURIComponent(id)}/versions`, []),
+  deptAudit: (id) => get(`/dept/${encodeURIComponent(id)}/audit`, []),
+
+  saveDeptConfig: (id, config) =>
+    put(`/dept/${encodeURIComponent(id)}/config`, { config }, () => ({
+      ok: true,
+      config,
+      message: NOT_PERSISTED,
+    })),
+
+  /** One page's own data — never anything else in the document. */
+  saveDeptPage: (id, pageId, config) =>
+    put(
+      `/dept/${encodeURIComponent(id)}/pages/${encodeURIComponent(pageId)}`,
+      { config },
+      () => ({ ok: true, message: NOT_PERSISTED }),
+    ),
+
+  saveDeptAccess: (id, access) =>
+    put(`/dept/${encodeURIComponent(id)}/access`, { access }, () => ({
+      ok: true,
+      message: NOT_PERSISTED,
+    })),
+
+  restoreDeptVersion: (id, versionId) =>
+    post(
+      `/dept/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/restore`,
+      {},
+      () => ({ ok: false, message: "Version history needs a database." }),
+    ),
+
+  createDept: (id, config) =>
+    post("/dept", { id, config }, () => ({ ok: true, config, message: NOT_PERSISTED })),
 
   assistant: (message) =>
     post("/assistant", { message }, () => ({

@@ -2,7 +2,8 @@
 
 Public community site and API for **Florida Roleplay**, a FiveM roleplay server —
 rules, applications, departments, store, supporters, events, knowledge base and
-reports, plus two gated sub-applications: a **Staff Hub** and a **Civilian Hub**.
+reports, plus gated sub-applications: a **Staff Hub**, a **Civilian Hub**, and a
+**department hub** that renders a whole site per department from a saved config.
 
 ```
 florida-roleplay/
@@ -129,6 +130,75 @@ whether to apply should be able to read the penal code and see who is hiring. A
 member who simply is not whitelisted yet gets its own denial page
 (`AUTH_NOT_WHITELISTED`) pointing at the whitelist application rather than the
 staff copy about contacting a supervisor.
+
+## Department hubs
+
+Every department runs its own internal site at `/departments/<id>/hub` — FHP,
+HCSO, TPD, HCFR and DHS ship with one, and more are created from the Builder
+Portal without a deploy.
+
+**One engine, many sites.** A department site *is* a config document. There is a
+single route; the `:deptId` segment picks which config loads, and the pages
+inside come out of that config rather than out of the route table. Adding a
+department is a row in `department_configs`, not a migration.
+
+```
+client/src/data/departmentConfigs.js   # the saved sites (seeds + templates)
+client/src/lib/departmentConfig.js     # the engine — normalise, authorise, theme
+client/src/lib/deptRoster.js           # projecting the community roster
+client/src/components/dept/DeptShell.jsx   # the page-type registry
+server/src/routes/departmentHub.js     # /api/dept
+```
+
+### Page types
+
+`home`, `content`, `roster`, `fleet`, `uniforms`, `chain`, `calendar`,
+`adminlog`, `activity`, `hours`, `audit`, `access`, `builder`. Adding one means
+writing a component, registering it in `PAGE_COMPONENTS` in `DeptShell.jsx`, and
+listing it in `PAGE_TYPES` in `lib/departmentConfig.js`. Every department gets it
+at once.
+
+### The roster is a projection, not a copy
+
+A department's roster is the **community roster**, filtered to that department
+and bucketed into the department's own bands by the Discord role map. The config
+owns presentation — which bands exist, their colours, which columns show — and
+nothing else. Promote someone in Discord and they move bands on their department
+site with nothing else to update, because there is no second roster for the bot
+to keep in step. A rank no band claims shows under "Unassigned" rather than
+vanishing.
+
+Activity status is edited against the community roster too, so it asks for the
+site-wide `roster.edit_status` permission: a status set on a department site is
+the same status the Civilian Hub's roster shows.
+
+### Capabilities
+
+Inside a department, a Discord role can hold `manage`, `editRoster`,
+`editStructure`, `manageCalendar`, `manageLog`, `manageAccess` and `viewAudit`
+(`manage` implies the rest). Those are granted on the department's own Access
+page, scoped to that department.
+
+The community-wide `departments.*` permissions are the counterpart: they grant
+the same capabilities in **every** department, and `departments.manage` is the
+way back into a department whose own access table locks everyone out — which is
+why the access table refuses to save without at least one role able to manage
+the site, in the UI and again on the server.
+
+### Two write surfaces
+
+`PUT /api/dept/:id/config` replaces the whole document and needs `manage` — that
+is the Builder Portal. `PUT /api/dept/:id/pages/:pageId` writes one page's own
+data and needs whatever capability that page type declares, so the fleet editor
+cannot reach the access table on its way past. Every write versions the config it
+replaced; the Audit page restores one.
+
+### Hostname resolution
+
+Departments resolve from the URL path, because the community is one site on one
+domain. `server/src/lib/tenant.js` also resolves from the `Host` header — an
+explicit `DEPARTMENT_MAP` entry, then the first label of a real subdomain — so
+pointing `fhp.floridarp.gg` at this deployment later needs no code change.
 
 ## Community roster and the Discord bot
 

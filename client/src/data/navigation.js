@@ -45,6 +45,7 @@ export const navGroups = [
       tile: "bg-sky-500/10 text-sky-400 ring-sky-400/20",
     },
     items: [
+      { label: "All Departments", to: "/departments", icon: "LayoutGrid" },
       { label: "Florida Highway Patrol", to: "/departments/fhp", icon: "Car" },
       { label: "Hillsborough County SO", to: "/departments/hcso", icon: "Shield" },
       { label: "Tampa Police Department", to: "/departments/tpd", icon: "Building2" },
