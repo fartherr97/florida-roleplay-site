@@ -66,11 +66,24 @@ body {
 }
 .animate-float { animation: float 3.5s ease-in-out infinite; }
 
+/* Motion is decoration here — the float loop and the entrance both convey
+   nothing the layout does not already say — so anyone who has asked their
+   system for less of it gets none. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float { animation: none; }
+}
+
 @keyframes fade-up {
   from { transform: translateY(16px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 .animate-fade-up { animation: fade-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Skipped rather than shortened: `both` fill mode means the element would
+     otherwise sit at the animation's starting offset and never arrive. */
+  .animate-fade-up { animation: none; }
+}
 .delay-100 { animation-delay: 0.1s; }
 .delay-200 { animation-delay: 0.2s; }
 .delay-300 { animation-delay: 0.3s; }

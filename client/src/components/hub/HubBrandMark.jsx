@@ -2,28 +2,25 @@ import { SITE } from "../../data/mockData";
 import { cn } from "../../lib/cn";
 
 /**
- * The bordered logo plate the portal landing pages lead with — a hairline square
- * holding the emblem, with the community's short name in the top-left corner.
+ * The emblem the portal landing pages lead with — the logo alone, drifting.
+ *
+ * The wrapper and the image animate separately on purpose. Both `fade-up` (the
+ * entrance the landing page applies from outside) and `float` (the idle loop)
+ * animate `transform`, so putting them on one element would let whichever
+ * class comes later in the stylesheet silently win. The wrapper takes the
+ * entrance, the image takes the loop, and the two compose.
+ *
+ * The shadow is `drop-shadow` rather than a box shadow: the emblem is a circular
+ * badge on transparency, and a box shadow would cast a rectangle around it.
  */
 export default function HubBrandMark({ className }) {
   return (
-    <div
-      className={cn(
-        "relative grid size-40 place-items-center rounded-2xl border border-white/12 bg-white/[0.02] sm:size-52",
-        className,
-      )}
-    >
-      <span className="absolute left-3 top-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
-        {SITE.shortName}
-      </span>
-      {/* Sized to sit inside the plate like a coin in a frame. The emblem is a
-          circular badge with its own detail, so giving it most of the plate
-          reads as branding; at the smaller size it looked like a placeholder. */}
+    <div className={cn("grid place-items-center", className)}>
       <img
         src={SITE.logoUrl}
         alt=""
         aria-hidden="true"
-        className="size-28 object-contain sm:size-36"
+        className="animate-float size-40 object-contain drop-shadow-[0_18px_30px_rgba(0,0,0,0.55)] sm:size-52"
       />
     </div>
   );
