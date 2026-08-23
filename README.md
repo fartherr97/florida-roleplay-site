@@ -523,14 +523,14 @@ account does not have website access."` That is the API working correctly, and
 `BotGate` gives it its own page saying what is missing and who to ask — not an
 error, and not an invitation to sign in again, which would do the same thing.
 
-### The menu entry, and why it is not a route guard
+### It is not in this site's guard table
 
-`bot.dashboard` keeps the Management menu entry out of everybody's menu but
-Directorship's. It is marked `menuOnly` in `src/lib/guards.js`, so it filters the
-menu and nothing else: `routeGuardFor` drops `menuOnly` entries, and the route
-opens for anyone who asks for it. Blocking the route on a site permission would
-be a second, weaker copy of a decision the bot API already makes, and it could
-lock out somebody the bot would have let in.
+The link sits in the Management menu for everyone, and the route is not in
+`src/lib/guards.js`. Authorisation here belongs to the bot API, which re-checks
+every call; gating the route on a site permission as well would be a second,
+weaker opinion that could disagree with it, and could lock out somebody the bot
+would have let in. Anybody who opens it without a bot session gets the sign-in
+page, and anybody who signs in without staff access gets the not-staff page.
 
 ### Async work
 

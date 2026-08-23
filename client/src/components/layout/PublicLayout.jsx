@@ -4,7 +4,7 @@ import TopBar from "./TopBar";
 import Footer from "./Footer";
 import AnimatedOutlet from "./AnimatedOutlet";
 import RequireRole from "../auth/RequireRole";
-import { routeGuardFor } from "../../lib/guards";
+import { guardFor } from "../../lib/guards";
 
 /**
  * Shell for every public page. `main` is deliberately unconstrained so the
@@ -17,7 +17,7 @@ import { routeGuardFor } from "../../lib/guards";
  */
 export default function PublicLayout() {
   const { pathname } = useLocation();
-  const guard = routeGuardFor(pathname);
+  const guard = guardFor(pathname);
 
   return (
     <RequireRole permission={guard?.permission} reason={guard?.reason}>

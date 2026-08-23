@@ -149,13 +149,6 @@ export const PERMISSION_GROUPS = [
         sensitive: true,
       },
       {
-        key: "bot.dashboard",
-        label: "Open the bot dashboard",
-        detail:
-          "See the Bot Dashboard link in the Management menu. The bot API signs people in with Discord and decides for itself what they may do there, so this only keeps the link out of everybody else's menu.",
-        sensitive: true,
-      },
-      {
         key: "discord.roles.manage",
         label: "Map Discord roles",
         detail:
@@ -275,10 +268,6 @@ export const DEFAULT_GRANTS = {
   // edit permissions could simply grant it to themselves.
   "permissions.manage": ["directorship"],
   "discord.roles.manage": ["directorship"],
-
-  // Only hides the menu entry. The bot API authenticates separately and
-  // re-checks every call, so this grant confers nothing on its own.
-  "bot.dashboard": ["directorship"],
 };
 
 /* ------------------------------------------------------------------ *
