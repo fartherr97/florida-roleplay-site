@@ -490,9 +490,16 @@ a live bypass. `/sign-in` and `/create-account` are stubs that link to Discord.
 ## Placeholders
 
 Everything that needs a real value is defined once at the top of
-`client/src/data/mockData.js` under `SITE`, each marked `TODO:` — logo URL, hero
-photo, FiveM connect address, Discord invite, Tebex store URL, the assistant's
-name and the social handles.
+`client/src/data/mockData.js` under `SITE`, each marked `TODO:` — hero photo,
+FiveM connect address, Discord invite, Tebex store URL, the assistant's name and
+the social handles.
+
+The **logo is real**: `client/public/logo.png`, square-cropped and resized from
+the 1024px original so a 32px nav mark does not pull a 1.75 MB file. It is the
+only place to change it — `SITE.logoUrl` points at it, and both `Logo` and
+`HubBrandMark` read that, which covers the top bars, drawers, footer, hub landing
+plates, roster headers and the 403/404 panels. `favicon.png` and
+`apple-touch-icon.png` beside it are the same artwork at 64px and 180px.
 
 ## Checks
 

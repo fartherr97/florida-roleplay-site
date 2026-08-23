@@ -16,11 +16,14 @@ export default function HubBrandMark({ className }) {
       <span className="absolute left-3 top-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
         {SITE.shortName}
       </span>
+      {/* Sized to sit inside the plate like a coin in a frame. The emblem is a
+          circular badge with its own detail, so giving it most of the plate
+          reads as branding; at the smaller size it looked like a placeholder. */}
       <img
         src={SITE.logoUrl}
         alt=""
         aria-hidden="true"
-        className="size-16 object-contain sm:size-20"
+        className="size-28 object-contain sm:size-36"
       />
     </div>
   );

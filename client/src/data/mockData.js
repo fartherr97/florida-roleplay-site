@@ -15,8 +15,9 @@
 export const SITE = {
   name: "Florida Roleplay",
   shortName: "FLRP",
-  // TODO: replace with the real hosted logo URL.
-  logoUrl: "/favicon.svg",
+  // The community emblem, in client/public. Square-cropped and sized down from
+  // the 1024px original so a 32px nav mark does not pull a 1.75 MB file.
+  logoUrl: "/logo.png",
   // TODO: replace with a real in-game screenshot of the server.
   //       Royalty-free Florida coastline placeholder (Unsplash, free licence).
   heroImage:
