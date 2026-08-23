@@ -15,12 +15,12 @@
 export const portal = {
   reminders: [
     "Claim your tickets before working them — double-handled tickets are the top cause of conflicting rulings.",
-    "Vest hours reset on the 1st. Trial Moderators need eight logged hours before their review.",
-    "Any ban over seven days needs a Senior Admin's sign-off before you issue it.",
+    "Vest hours reset on the 1st. Trial Mods need eight logged hours before their review.",
+    "Any ban over seven days needs a Sr. Admin's sign-off before you issue it.",
   ],
   featuredMember: {
     name: "Jamie Okonkwo",
-    rank: "Senior Moderator",
+    rank: "Sr. Mod",
     note: "Cleared the weekend backlog single-handedly and rewrote the pursuit-policy macro the whole team now uses.",
     claims: "212",
     vestHours: "46",
@@ -57,20 +57,20 @@ export const portalLinks = {
  * ------------------------------------------------------------------ */
 
 export const roster = [
-  { id: "r-1", name: "Marcus Reyes", handle: "reyes", rank: "Director", rankId: "director", team: "Management", joined: "2024-03-04", claims: 88, vestHours: 21, status: "Active" },
-  { id: "r-2", name: "Dana Whitfield", handle: "dwhitfield", rank: "Director", rankId: "director", team: "Management", joined: "2024-05-19", claims: 74, vestHours: 18, status: "Active" },
-  { id: "r-3", name: "Alex Duarte", handle: "aduarte", rank: "Senior Administrator", rankId: "senior_admin", team: "Staff Team", joined: "2024-06-02", claims: 341, vestHours: 96, status: "Active" },
-  { id: "r-4", name: "Priya Raman", handle: "praman", rank: "Senior Administrator", rankId: "senior_admin", team: "Development", joined: "2024-07-11", claims: 129, vestHours: 34, status: "Active" },
-  { id: "r-5", name: "Sam Bennett", handle: "sbennett", rank: "Administrator", rankId: "admin", team: "Support", joined: "2024-09-23", claims: 268, vestHours: 71, status: "Active" },
-  { id: "r-6", name: "Noor Haddad", handle: "nhaddad", rank: "Administrator", rankId: "admin", team: "Staff Team", joined: "2024-11-08", claims: 254, vestHours: 68, status: "Active" },
-  { id: "r-7", name: "Jamie Okonkwo", handle: "jokonkwo", rank: "Senior Moderator", rankId: "senior_mod", team: "Staff Team", joined: "2025-01-16", claims: 212, vestHours: 46, status: "Active" },
-  { id: "r-8", name: "Ellis Prator", handle: "eprator", rank: "Senior Moderator", rankId: "senior_mod", team: "Staff Team", joined: "2025-02-27", claims: 197, vestHours: 41, status: "Active" },
-  { id: "r-9", name: "Kai Lindqvist", handle: "klindqvist", rank: "Moderator", rankId: "moderator", team: "Staff Team", joined: "2025-04-30", claims: 143, vestHours: 33, status: "Active" },
-  { id: "r-10", name: "Rosa Delgado", handle: "rdelgado", rank: "Moderator", rankId: "moderator", team: "Support", joined: "2025-06-14", claims: 118, vestHours: 29, status: "Active" },
-  { id: "r-11", name: "Toby Marsh", handle: "tmarsh", rank: "Moderator", rankId: "moderator", team: "Staff Team", joined: "2025-08-01", claims: 96, vestHours: 24, status: "Leave" },
-  { id: "r-12", name: "Wren Castellano", handle: "wcastellano", rank: "Trial Moderator", rankId: "trial_mod", team: "Staff Team", joined: "2026-06-20", claims: 41, vestHours: 12, status: "Active" },
-  { id: "r-13", name: "Iggy Salas", handle: "isalas", rank: "Trial Moderator", rankId: "trial_mod", team: "Staff Team", joined: "2026-07-09", claims: 28, vestHours: 9, status: "Active" },
-  { id: "r-14", name: "Bex Ferreira", handle: "bferreira", rank: "Trial Moderator", rankId: "trial_mod", team: "Support", joined: "2026-08-02", claims: 12, vestHours: 4, status: "Active" },
+  { id: "r-1", name: "Marcus Reyes", handle: "reyes", rank: "Head Admin", rankId: "head_admin", team: "Management", joined: "2024-03-04", claims: 88, vestHours: 21, status: "Active" },
+  { id: "r-2", name: "Dana Whitfield", handle: "dwhitfield", rank: "Head Admin", rankId: "head_admin", team: "Management", joined: "2024-05-19", claims: 74, vestHours: 18, status: "Active" },
+  { id: "r-3", name: "Alex Duarte", handle: "aduarte", rank: "Sr. Admin", rankId: "senior_admin", team: "Staff Team", joined: "2024-06-02", claims: 341, vestHours: 96, status: "Active" },
+  { id: "r-4", name: "Priya Raman", handle: "praman", rank: "Sr. Admin", rankId: "senior_admin", team: "Development", joined: "2024-07-11", claims: 129, vestHours: 34, status: "Active" },
+  { id: "r-5", name: "Sam Bennett", handle: "sbennett", rank: "Admin", rankId: "admin", team: "Support", joined: "2024-09-23", claims: 268, vestHours: 71, status: "Active" },
+  { id: "r-6", name: "Noor Haddad", handle: "nhaddad", rank: "Admin", rankId: "admin", team: "Staff Team", joined: "2024-11-08", claims: 254, vestHours: 68, status: "Active" },
+  { id: "r-7", name: "Jamie Okonkwo", handle: "jokonkwo", rank: "Sr. Mod", rankId: "senior_mod", team: "Staff Team", joined: "2025-01-16", claims: 212, vestHours: 46, status: "Active" },
+  { id: "r-8", name: "Ellis Prator", handle: "eprator", rank: "Sr. Mod", rankId: "senior_mod", team: "Staff Team", joined: "2025-02-27", claims: 197, vestHours: 41, status: "Active" },
+  { id: "r-9", name: "Kai Lindqvist", handle: "klindqvist", rank: "Mod", rankId: "mod", team: "Staff Team", joined: "2025-04-30", claims: 143, vestHours: 33, status: "Active" },
+  { id: "r-10", name: "Rosa Delgado", handle: "rdelgado", rank: "Mod", rankId: "mod", team: "Support", joined: "2025-06-14", claims: 118, vestHours: 29, status: "Active" },
+  { id: "r-11", name: "Toby Marsh", handle: "tmarsh", rank: "Mod", rankId: "mod", team: "Staff Team", joined: "2025-08-01", claims: 96, vestHours: 24, status: "Leave" },
+  { id: "r-12", name: "Wren Castellano", handle: "wcastellano", rank: "Trial Mod", rankId: "trial_mod", team: "Staff Team", joined: "2026-06-20", claims: 41, vestHours: 12, status: "Active" },
+  { id: "r-13", name: "Iggy Salas", handle: "isalas", rank: "Trial Mod", rankId: "trial_mod", team: "Staff Team", joined: "2026-07-09", claims: 28, vestHours: 9, status: "Active" },
+  { id: "r-14", name: "Bex Ferreira", handle: "bferreira", rank: "Trial Mod", rankId: "trial_mod", team: "Support", joined: "2026-08-02", claims: 12, vestHours: 4, status: "Active" },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -106,7 +106,7 @@ export const dashboard = {
 };
 
 /* ------------------------------------------------------------------ *
- * Trial Moderator checklist
+ * Trial Mod checklist
  * ------------------------------------------------------------------ */
 
 export const checklist = [
@@ -126,7 +126,7 @@ export const checklist = [
     title: "Shadowing",
     description: "Observe before you act. Minimum three sessions.",
     items: [
-      { id: "ck-5", label: "Shadowed three ticket resolutions with a Moderator+", required: true },
+      { id: "ck-5", label: "Shadowed three ticket resolutions with a Mod+", required: true },
       { id: "ck-6", label: "Observed one ban appeal from start to decision", required: true },
       { id: "ck-7", label: "Watched a pursuit-policy dispute handled live", required: false },
     ],
@@ -145,10 +145,10 @@ export const checklist = [
   {
     id: "review",
     title: "Review",
-    description: "Sign-off before full Moderator.",
+    description: "Sign-off before full Mod.",
     items: [
-      { id: "ck-12", label: "Passed the Trial Moderator exam", required: true },
-      { id: "ck-13", label: "Evaluation completed by an Administrator", required: true },
+      { id: "ck-12", label: "Passed the Trial Mod exam", required: true },
+      { id: "ck-13", label: "Evaluation completed by an Admin", required: true },
       { id: "ck-14", label: "No active infractions on the staff record", required: true },
     ],
   },
@@ -159,11 +159,11 @@ export const checklist = [
  * ------------------------------------------------------------------ */
 
 export const disciplinaryActions = [
-  { id: "da-2026-041", staffName: "Toby Marsh", rank: "Moderator", type: "Written Warning", tone: "amber", issuedBy: "Alex Duarte", issuedAt: "2026-08-12", status: "Active", summary: "Issued a 14-day ban without the required Senior Admin sign-off. Ban reduced on appeal." },
-  { id: "da-2026-038", staffName: "Rosa Delgado", rank: "Moderator", type: "Verbal Warning", tone: "slate", issuedBy: "Sam Bennett", issuedAt: "2026-07-28", status: "Expired", summary: "Handled a ticket involving a friend rather than reassigning it. Coached on conflict of interest." },
-  { id: "da-2026-033", staffName: "Iggy Salas", rank: "Trial Moderator", type: "Coaching Note", tone: "brand", issuedBy: "Noor Haddad", issuedAt: "2026-07-04", status: "Closed", summary: "Closed two tickets without recording evidence links. Re-trained on the retention policy." },
-  { id: "da-2026-027", staffName: "Kai Lindqvist", rank: "Moderator", type: "Written Warning", tone: "amber", issuedBy: "Alex Duarte", issuedAt: "2026-06-15", status: "Expired", summary: "Argued with a member in a public channel instead of moving to a ticket." },
-  { id: "da-2026-019", staffName: "Former Staff — M. Boyle", rank: "Trial Moderator", type: "Removal", tone: "rose", issuedBy: "Marcus Reyes", issuedAt: "2026-05-02", status: "Final", summary: "Used staff tooling to gain an in-character advantage. Removed and blacklisted from future applications." },
+  { id: "da-2026-041", staffName: "Toby Marsh", rank: "Mod", type: "Written Warning", tone: "amber", issuedBy: "Alex Duarte", issuedAt: "2026-08-12", status: "Active", summary: "Issued a 14-day ban without the required Sr. Admin sign-off. Ban reduced on appeal." },
+  { id: "da-2026-038", staffName: "Rosa Delgado", rank: "Mod", type: "Verbal Warning", tone: "slate", issuedBy: "Sam Bennett", issuedAt: "2026-07-28", status: "Expired", summary: "Handled a ticket involving a friend rather than reassigning it. Coached on conflict of interest." },
+  { id: "da-2026-033", staffName: "Iggy Salas", rank: "Trial Mod", type: "Coaching Note", tone: "brand", issuedBy: "Noor Haddad", issuedAt: "2026-07-04", status: "Closed", summary: "Closed two tickets without recording evidence links. Re-trained on the retention policy." },
+  { id: "da-2026-027", staffName: "Kai Lindqvist", rank: "Mod", type: "Written Warning", tone: "amber", issuedBy: "Alex Duarte", issuedAt: "2026-06-15", status: "Expired", summary: "Argued with a member in a public channel instead of moving to a ticket." },
+  { id: "da-2026-019", staffName: "Former Staff — M. Boyle", rank: "Trial Mod", type: "Removal", tone: "rose", issuedBy: "Marcus Reyes", issuedAt: "2026-05-02", status: "Final", summary: "Used staff tooling to gain an in-character advantage. Removed and blacklisted from future applications." },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -172,9 +172,9 @@ export const disciplinaryActions = [
 
 /** The three staff exams, in promotion order. */
 export const EXAMS = [
-  { key: "trial", label: "Trial Moderator Exam", short: "Trial Mod" },
-  { key: "senior", label: "Senior Moderator Exam", short: "Senior Mod" },
-  { key: "admin", label: "Administrator Exam", short: "Administrator" },
+  { key: "trial", label: "Trial Mod Exam", short: "Trial Mod" },
+  { key: "senior", label: "Sr. Mod Exam", short: "Sr. Mod" },
+  { key: "admin", label: "Admin Exam", short: "Admin" },
 ];
 
 /** Score thresholds. Below reviewMin is a fail; the band in between is a review. */
@@ -222,7 +222,7 @@ export const questionCatalog = [
   { rowNumber: 4, examType: "trial", questionId: "T-03", questionNumber: "3", questionText: "How many players may take part in a single criminal act?", questionType: "Multiple choice", points: "2", correctAnswer: "Six" },
   { rowNumber: 5, examType: "trial", questionId: "T-04", questionNumber: "4", questionText: "When does the New Life Rule take effect?", questionType: "Short answer", points: "2", correctAnswer: "After a character is downed and respawns" },
   { rowNumber: 6, examType: "senior", questionId: "S-01", questionNumber: "1", questionText: "When must a pursuit be terminated under the pursuit policy?", questionType: "Short answer", points: "2", correctAnswer: "When risk to the public outweighs the offence" },
-  { rowNumber: 7, examType: "senior", questionId: "S-02", questionNumber: "2", questionText: "Who signs off a ban longer than seven days?", questionType: "Multiple choice", points: "1", correctAnswer: "A Senior Administrator" },
-  { rowNumber: 8, examType: "admin", questionId: "A-01", questionNumber: "1", questionText: "Outline the escalation path for a staff complaint against an Administrator.", questionType: "Long answer", points: "4", correctAnswer: "Route to Senior Admin, then Director if unresolved" },
+  { rowNumber: 7, examType: "senior", questionId: "S-02", questionNumber: "2", questionText: "Who signs off a ban longer than seven days?", questionType: "Multiple choice", points: "1", correctAnswer: "A Sr. Admin" },
+  { rowNumber: 8, examType: "admin", questionId: "A-01", questionNumber: "1", questionText: "Outline the escalation path for a staff complaint against an Admin.", questionType: "Long answer", points: "4", correctAnswer: "Route to Sr. Admin, then Head Admin if unresolved" },
   { rowNumber: 9, examType: "admin", questionId: "A-02", questionNumber: "2", questionText: "How long is evidence retained before deletion?", questionType: "Multiple choice", points: "2", correctAnswer: "90 days" },
 ];

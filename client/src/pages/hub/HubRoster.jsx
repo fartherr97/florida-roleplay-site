@@ -12,11 +12,12 @@ import { formatDate } from "../../lib/format";
 
 const RANK_TONES = {
   trial_mod: "slate",
-  moderator: "brand",
+  mod: "brand",
   senior_mod: "green",
+  junior_admin: "primary",
   admin: "primary",
   senior_admin: "amber",
-  director: "rose",
+  head_admin: "rose",
 };
 
 const RANK_OPTIONS = [

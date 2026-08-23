@@ -6,6 +6,7 @@
 import * as mock from "../data/mockData";
 import * as hub from "../data/staffHubData";
 import * as civ from "../data/civilianHubData";
+import * as rosterMock from "../data/rosterData";
 
 export const USE_API = true;
 
@@ -14,7 +15,7 @@ const BASE = "/api";
 /**
  * While Discord OAuth is stubbed, the Staff Hub can browse as any rank. The
  * chosen rank rides along on every request so the API resolves the same rank the
- * UI is rendering — otherwise a previewed Director would see the page and then a
+ * UI is rendering — otherwise a previewed Head Admin would see the page and then a
  * 403 for its data. The server only honours this outside production.
  */
 const PREVIEW_KEY = "flrp.previewRank";
@@ -215,6 +216,15 @@ export const api = {
   civVehicles: () => get("/civilian-hub/vehicles", civ.vehicles),
   civProperties: () => get("/civilian-hub/properties", civ.properties),
   civLicences: () => get("/civilian-hub/licences", civ.licences),
+  roster: () => get("/roster", rosterMock.roster),
+  rosterRoleMap: () =>
+    get("/roster/role-map", {
+      divisions: rosterMock.DIVISIONS,
+      departments: rosterMock.DEPARTMENTS,
+      roles: rosterMock.ROLE_MAP,
+    }),
+  rosterSyncLog: () => get("/roster/sync-log", rosterMock.syncLog),
+
   civBusinesses: () => get("/civilian-hub/businesses", civ.businesses),
   civJobs: () => get("/civilian-hub/jobs", civ.jobs),
   civClassifieds: () => get("/civilian-hub/classifieds", civ.classifieds),

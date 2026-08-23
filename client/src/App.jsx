@@ -24,23 +24,15 @@ import CreateAccount from "./pages/CreateAccount";
 import HubShell from "./components/hub/HubShell";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
+import { CIVILIAN_RANKS } from "./data/mockData";
 
-/** Chips on the Civilian Hub landing — what the hub covers, not a rank ladder. */
-const CIVILIAN_CHIPS = [
-  { id: "characters", label: "Characters", tone: "green" },
-  { id: "vehicles", label: "Vehicles", tone: "brand" },
-  { id: "property", label: "Property", tone: "primary" },
-  { id: "licences", label: "Licences", tone: "amber" },
-  { id: "business", label: "Business", tone: "slate" },
-  { id: "law", label: "Penal Code", tone: "rose" },
-];
 import HubHome from "./pages/hub/HubHome";
 import HubRoster from "./pages/hub/HubRoster";
 import HubDashboard from "./pages/hub/HubDashboard";
 import HubChecklist from "./pages/hub/HubChecklist";
 import HubDaDatabase from "./pages/hub/HubDaDatabase";
 import HubLinks from "./pages/hub/HubLinks";
-import HubDirector from "./pages/hub/HubDirector";
+import HubHeadAdmin from "./pages/hub/HubHeadAdmin";
 import HubSubmissions from "./pages/hub/HubSubmissions";
 import HubExamMembers from "./pages/hub/HubExamMembers";
 import HubAuditLog from "./pages/hub/HubAuditLog";
@@ -50,6 +42,7 @@ import CivCharacters from "./pages/civ/CivCharacters";
 import CivVehicles from "./pages/civ/CivVehicles";
 import CivProperties from "./pages/civ/CivProperties";
 import CivLicences from "./pages/civ/CivLicences";
+import CivRoster from "./pages/civ/CivRoster";
 import CivBusinesses from "./pages/civ/CivBusinesses";
 import CivJobs from "./pages/civ/CivJobs";
 import CivClassifieds from "./pages/civ/CivClassifieds";
@@ -120,10 +113,13 @@ export default function App() {
             <Route path="staff-roster" element={<Navigate to="/staff-hub/roster" replace />} />
             <Route path="trial-mod-checklist" element={<Navigate to="/staff-hub/trial-checklist" replace />} />
             <Route path="staff-da-database" element={<Navigate to="/staff-hub/da-database" replace />} />
+            <Route path="staff-hub/director" element={<Navigate to="/staff-hub/head-admin" replace />} />
             <Route path="civilian-portal" element={<Navigate to="/civilian-hub" replace />} />
             <Route path="penal-code" element={<Navigate to="/civilian-hub/penal-code" replace />} />
             <Route path="jobs" element={<Navigate to="/civilian-hub/jobs" replace />} />
             <Route path="businesses" element={<Navigate to="/civilian-hub/businesses" replace />} />
+            <Route path="roster" element={<Navigate to="/civilian-hub/roster" replace />} />
+            <Route path="community-roster" element={<Navigate to="/civilian-hub/roster" replace />} />
             <Route path="connect" element={<Navigate to="/join" replace />} />
             <Route path="login" element={<Navigate to="/sign-in" replace />} />
             <Route path="register" element={<Navigate to="/create-account" replace />} />
@@ -182,7 +178,7 @@ export default function App() {
                 />
               }
             />
-            <Route path="/staff-hub/director" element={<HubDirector />} />
+            <Route path="/staff-hub/head-admin" element={<HubHeadAdmin />} />
 
             <Route path="/staff-hub/submissions" element={<HubSubmissions />} />
             <Route path="/staff-hub/exam-members" element={<HubExamMembers />} />
@@ -192,13 +188,14 @@ export default function App() {
 
           {/* Civilian Hub — same shape: a public landing page, then a gated
               shell over its sections. */}
-          <Route path="/civilian-hub" element={<HubLanding hub={CIVILIAN_HUB} chips={CIVILIAN_CHIPS} chipNote="Personal records need a whitelisted character; the community pages are open to any member." />} />
+          <Route path="/civilian-hub" element={<HubLanding hub={CIVILIAN_HUB} chips={CIVILIAN_RANKS} chipNote="Certification tiers are granted in Discord. Personal records need a whitelisted character; the community pages are open to any member." />} />
           <Route element={<HubShell hub={CIVILIAN_HUB} />}>
             <Route path="/civilian-hub/home" element={<CivHome />} />
             <Route path="/civilian-hub/characters" element={<CivCharacters />} />
             <Route path="/civilian-hub/vehicles" element={<CivVehicles />} />
             <Route path="/civilian-hub/properties" element={<CivProperties />} />
             <Route path="/civilian-hub/licences" element={<CivLicences />} />
+            <Route path="/civilian-hub/roster" element={<CivRoster />} />
             <Route path="/civilian-hub/businesses" element={<CivBusinesses />} />
             <Route path="/civilian-hub/jobs" element={<CivJobs />} />
             <Route path="/civilian-hub/classifieds" element={<CivClassifieds />} />

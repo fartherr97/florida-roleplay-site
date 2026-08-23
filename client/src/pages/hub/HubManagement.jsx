@@ -49,7 +49,7 @@ function ThresholdCard({ exam, values, onChange }) {
   );
 }
 
-/** Exam thresholds and the question catalog. Director only. */
+/** Exam thresholds and the question catalog. Head Admin only. */
 export default function HubManagement() {
   const [settings, setSettings] = useState(seedSettings);
   const [catalog, setCatalog] = useState(seedCatalog);
@@ -116,7 +116,7 @@ export default function HubManagement() {
         icon="SlidersHorizontal"
         title="Management"
         subtitle="Grading thresholds and the question catalog behind the three staff exams."
-        actions={<Badge tone="rose">Director only</Badge>}
+        actions={<Badge tone="rose">Head Admin only</Badge>}
       />
 
       {status && (

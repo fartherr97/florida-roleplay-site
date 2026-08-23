@@ -438,3 +438,58 @@ CREATE TABLE IF NOT EXISTS civ_penal_code (
   PRIMARY KEY (code),
   KEY idx_civ_penal_degree (degree)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Community roster (written by the Discord bot)
+-- ---------------------------------------------------------------------------
+
+-- One row per member holding a mapped Discord role. `discord_id` is unique
+-- because the sync API upserts on it, and losing a member's roles deletes the
+-- row rather than flagging it.
+CREATE TABLE IF NOT EXISTS roster_members (
+  id              VARCHAR(64)  NOT NULL,
+  discord_id      VARCHAR(20)  NOT NULL,
+  character_name  VARCHAR(128) NOT NULL,
+  display_name    VARCHAR(128) NULL,
+  department      VARCHAR(32)  NOT NULL,
+  rank_label      VARCHAR(64)  NOT NULL,
+  callsign        VARCHAR(32)  NULL,
+  status          VARCHAR(32)  NOT NULL DEFAULT 'Active',
+  joined_at       DATE         NULL,
+  synced_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source          VARCHAR(32)  NOT NULL DEFAULT 'discord-sync',
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_roster_discord (discord_id),
+  KEY idx_roster_department (department),
+  KEY idx_roster_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The Discord role → department/rank mapping the bot reads. Editing a row here
+-- changes what a role means everywhere at once; the bot holds no copy.
+CREATE TABLE IF NOT EXISTS roster_role_map (
+  role_id           VARCHAR(20)  NOT NULL,
+  role_key          VARCHAR(64)  NOT NULL,
+  department        VARCHAR(32)  NOT NULL,
+  rank_label        VARCHAR(64)  NOT NULL,
+  sort_order        INT          NOT NULL DEFAULT 0,
+  display_template  VARCHAR(128) NOT NULL DEFAULT '{first} {surname}',
+  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (role_id),
+  UNIQUE KEY uq_roster_role_key (role_key),
+  KEY idx_roster_role_department (department)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Append-only record of what the bot changed, so a wrong rank can be traced.
+CREATE TABLE IF NOT EXISTS roster_sync_log (
+  id              INT          NOT NULL AUTO_INCREMENT,
+  discord_id      VARCHAR(20)  NULL,
+  character_name  VARCHAR(128) NULL,
+  action          VARCHAR(32)  NOT NULL,
+  detail          TEXT         NULL,
+  actor           VARCHAR(64)  NOT NULL DEFAULT 'roster-bot',
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_roster_log_discord (discord_id),
+  KEY idx_roster_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

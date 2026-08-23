@@ -36,7 +36,7 @@ export default function HubLinks({ section, icon, title, subtitle, badge, badgeT
       {links.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-sm text-slate-400">
-            No links here yet. A Director can add them from the Director panel.
+            No links here yet. A Head Admin can add them from the Head Admin panel.
           </p>
         </Card>
       ) : (

@@ -12,35 +12,44 @@
 export const ROLES = {
   MEMBER: "member",
   WHITELISTED: "whitelisted",
-  STAFF: "staff",
+  CERT_CIV_1: "cert_civ_1",
+  CERT_CIV_2: "cert_civ_2",
+  CERT_CIV_3: "cert_civ_3",
   TRIAL_MOD: "trial_mod",
-  MODERATOR: "moderator",
+  MOD: "mod",
   SENIOR_MOD: "senior_mod",
+  JUNIOR_ADMIN: "junior_admin",
   ADMIN: "admin",
   SENIOR_ADMIN: "senior_admin",
-  DIRECTOR: "director",
-  MANAGEMENT: "management",
+  HEAD_ADMIN: "head_admin",
   DEPT_HEAD: "department_head",
 };
 
 /** Role bundles the hub gates on, mirrored in client/src/data/hubNavigation.js. */
 export const STAFF_ANY = [
-  ROLES.STAFF, ROLES.TRIAL_MOD, ROLES.MODERATOR, ROLES.SENIOR_MOD,
-  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.DIRECTOR, ROLES.MANAGEMENT,
+  ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD, ROLES.JUNIOR_ADMIN,
+  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
 ];
 export const ADMIN_PLUS = [
-  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.DIRECTOR, ROLES.MANAGEMENT,
+  ROLES.JUNIOR_ADMIN, ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
 ];
-export const SENIOR_ADMIN_PLUS = [
-  ROLES.SENIOR_ADMIN, ROLES.DIRECTOR, ROLES.MANAGEMENT,
-];
-export const DIRECTOR_ONLY = [ROLES.DIRECTOR, ROLES.MANAGEMENT];
+export const SENIOR_ADMIN_PLUS = [ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN];
+export const HEAD_ADMIN_ONLY = [ROLES.HEAD_ADMIN];
 
 /** Any signed-in community member; staff hold these implicitly. */
-export const MEMBER_ANY = [ROLES.MEMBER, ROLES.WHITELISTED, ...STAFF_ANY];
+export const MEMBER_ANY = [
+  ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.CERT_CIV_2,
+  ROLES.CERT_CIV_3, ...STAFF_ANY,
+];
 
 /** Personal civilian records only exist for a whitelisted character. */
-export const WHITELISTED_ANY = [ROLES.WHITELISTED, ...STAFF_ANY];
+export const WHITELISTED_ANY = [
+  ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.CERT_CIV_2, ROLES.CERT_CIV_3,
+  ...STAFF_ANY,
+];
+
+/** Civilian floor every staff rank also carries. */
+const CIV_BASE = [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1];
 
 /**
  * Every rank the preview switcher offers and the roles each grants, mirroring
@@ -50,40 +59,45 @@ export const WHITELISTED_ANY = [ROLES.WHITELISTED, ...STAFF_ANY];
  */
 export const STAFF_RANKS = {
   member: [ROLES.MEMBER],
-  whitelisted: [ROLES.MEMBER, ROLES.WHITELISTED],
-  trial_mod: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD],
-  moderator: [
-    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-    ROLES.MODERATOR,
+  cert_civ_1: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1],
+  cert_civ_2: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.CERT_CIV_2],
+  cert_civ_3: [
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.CERT_CIV_2,
+    ROLES.CERT_CIV_3,
   ],
-  senior_mod: [
-    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-    ROLES.MODERATOR, ROLES.SENIOR_MOD,
+  trial_mod: [...CIV_BASE, ROLES.TRIAL_MOD],
+  mod: [...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD],
+  senior_mod: [...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD],
+  junior_admin: [
+    ...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD,
+    ROLES.JUNIOR_ADMIN,
   ],
   admin: [
-    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-    ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN,
+    ...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD,
+    ROLES.JUNIOR_ADMIN, ROLES.ADMIN,
   ],
   senior_admin: [
-    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-    ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
+    ...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD,
+    ROLES.JUNIOR_ADMIN, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
   ],
-  director: [
-    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-    ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
-    ROLES.DIRECTOR, ROLES.MANAGEMENT,
+  head_admin: [
+    ...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD,
+    ROLES.JUNIOR_ADMIN, ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
   ],
 };
 
 export const RANK_LABELS = {
   member: "Member",
-  whitelisted: "Whitelisted",
+  cert_civ_1: "Cert. Civ. I",
+  cert_civ_2: "Cert. Civ. II",
+  cert_civ_3: "Cert. Civ. III",
   trial_mod: "Trial Mod",
-  moderator: "Moderator",
-  senior_mod: "Senior Mod",
-  admin: "Administrator",
-  senior_admin: "Senior Admin",
-  director: "Director",
+  mod: "Mod",
+  senior_mod: "Sr. Mod",
+  junior_admin: "Jr. Admin",
+  admin: "Admin",
+  senior_admin: "Sr. Admin",
+  head_admin: "Head Admin",
 };
 
 /** Every role the middleware will accept, for validation at the edges. */
@@ -95,10 +109,10 @@ export const devUser = {
   username: "sunshine.dev",
   displayName: "Sunshine Dev",
   avatar: null,
-  rank: "Senior Moderator",
+  rank: "Sr. Mod",
   roles: [
-    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-    ROLES.MODERATOR, ROLES.SENIOR_MOD,
+    ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.TRIAL_MOD,
+    ROLES.MOD, ROLES.SENIOR_MOD,
   ],
 };
 

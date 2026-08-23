@@ -26,6 +26,7 @@ export const navGroups = [
     },
     items: [
       { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
+      { label: "Community Roster", to: "/civilian-hub/roster", icon: "Users" },
       { label: "Vehicles", to: "/civilian-hub/vehicles", icon: "Car" },
       { label: "Properties", to: "/civilian-hub/properties", icon: "House" },
       { label: "Business Directory", to: "/civilian-hub/businesses", icon: "Store" },

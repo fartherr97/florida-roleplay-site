@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import Button from "../ui/Button";
 import { useAuth } from "../../context/useAuth";
-import { ROLES } from "../../data/mockData";
+import { STAFF_ANY } from "../../data/hubs";
 import { cn } from "../../lib/cn";
 
 /**
@@ -44,7 +44,7 @@ export default function UserChip({ className }) {
     .join("");
 
   // Only staff have somewhere to go from the chip; everyone else gets a plain pill.
-  const staff = hasRole([ROLES.STAFF, ROLES.MODERATOR, ROLES.ADMIN, ROLES.MANAGEMENT]);
+  const staff = hasRole(STAFF_ANY);
   const Tag = staff ? Link : "span";
 
   return (

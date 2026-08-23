@@ -12,29 +12,24 @@ import { ROLES } from "../data/mockData";
 import { hubRoutes } from "../data/hubs";
 
 export const STAFF_ROLES = [
-  ROLES.STAFF,
   ROLES.TRIAL_MOD,
-  ROLES.MODERATOR,
+  ROLES.MOD,
   ROLES.SENIOR_MOD,
+  ROLES.JUNIOR_ADMIN,
   ROLES.ADMIN,
   ROLES.SENIOR_ADMIN,
-  ROLES.DIRECTOR,
-  ROLES.MANAGEMENT,
+  ROLES.HEAD_ADMIN,
 ];
 export const MOD_ROLES = [
-  ROLES.MODERATOR,
+  ROLES.MOD,
   ROLES.SENIOR_MOD,
+  ROLES.JUNIOR_ADMIN,
   ROLES.ADMIN,
   ROLES.SENIOR_ADMIN,
-  ROLES.DIRECTOR,
-  ROLES.MANAGEMENT,
+  ROLES.HEAD_ADMIN,
 ];
-export const MANAGEMENT_ROLES = [ROLES.MANAGEMENT, ROLES.DIRECTOR];
-export const DEPT_HEAD_ROLES = [
-  ROLES.MANAGEMENT,
-  ROLES.DIRECTOR,
-  ROLES.DEPT_HEAD,
-];
+export const MANAGEMENT_ROLES = [ROLES.HEAD_ADMIN];
+export const DEPT_HEAD_ROLES = [ROLES.HEAD_ADMIN, ROLES.DEPT_HEAD];
 
 /** Matched with `end: true`, so each entry gates exactly its own path. */
 export const GUARDS = [

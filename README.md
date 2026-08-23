@@ -107,8 +107,9 @@ shared-package overhead.
 | Rank Access | Resources, Administrators, Senior Admins+, Director panel |
 | Exam Backend | Recent Submissions (with attempt review and manual override), Members, Audit Log, Management (thresholds and question catalog) |
 
-Ranks run Member → Whitelisted → Trial Mod → Moderator → Senior Mod →
-Administrator → Senior Admin → Director, each granting the roles below it.
+Ranks run Trial Mod → Mod → Sr. Mod → Jr. Admin → Admin → Sr. Admin → Head
+Admin, each granting the roles below it, over a civilian floor of Member →
+Cert. Civ. I → II → III.
 
 Exam results are never edited in place. An override writes an append-only row
 carrying the reviewer and their reason, and the Audit Log renders those rows; the
@@ -119,7 +120,7 @@ attempt keeps its original score alongside the new one.
 | Group | Pages |
 | --- | --- |
 | My Records | Overview, Characters, Vehicles, Properties, Licences |
-| Community | Business Directory, Job Board, Classifieds |
+| Community | Community Roster, Business Directory, Job Board, Classifieds |
 | Resources | Penal Code, Civilian Guides |
 
 Two gates apply. Personal records need a **whitelisted** character; the community
@@ -128,6 +129,68 @@ whether to apply should be able to read the penal code and see who is hiring. A
 member who simply is not whitelisted yet gets its own denial page
 (`AUTH_NOT_WHITELISTED`) pointing at the whitelist application rather than the
 staff copy about contacting a supervisor.
+
+## Community roster and the Discord bot
+
+`/civilian-hub/roster` lists everyone across every department — civilians, law
+enforcement, fire and EMS, staff and management. It is written by a Discord bot,
+not by hand: when someone's roles change, the bot posts the change here and the
+roster and their Discord nickname update together.
+
+The contract is deliberately one-way. **The bot holds no copy of what a role
+means.** It reads the map from the API, posts the roles a member now holds, and
+applies whatever nickname comes back — so a rank rename or a new department is a
+change in one place.
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/roster` | member | The roster |
+| GET | `/api/roster/role-map` | none | Divisions, departments and the Discord role → rank map |
+| GET | `/api/roster/sync-log` | member | What the bot changed, newest first |
+| POST | `/api/roster/sync` | bot | One member's roles changed |
+| POST | `/api/roster/sync/bulk` | bot | Full reconciliation sweep |
+
+Both POSTs accept `?dryRun=1`, which computes the result without writing — use it
+to preview a rename before applying it.
+
+```jsonc
+// POST /api/roster/sync
+{ "discordId": "402118844500000902", "characterName": "Aaron Jones",
+  "roles": ["100000000000000041"], "callsign": "122" }
+
+// →
+{ "ok": true, "action": "upserted", "matchedRole": "senior_admin",
+  "nickname": "122 | Sr. Admin | Jones",
+  "member": { "rank": "Sr. Admin", "rankFull": "Senior Administrator", … } }
+```
+
+**Nicknames** follow the community convention `{callsign} | {rank} | {surname}` —
+`122 | Sr. Admin | Jones`, `167 | Mod | Jacob`. The response carries two names:
+`displayName` is the full form the roster shows, and `nickname` is trimmed to
+Discord's 32-character limit. If the full form does not fit, the callsign is
+dropped first and the rank second — the person's name is the last thing to go,
+because a nickname nobody can be identified by defeats the point. The bot should
+apply `nickname` verbatim and never shorten anything itself.
+
+**Precedence.** A member holding several mapped roles is rostered under the
+highest `order`, so a promotion takes effect without removing the old role first,
+and staff ranks outrank department ranks — a Sr. Admin who also troops for FHP
+shows as staff.
+
+**Removal.** A member with no mapped roles left comes off the roster and the
+response returns `nickname: null`, meaning clear their nickname. The bulk sweep
+also drops anyone rostered but absent from the payload, so a nightly
+reconciliation converges even when individual role events were missed.
+
+**Auth.** The bot is not a Discord user, so it authenticates with a shared
+secret — `Authorization: Bearer $BOT_TOKEN` — rather than roles. Leave `BOT_TOKEN`
+unset and the sync endpoints answer `503`; they are never left open, because an
+unauthenticated endpoint that rewrites the roster and everyone's nickname is not
+something to leave to a default.
+
+**Role IDs are placeholders.** Every `roleId` in `client/src/data/rosterData.js`
+is a `TODO` — swap in the real Discord snowflakes before pointing the bot at a
+live guild. The keys, ranks and ordering are already correct.
 
 ### Where roles are declared
 

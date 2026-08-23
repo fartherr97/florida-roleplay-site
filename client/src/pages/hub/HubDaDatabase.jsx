@@ -60,7 +60,7 @@ export default function HubDaDatabase() {
         icon="Gavel"
         title="Staff DA Database"
         subtitle="Disciplinary actions issued against staff. Handle this record with the same discretion you would a member's."
-        actions={<Badge tone="rose">Administrator+</Badge>}
+        actions={<Badge tone="rose">Jr. Admin+</Badge>}
       />
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">

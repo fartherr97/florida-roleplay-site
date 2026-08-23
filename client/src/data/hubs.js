@@ -13,36 +13,46 @@ import { ROLES } from "./mockData";
 /* --------------------------- role bundles --------------------------- */
 
 export const STAFF_ANY = [
-  ROLES.STAFF,
   ROLES.TRIAL_MOD,
-  ROLES.MODERATOR,
+  ROLES.MOD,
   ROLES.SENIOR_MOD,
+  ROLES.JUNIOR_ADMIN,
   ROLES.ADMIN,
   ROLES.SENIOR_ADMIN,
-  ROLES.DIRECTOR,
-  ROLES.MANAGEMENT,
+  ROLES.HEAD_ADMIN,
 ];
 
+/** Jr. Admin and up. */
 export const ADMIN_PLUS = [
+  ROLES.JUNIOR_ADMIN,
   ROLES.ADMIN,
   ROLES.SENIOR_ADMIN,
-  ROLES.DIRECTOR,
-  ROLES.MANAGEMENT,
+  ROLES.HEAD_ADMIN,
 ];
 
-export const SENIOR_ADMIN_PLUS = [
-  ROLES.SENIOR_ADMIN,
-  ROLES.DIRECTOR,
-  ROLES.MANAGEMENT,
-];
+export const SENIOR_ADMIN_PLUS = [ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN];
 
-export const DIRECTOR_ONLY = [ROLES.DIRECTOR, ROLES.MANAGEMENT];
+/** The top of the staff ladder. */
+export const HEAD_ADMIN_ONLY = [ROLES.HEAD_ADMIN];
 
 /** Any signed-in community member. */
-export const MEMBER_ANY = [ROLES.MEMBER, ROLES.WHITELISTED, ...STAFF_ANY];
+export const MEMBER_ANY = [
+  ROLES.MEMBER,
+  ROLES.WHITELISTED,
+  ROLES.CERT_CIV_1,
+  ROLES.CERT_CIV_2,
+  ROLES.CERT_CIV_3,
+  ...STAFF_ANY,
+];
 
 /** Personal records only exist for a whitelisted character. */
-export const WHITELISTED_ANY = [ROLES.WHITELISTED, ...STAFF_ANY];
+export const WHITELISTED_ANY = [
+  ROLES.WHITELISTED,
+  ROLES.CERT_CIV_1,
+  ROLES.CERT_CIV_2,
+  ROLES.CERT_CIV_3,
+  ...STAFF_ANY,
+];
 
 /* ------------------------------- hubs ------------------------------- */
 
@@ -94,7 +104,7 @@ export const STAFF_HUB = {
         { to: "/staff-hub/resources", label: "Resources", icon: "BookOpen", roles: STAFF_ANY },
         { to: "/staff-hub/administrators", label: "Administrators", icon: "Shield", roles: ADMIN_PLUS },
         { to: "/staff-hub/senior-admins", label: "Senior Admins+", icon: "ShieldCheck", roles: SENIOR_ADMIN_PLUS },
-        { to: "/staff-hub/director", label: "Director", icon: "Crown", roles: DIRECTOR_ONLY },
+        { to: "/staff-hub/head-admin", label: "Head Admin", icon: "Crown", roles: HEAD_ADMIN_ONLY },
       ],
     },
     {
@@ -105,7 +115,7 @@ export const STAFF_HUB = {
         { to: "/staff-hub/submissions", label: "Recent Submissions", icon: "Inbox", roles: ADMIN_PLUS },
         { to: "/staff-hub/exam-members", label: "Members", icon: "UserSearch", roles: ADMIN_PLUS },
         { to: "/staff-hub/audit-log", label: "Audit Log", icon: "ScrollText", roles: SENIOR_ADMIN_PLUS },
-        { to: "/staff-hub/management", label: "Management", icon: "SlidersHorizontal", roles: DIRECTOR_ONLY },
+        { to: "/staff-hub/management", label: "Management", icon: "SlidersHorizontal", roles: HEAD_ADMIN_ONLY },
       ],
     },
   ],
@@ -139,6 +149,7 @@ export const CIVILIAN_HUB = {
       label: "Community",
       tone: TONES.brand,
       items: [
+        { to: "/civilian-hub/roster", label: "Community Roster", icon: "Users", roles: MEMBER_ANY },
         { to: "/civilian-hub/businesses", label: "Business Directory", icon: "Store", roles: MEMBER_ANY },
         { to: "/civilian-hub/jobs", label: "Job Board", icon: "Briefcase", roles: MEMBER_ANY },
         { to: "/civilian-hub/classifieds", label: "Classifieds", icon: "Tag", roles: MEMBER_ANY },

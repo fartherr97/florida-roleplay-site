@@ -27,7 +27,7 @@ export default function HubAuditLog() {
         icon="ScrollText"
         title="Audit Log"
         subtitle="Every override applied to an exam result, who applied it and why. Entries are never edited or removed."
-        actions={<Badge tone="amber">Senior Admin+</Badge>}
+        actions={<Badge tone="amber">Sr. Admin+</Badge>}
       />
 
       {logs.length === 0 ? (

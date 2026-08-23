@@ -47,28 +47,35 @@ export const SITE = {
 export const ROLES = {
   MEMBER: "member",
   WHITELISTED: "whitelisted",
-  STAFF: "staff",
+  // Civilian certification tiers
+  CERT_CIV_1: "cert_civ_1",
+  CERT_CIV_2: "cert_civ_2",
+  CERT_CIV_3: "cert_civ_3",
+  // Staff ladder, lowest to highest
   TRIAL_MOD: "trial_mod",
-  MODERATOR: "moderator",
+  MOD: "mod",
   SENIOR_MOD: "senior_mod",
+  JUNIOR_ADMIN: "junior_admin",
   ADMIN: "admin",
   SENIOR_ADMIN: "senior_admin",
-  DIRECTOR: "director",
-  MANAGEMENT: "management",
+  HEAD_ADMIN: "head_admin",
+  // Department command, orthogonal to the staff ladder
   DEPT_HEAD: "department_head",
 };
 
 export const ROLE_LABELS = {
   member: "Member",
   whitelisted: "Whitelisted",
-  staff: "Staff",
-  trial_mod: "Trial Moderator",
-  moderator: "Moderator",
-  senior_mod: "Senior Moderator",
-  admin: "Administrator",
-  senior_admin: "Senior Administrator",
-  director: "Director",
-  management: "Management",
+  cert_civ_1: "Cert. Civ. I",
+  cert_civ_2: "Cert. Civ. II",
+  cert_civ_3: "Cert. Civ. III",
+  trial_mod: "Trial Mod",
+  mod: "Mod",
+  senior_mod: "Sr. Mod",
+  junior_admin: "Jr. Admin",
+  admin: "Admin",
+  senior_admin: "Sr. Admin",
+  head_admin: "Head Admin",
   department_head: "Department Head",
 };
 
@@ -78,79 +85,53 @@ export const ROLE_LABELS = {
  * personal records the Civilian Hub shows.
  */
 export const CIVILIAN_RANKS = [
+  { id: "member", label: "Member", tone: "slate", roles: [ROLES.MEMBER] },
   {
-    id: "member",
-    label: "Member",
-    tone: "slate",
-    roles: [ROLES.MEMBER],
+    id: "cert_civ_1",
+    label: "Cert. Civ. I",
+    tone: "green",
+    roles: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1],
   },
   {
-    id: "whitelisted",
-    label: "Whitelisted",
+    id: "cert_civ_2",
+    label: "Cert. Civ. II",
     tone: "green",
-    roles: [ROLES.MEMBER, ROLES.WHITELISTED],
+    roles: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.CERT_CIV_2],
+  },
+  {
+    id: "cert_civ_3",
+    label: "Cert. Civ. III",
+    tone: "green",
+    roles: [
+      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1, ROLES.CERT_CIV_2,
+      ROLES.CERT_CIV_3,
+    ],
   },
 ];
 
-/**
- * Staff ranks in ascending order, used by the rank chips on the Staff Hub's
- * landing page. Each rank carries the roles it grants, so previewing a rank
- * behaves exactly like holding those Discord roles.
- */
-export const STAFF_RANKS = [
-  {
-    id: "trial_mod",
-    label: "Trial Mod",
-    tone: "slate",
-    roles: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD],
-  },
-  {
-    id: "moderator",
-    label: "Moderator",
-    tone: "brand",
-    roles: [
-      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-      ROLES.MODERATOR,
-    ],
-  },
-  {
-    id: "senior_mod",
-    label: "Senior Mod",
-    tone: "green",
-    roles: [
-      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-      ROLES.MODERATOR, ROLES.SENIOR_MOD,
-    ],
-  },
-  {
-    id: "admin",
-    label: "Administrator",
-    tone: "primary",
-    roles: [
-      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-      ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN,
-    ],
-  },
-  {
-    id: "senior_admin",
-    label: "Senior Admin",
-    tone: "amber",
-    roles: [
-      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-      ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
-    ],
-  },
-  {
-    id: "director",
-    label: "Director",
-    tone: "rose",
-    roles: [
-      ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
-      ROLES.MODERATOR, ROLES.SENIOR_MOD, ROLES.ADMIN, ROLES.SENIOR_ADMIN,
-      ROLES.DIRECTOR, ROLES.MANAGEMENT,
-    ],
-  },
+const CIV_BASE = [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.CERT_CIV_1];
+
+const STAFF_LADDER = [
+  { id: "trial_mod", label: "Trial Mod", role: ROLES.TRIAL_MOD, tone: "slate" },
+  { id: "mod", label: "Mod", role: ROLES.MOD, tone: "brand" },
+  { id: "senior_mod", label: "Sr. Mod", role: ROLES.SENIOR_MOD, tone: "green" },
+  { id: "junior_admin", label: "Jr. Admin", role: ROLES.JUNIOR_ADMIN, tone: "primary" },
+  { id: "admin", label: "Admin", role: ROLES.ADMIN, tone: "primary" },
+  { id: "senior_admin", label: "Sr. Admin", role: ROLES.SENIOR_ADMIN, tone: "amber" },
+  { id: "head_admin", label: "Head Admin", role: ROLES.HEAD_ADMIN, tone: "rose" },
 ];
+
+/**
+ * Staff ranks in ascending order. Each rank carries every role below it, so
+ * previewing a rank behaves exactly like holding those Discord roles and a
+ * promotion never needs the previous role removed first.
+ */
+export const STAFF_RANKS = STAFF_LADDER.map((rank, index) => ({
+  id: rank.id,
+  label: rank.label,
+  tone: rank.tone,
+  roles: [...CIV_BASE, ...STAFF_LADDER.slice(0, index + 1).map((r) => r.role)],
+}));
 
 /**
  * Every rank the preview switcher offers, civilian standing first. Keeping both
@@ -165,8 +146,10 @@ export const mockUser = {
   username: "sunshine.dev",
   displayName: "Sunshine Dev",
   avatar: null,
-  rank: "Senior Moderator",
-  roles: ["member", "whitelisted", "staff", "trial_mod", "moderator", "senior_mod"],
+  rank: "Sr. Mod",
+  roles: [
+    "member", "whitelisted", "cert_civ_1", "trial_mod", "mod", "senior_mod",
+  ],
 };
 
 /* ------------------------------------------------------------------ *
@@ -562,7 +545,7 @@ export const staff = [
     id: "s-1",
     name: "Marcus Reyes",
     handle: "reyes",
-    role: "Owner",
+    role: "Head Admin",
     group: "Management",
     department: "Management",
     tone: "rose",
@@ -572,7 +555,7 @@ export const staff = [
     id: "s-2",
     name: "Dana Whitfield",
     handle: "dwhitfield",
-    role: "Community Manager",
+    role: "Head Admin",
     group: "Management",
     department: "Management",
     tone: "rose",
@@ -582,7 +565,7 @@ export const staff = [
     id: "s-3",
     name: "Priya Raman",
     handle: "praman",
-    role: "Head of Development",
+    role: "Head Admin",
     group: "Management",
     department: "Development",
     tone: "rose",
@@ -592,7 +575,7 @@ export const staff = [
     id: "s-4",
     name: "Alex Duarte",
     handle: "aduarte",
-    role: "Head Administrator",
+    role: "Sr. Admin",
     group: "Staff",
     department: "Staff Team",
     tone: "primary",
@@ -602,7 +585,7 @@ export const staff = [
     id: "s-5",
     name: "Jamie Okonkwo",
     handle: "jokonkwo",
-    role: "Senior Moderator",
+    role: "Sr. Mod",
     group: "Staff",
     department: "Staff Team",
     tone: "primary",
@@ -612,7 +595,7 @@ export const staff = [
     id: "s-6",
     name: "Sam Bennett",
     handle: "sbennett",
-    role: "Support Lead",
+    role: "Admin",
     group: "Staff",
     department: "Support",
     tone: "primary",

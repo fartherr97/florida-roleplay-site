@@ -219,7 +219,7 @@ export default function HubSubmissions() {
         icon="Inbox"
         title="Recent Submissions"
         subtitle="Every staff exam attempt, newest first. Open one to review its answers or override the result."
-        actions={<Badge tone="primary">Administrator+</Badge>}
+        actions={<Badge tone="primary">Jr. Admin+</Badge>}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

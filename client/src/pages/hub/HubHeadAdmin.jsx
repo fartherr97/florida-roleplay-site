@@ -31,11 +31,11 @@ function Panel({ title, children }) {
 }
 
 /**
- * Director panel — edits the featured member, reminders, quick notes and every
+ * Head Admin panel — edits the featured member, reminders, quick notes and every
  * rank's link collection. Writes go to the API; when it is unreachable the save
  * reports that rather than pretending it persisted.
  */
-export default function HubDirector() {
+export default function HubHeadAdmin() {
   const [featured, setFeatured] = useState(seedPortal.featuredMember);
   const [reminders, setReminders] = useState(seedPortal.reminders);
   const [quickNotes, setQuickNotes] = useState(seedPortal.quickNotes);
@@ -92,9 +92,9 @@ export default function HubDirector() {
     <>
       <HubPageHeader
         icon="Crown"
-        title="Director"
+        title="Head Admin"
         subtitle="Manage the featured member, reminders, quick notes and every rank's links."
-        actions={<Badge tone="rose">Director only</Badge>}
+        actions={<Badge tone="rose">Head Admin only</Badge>}
       />
 
       {status && (

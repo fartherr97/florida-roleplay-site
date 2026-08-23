@@ -81,7 +81,7 @@ export async function attachUser(req, _res, next) {
 }
 
 /**
- * Gate factory. `requireRole(["staff", "admin"])` passes when the caller holds
+ * Gate factory. `requireRole(["admin", "head_admin"])` passes when the caller holds
  * any of the listed roles.
  */
 const MESSAGES = {

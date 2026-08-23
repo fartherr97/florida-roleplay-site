@@ -89,7 +89,7 @@ export default function HubExamMembers() {
         icon="UserSearch"
         title="Members"
         subtitle="Everyone who has sat a staff exam, with their full attempt history."
-        actions={<Badge tone="primary">Administrator+</Badge>}
+        actions={<Badge tone="primary">Jr. Admin+</Badge>}
       />
 
       <div className="relative mb-6 max-w-lg">

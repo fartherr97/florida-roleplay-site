@@ -13,7 +13,7 @@ import { query } from "../db.js";
 import * as seed from "../staffHubSeed.js";
 import {
   ADMIN_PLUS,
-  DIRECTOR_ONLY,
+  HEAD_ADMIN_ONLY,
   SENIOR_ADMIN_PLUS,
   STAFF_ANY,
 } from "../seed.js";
@@ -77,7 +77,7 @@ const PORTAL_SECTIONS = {
   links: "links",
 };
 
-router.post("/portal/:section", requireRole(DIRECTOR_ONLY), async (req, res) => {
+router.post("/portal/:section", requireRole(HEAD_ADMIN_ONLY), async (req, res) => {
   const key = PORTAL_SECTIONS[req.params.section];
   if (!key) {
     return res.status(400).json({ ok: false, errors: ["Unknown portal section."] });
@@ -399,7 +399,7 @@ router.get("/exams/audit-log", requireRole(SENIOR_ADMIN_PLUS), (_req, res) =>
 
 /* -------------------------------------------------------- exam config */
 
-router.get("/exams/settings", requireRole(DIRECTOR_ONLY), async (_req, res) => {
+router.get("/exams/settings", requireRole(HEAD_ADMIN_ONLY), async (_req, res) => {
   try {
     const rows = await query("SELECT * FROM hub_exam_settings");
     if (rows.length) {
@@ -423,7 +423,7 @@ router.get("/exams/settings", requireRole(DIRECTOR_ONLY), async (_req, res) => {
   return res.json(seed.examSettings);
 });
 
-router.post("/exams/settings", requireRole(DIRECTOR_ONLY), async (req, res) => {
+router.post("/exams/settings", requireRole(HEAD_ADMIN_ONLY), async (req, res) => {
   const body = req.body ?? {};
   const errors = [];
 
@@ -469,7 +469,7 @@ router.post("/exams/settings", requireRole(DIRECTOR_ONLY), async (req, res) => {
   }
 });
 
-router.get("/exams/question-catalog", requireRole(DIRECTOR_ONLY), (_req, res) =>
+router.get("/exams/question-catalog", requireRole(HEAD_ADMIN_ONLY), (_req, res) =>
   safe(
     res,
     async () => {
@@ -493,7 +493,7 @@ router.get("/exams/question-catalog", requireRole(DIRECTOR_ONLY), (_req, res) =>
 
 router.post(
   "/exams/question-catalog/:row",
-  requireRole(DIRECTOR_ONLY),
+  requireRole(HEAD_ADMIN_ONLY),
   async (req, res) => {
     const rowNumber = Number(req.params.row);
     const body = req.body ?? {};

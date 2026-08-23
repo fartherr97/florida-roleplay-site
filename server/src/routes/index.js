@@ -9,6 +9,7 @@ import * as seed from "../seed.js";
 import { attachUser, requireRole } from "../middleware/requireRole.js";
 import staffHubRouter from "./staffHub.js";
 import civilianHubRouter from "./civilianHub.js";
+import rosterRouter from "./roster.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -16,12 +17,7 @@ import {
 } from "../validate.js";
 
 const router = Router();
-const STAFF_ROLES = [
-  seed.ROLES.STAFF,
-  seed.ROLES.MODERATOR,
-  seed.ROLES.ADMIN,
-  seed.ROLES.MANAGEMENT,
-];
+const STAFF_ROLES = seed.STAFF_ANY;
 
 router.use(attachUser);
 
@@ -29,6 +25,9 @@ router.use(attachUser);
 // the gating for each stays next to the query it protects.
 router.use("/staff-hub", staffHubRouter);
 router.use("/civilian-hub", civilianHubRouter);
+// The roster is read by members and written by the Discord bot, so it sits
+// alongside the hubs rather than inside either one.
+router.use("/roster", rosterRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {
