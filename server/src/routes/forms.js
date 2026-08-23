@@ -138,17 +138,45 @@ function shape(form, context) {
  * ------------------------------------------------------------------ */
 
 /**
- * The forms a caller may see, optionally narrowed to one hub's audience.
- * Unpublished drafts only appear for someone who can manage them.
+ * Which permission a hub's forms sit behind.
+ *
+ * `forms.view` is granted broadly — a member has to be able to reach the
+ * whitelist knowledge check before they are anything else. But the Staff Hub's
+ * forms are staff-internal, and a promotion exam's title and description say
+ * plenty on their own, so listing a hub's forms takes the same permission as
+ * opening that hub.
+ */
+const AUDIENCE_PERMISSIONS = { staff: "staff.view", civilian: "civilian.view" };
+
+function mayReadAudience(audience, context) {
+  const required = AUDIENCE_PERMISSIONS[audience];
+  return !required || context.permissions.has(required);
+}
+
+/**
+ * The forms a caller may see, narrowed to one hub's audience. Unpublished
+ * drafts only appear for someone who can manage them.
  */
 router.get("/", requirePermission("forms.view"), withCaller, async (req, res) => {
   const audience = str(req.query.audience);
   const context = req.callerContext;
+
+  if (!mayReadAudience(audience, context)) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: "Your Discord roles don't give you access to that hub's forms.",
+    });
+  }
+
   const forms = await loadForms();
   const submissions = await loadSubmissions();
 
   const visible = forms
     .filter((form) => !audience || form.audience === audience || form.audience === "all")
+    // Without an audience filter, drop anything from a hub this caller cannot
+    // read — a bare GET /forms must not be a way around the check above.
+    .filter((form) => audience || mayReadAudience(form.audience, context))
     .filter(
       (form) =>
         form.published ||
@@ -172,6 +200,13 @@ router.get("/:formId", requirePermission("forms.view"), withCaller, async (req, 
   if (!form) return res.status(404).json({ ok: false, message: "No such form." });
 
   const context = req.callerContext;
+  if (!mayReadAudience(form.audience, context)) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: "Your Discord roles don't give you access to that hub's forms.",
+    });
+  }
   if (!canTakeForm(form, context) && !canReviewForm(form, context)) {
     return res.status(403).json({
       ok: false,

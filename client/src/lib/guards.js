@@ -26,7 +26,9 @@ export const GUARDS = [
   // Staff Hub
   { path: "/staff-hub/home", permission: "staff.view" },
   { path: "/staff-hub/roster", permission: "staff.view" },
-  { path: "/staff-hub/forms", permission: "forms.view" },
+  // The forms themselves need forms.view, but this page lists the staff ones —
+  // so it takes the same permission as the rest of the Staff Hub.
+  { path: "/staff-hub/forms", permission: "staff.view" },
   { path: "/staff-hub/promotion-board", permission: "promotions.view" },
   { path: "/staff-hub/dashboard", permission: "staff.view" },
   { path: "/staff-hub/trial-checklist", permission: "staff.view" },
