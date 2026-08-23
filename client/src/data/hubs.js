@@ -93,6 +93,7 @@ export const STAFF_HUB = {
         { to: "/staff-hub/roster", label: "Staff Roster", icon: "Users", permission: "staff.view" },
         { to: "/staff-hub/dashboard", label: "Staff Dashboard", icon: "ChartColumn", permission: "staff.view" },
         { to: "/staff-hub/trial-checklist", label: "Trial Mod Checklist", icon: "ListChecks", permission: "staff.view" },
+        { to: "/staff-hub/forms", label: "Forms & Exams", icon: "ClipboardList", permission: "forms.view" },
         { to: "/staff-hub/da-database", label: "Staff DA Database", icon: "Gavel", permission: "staff.da_view" },
       ],
     },
@@ -155,6 +156,7 @@ export const CIVILIAN_HUB = {
         { to: "/civilian-hub/businesses", label: "Business Directory", icon: "Store", permission: "civilian.view" },
         { to: "/civilian-hub/jobs", label: "Job Board", icon: "Briefcase", permission: "civilian.view" },
         { to: "/civilian-hub/classifieds", label: "Classifieds", icon: "Tag", permission: "civilian.view" },
+        { to: "/civilian-hub/forms", label: "Forms & Assessments", icon: "ClipboardList", permission: "forms.view" },
       ],
     },
     {

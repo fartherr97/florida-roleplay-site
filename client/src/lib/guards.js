@@ -26,6 +26,7 @@ export const GUARDS = [
   // Staff Hub
   { path: "/staff-hub/home", permission: "staff.view" },
   { path: "/staff-hub/roster", permission: "staff.view" },
+  { path: "/staff-hub/forms", permission: "forms.view" },
   { path: "/staff-hub/dashboard", permission: "staff.view" },
   { path: "/staff-hub/trial-checklist", permission: "staff.view" },
   { path: "/staff-hub/resources", permission: "staff.view" },
@@ -43,6 +44,7 @@ export const GUARDS = [
   // Civilian Hub
   { path: "/civilian-hub/home", permission: "civilian.view" },
   { path: "/civilian-hub/roster", permission: "roster.view" },
+  { path: "/civilian-hub/forms", permission: "forms.view" },
   { path: "/civilian-hub/businesses", permission: "civilian.view" },
   { path: "/civilian-hub/jobs", permission: "civilian.view" },
   { path: "/civilian-hub/classifieds", permission: "civilian.view" },

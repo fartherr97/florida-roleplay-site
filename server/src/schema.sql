@@ -591,3 +591,49 @@ CREATE TABLE IF NOT EXISTS hub_training (
   created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Forms and exams
+-- ---------------------------------------------------------------------------
+
+-- One row per form. The whole document — questions, answer key, thresholds and
+-- who may take or review it — is JSON, so adding a question type needs no
+-- migration. An empty table means the seeds in server/src/formsSeed.js apply.
+CREATE TABLE IF NOT EXISTS forms (
+  id          VARCHAR(64) NOT NULL,
+  audience    VARCHAR(16) NOT NULL DEFAULT 'staff',
+  document    JSON        NOT NULL,
+  updated_by  VARCHAR(20) NULL,
+  created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_forms_audience (audience)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Answers only. The score is never stored: it is computed from the form on
+-- every read, so correcting an answer key re-grades the whole history instead
+-- of leaving old results wrong. subject_name is NULL for an anonymous form —
+-- the identity is not recorded rather than recorded and hidden.
+CREATE TABLE IF NOT EXISTS form_submissions (
+  id                  VARCHAR(64)  NOT NULL,
+  form_id             VARCHAR(64)  NOT NULL,
+  subject_name        VARCHAR(128) NULL,
+  subject_discord_id  VARCHAR(20)  NULL,
+  answers             JSON         NOT NULL,
+  submitted_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_form_submissions_form (form_id, submitted_at),
+  KEY idx_form_submissions_discord (subject_discord_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A reviewer's score for one written answer, kept apart from the submission so
+-- the original auto-grade is never overwritten — the machine's result and the
+-- human's adjustment to it are two different facts.
+CREATE TABLE IF NOT EXISTS form_reviews (
+  submission_id  VARCHAR(64) NOT NULL,
+  question_id    VARCHAR(64) NOT NULL,
+  awarded        INT         NOT NULL DEFAULT 0,
+  reviewer       VARCHAR(20) NULL,
+  reviewed_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (submission_id, question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

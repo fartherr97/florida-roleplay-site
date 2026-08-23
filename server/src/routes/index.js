@@ -13,6 +13,7 @@ import civilianHubRouter from "./civilianHub.js";
 import rosterRouter from "./roster.js";
 import permissionsRouter from "./permissions.js";
 import departmentHubRouter from "./departmentHub.js";
+import formsRouter from "./forms.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -36,6 +37,9 @@ router.use("/permissions", permissionsRouter);
 // public site already owns that path for its department directory — this one
 // serves the config documents behind each department's own hub.
 router.use("/dept", departmentHubRouter);
+// Forms and exams are one engine serving both hubs, so the router sits beside
+// them rather than inside either.
+router.use("/forms", formsRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

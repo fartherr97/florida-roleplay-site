@@ -40,6 +40,7 @@ import HubAuditLog from "./pages/hub/HubAuditLog";
 import HubManagement from "./pages/hub/HubManagement";
 import HubPermissions from "./pages/hub/HubPermissions";
 import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
+import HubForms from "./pages/hub/HubForms";
 import CivHome from "./pages/civ/CivHome";
 import CivCharacters from "./pages/civ/CivCharacters";
 import CivVehicles from "./pages/civ/CivVehicles";
@@ -51,6 +52,7 @@ import CivJobs from "./pages/civ/CivJobs";
 import CivClassifieds from "./pages/civ/CivClassifieds";
 import CivPenalCode from "./pages/civ/CivPenalCode";
 import CivGuides from "./pages/civ/CivGuides";
+import CivForms from "./pages/civ/CivForms";
 import Moderation from "./pages/staff/Moderation";
 import Support from "./pages/staff/Support";
 import Leadership from "./pages/management/Leadership";
@@ -138,6 +140,7 @@ export default function App() {
           <Route element={<HubShell hub={STAFF_HUB} />}>
             <Route path="/staff-hub/home" element={<HubHome />} />
             <Route path="/staff-hub/roster" element={<HubRoster />} />
+            <Route path="/staff-hub/forms" element={<HubForms />} />
             <Route path="/staff-hub/dashboard" element={<HubDashboard />} />
             <Route path="/staff-hub/trial-checklist" element={<HubChecklist />} />
             <Route path="/staff-hub/da-database" element={<HubDaDatabase />} />
@@ -201,6 +204,7 @@ export default function App() {
             <Route path="/civilian-hub/properties" element={<CivProperties />} />
             <Route path="/civilian-hub/licences" element={<CivLicences />} />
             <Route path="/civilian-hub/roster" element={<CivRoster />} />
+            <Route path="/civilian-hub/forms" element={<CivForms />} />
             <Route path="/civilian-hub/businesses" element={<CivBusinesses />} />
             <Route path="/civilian-hub/jobs" element={<CivJobs />} />
             <Route path="/civilian-hub/classifieds" element={<CivClassifieds />} />

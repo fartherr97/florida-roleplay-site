@@ -85,6 +85,24 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "forms",
+    label: "Forms & exams",
+    description:
+      "The shared form engine behind staff promotion exams, civilian certification tests and feedback forms.",
+    permissions: [
+      { key: "forms.view", label: "See the forms list", detail: "Open the forms available to you in a hub." },
+      { key: "forms.submit", label: "Submit a form", detail: "Fill in and submit a published form you qualify for." },
+      { key: "forms.review", label: "Review submissions", detail: "Read every response and grade the written answers on any form." },
+      {
+        key: "forms.manage",
+        label: "Build forms",
+        detail:
+          "Create and edit forms, set answer keys and pass thresholds, and publish. Anyone with this can read every response, so grant it with exams management.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "site",
     label: "Public site",
     description: "Gated areas of the main community site.",
@@ -206,6 +224,11 @@ export const DEFAULT_GRANTS = {
   "exams.override": staffFrom("senior_admin"),
   "exams.audit": staffFrom("senior_admin"),
   "exams.manage": ["head_admin", "directorship"],
+
+  "forms.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
+  "forms.submit": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
+  "forms.review": staffFrom("senior_mod"),
+  "forms.manage": ["head_admin", "directorship"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

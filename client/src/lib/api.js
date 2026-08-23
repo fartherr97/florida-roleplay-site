@@ -8,6 +8,8 @@ import * as hub from "../data/staffHubData";
 import * as civ from "../data/civilianHubData";
 import * as rosterMock from "../data/rosterData";
 import { DEPARTMENT_CONFIGS } from "../data/departmentConfigs";
+import * as formsMock from "../data/formsData";
+import { gradeSubmission } from "./forms";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { projectRoster } from "./deptRoster";
 import { BASE_ROLES, DEFAULT_GRANTS, PERMISSION_GROUPS } from "../data/permissions";
@@ -119,6 +121,32 @@ async function put(path, body, fallback) {
 function deptFallback(id) {
   const config = DEPARTMENT_CONFIGS[id];
   return config ? { config: normalizeConfig(config, id), capabilities: [] } : null;
+}
+
+/**
+ * The forms list, computed locally. `canTake`/`canReview` are left false: the
+ * server resolves them against the caller's Discord roles, and guessing here
+ * would offer a form that then 403s on open.
+ */
+function formsFallback(audience) {
+  return formsMock.forms
+    .filter((form) => !audience || form.audience === audience || form.audience === "all")
+    .filter((form) => form.published)
+    .map((form) => ({
+      ...form,
+      canTake: false,
+      canReview: false,
+      submissionCount: formsMock.submissions.filter((entry) => entry.formId === form.id).length,
+    }));
+}
+
+/** Seed submissions, graded through the same engine the server uses. */
+function submissionsFallback(formId) {
+  const form = formsMock.forms.find((entry) => entry.id === formId);
+  if (!form) return [];
+  return formsMock.submissions
+    .filter((entry) => entry.formId === formId)
+    .map((entry) => ({ ...entry, ...gradeSubmission(form, entry.answers) }));
 }
 
 /** Reference ids are generated client-side only when the API is unreachable. */
@@ -364,6 +392,45 @@ export const api = {
 
   createDept: (id, config) =>
     post("/dept", { id, config }, () => ({ ok: true, config, message: NOT_PERSISTED })),
+
+  /* ---------------------------- Forms & exams --------------------------- */
+
+  /**
+   * The form engine. Note what the fallbacks do NOT do: they never grade a
+   * submission locally and call it a result. The server is what grades — a
+   * client that scored its own exam would be scoring its own exam — so an
+   * unreachable API reports that the submission did not land rather than
+   * inventing a pass.
+   */
+  forms: (audience) =>
+    get(`/forms?audience=${encodeURIComponent(audience)}`, formsFallback(audience)),
+
+  form: (id) =>
+    get(`/forms/${encodeURIComponent(id)}`, formsMock.forms.find((f) => f.id === id) ?? null),
+
+  formSubmissions: (id) =>
+    get(`/forms/${encodeURIComponent(id)}/submissions`, submissionsFallback(id)),
+
+  submitForm: (id, answers) =>
+    post(`/forms/${encodeURIComponent(id)}/submit`, { answers }, () => ({
+      ok: false,
+      message:
+        "The API is unreachable, so this submission was not recorded. Try again once it is back.",
+    })),
+
+  reviewSubmission: (formId, submissionId, points) =>
+    post(
+      `/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}/review`,
+      { points },
+      () => ({ ok: true, message: NOT_PERSISTED }),
+    ),
+
+  saveForm: (id, form) =>
+    put(`/forms/${encodeURIComponent(id)}`, { form }, () => ({
+      ok: true,
+      form,
+      message: NOT_PERSISTED,
+    })),
 
   assistant: (message) =>
     post("/assistant", { message }, () => ({

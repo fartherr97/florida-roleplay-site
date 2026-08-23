@@ -4,7 +4,8 @@ import { cn } from "../../lib/cn";
 const BASE =
   "w-full rounded-2xl bg-black/30 px-4 text-sm text-slate-100 placeholder:text-slate-500 " +
   "ring-1 ring-inset ring-white/10 transition focus:outline-none focus:ring-2 " +
-  "focus:ring-brand-500/70 focus:bg-black/40";
+  "focus:ring-brand-500/70 focus:bg-black/40 " +
+  "disabled:opacity-60 disabled:cursor-default";
 
 export function TextInput({ className, ...props }) {
   return <input className={cn(BASE, "h-12", className)} {...props} />;

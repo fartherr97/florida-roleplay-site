@@ -27,6 +27,7 @@ export const navGroups = [
     items: [
       { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
       { label: "Community Roster", to: "/civilian-hub/roster", icon: "Users" },
+      { label: "Forms & Assessments", to: "/civilian-hub/forms", icon: "ClipboardList" },
       { label: "Vehicles", to: "/civilian-hub/vehicles", icon: "Car" },
       { label: "Properties", to: "/civilian-hub/properties", icon: "House" },
       { label: "Business Directory", to: "/civilian-hub/businesses", icon: "Store" },
@@ -63,6 +64,7 @@ export const navGroups = [
     items: [
       { label: "Staff Hub", to: "/staff-hub", icon: "LayoutGrid" },
       { label: "Staff Roster", to: "/staff-hub/roster", icon: "Users" },
+      { label: "Staff Forms & Exams", to: "/staff-hub/forms", icon: "ClipboardList" },
       { label: "Staff Dashboard", to: "/staff-hub/dashboard", icon: "ChartColumn" },
       { label: "Trial Mod Checklist", to: "/staff-hub/trial-checklist", icon: "ListChecks" },
       { label: "Staff DA Database", to: "/staff-hub/da-database", icon: "Gavel" },

@@ -226,6 +226,55 @@ seats it is meant to have, and a seat nobody holds renders greyed out rather tha
 being filtered away — an empty Junior Administrator slot is exactly the sort of
 thing a roster exists to surface.
 
+## Forms and exams
+
+One engine serves both hubs: `/staff-hub/forms` and `/civilian-hub/forms` render
+the same component with a different audience.
+
+**A form and an exam are the same document.** Questions carry points and an
+optional answer key; set them and you have an exam, leave them at zero (or set
+`feedback: true`) and you have a survey. Building two systems for that would have
+meant two builders, two renderers and two ways to read the results.
+
+```
+client/src/lib/forms.js                    # the engine — pure, mirrored server-side
+client/src/data/formsData.js               # the forms the community ships with
+client/src/components/forms/               # runner, builder, review, summary
+server/src/routes/forms.js                 # /api/forms
+```
+
+### The two rules that matter
+
+**The server grades, the client does not.** A submission posts answers only; the
+score, the pass/fail and the needs-review flag are computed on the server from
+the stored form. A client that posted its own score would be posting its own exam
+result.
+
+**The answer key never reaches a candidate.** `GET /api/forms` strips `correct`
+from every question unless the caller may review or manage that form — otherwise
+passing an exam would take opening devtools.
+
+### Grading
+
+Ten question types. Objective ones auto-grade; paragraphs always go to a human;
+scale, rating, date and time auto-grade only when a key is set. A scored question
+whose key was never filled in is flagged for review rather than silently marked
+wrong, and the builder warns about those, because the alternative is failing
+people for the author's omission.
+
+Reviewer scores live in their own table, so the original auto-grade is never
+overwritten — the machine's result and the human's adjustment are two different
+facts. And scores are computed on read, so correcting an answer key re-grades the
+whole history instead of leaving old results wrong.
+
+### Access
+
+Each form names Discord role keys in `submitRoles` and `reviewRoles`; empty means
+"anyone who can open this hub". On top of that the `forms.*` permissions apply
+community-wide: `forms.review` grades anything, `forms.manage` authors. An
+anonymous form records no name and no Discord id — the identity is not stored
+rather than stored and hidden.
+
 ## Community roster and the Discord bot
 
 `/civilian-hub/roster` lists everyone across every department — civilians, law
