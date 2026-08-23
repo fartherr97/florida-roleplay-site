@@ -119,6 +119,21 @@ It lives in `SPECIAL_ROLES` as a `tier` instead: bound to a Discord role like
 everything else, and grantable, but not a seat on a team. That is also what
 distinguishes it from Directorship, which *is* rostered under Management.
 
+**Ownership holds every permission unconditionally.** `permissionsFor` and
+`grantsPermission` short-circuit on it rather than consulting the grant table,
+and every gate goes through those two — `requirePermission` included, which is
+why it no longer does a lookup of its own.
+
+That is not a shortcut, it is what stops the tier being a lie. The rank ladder is
+a preview convenience: somebody who really holds the Ownership Discord role holds
+*only* that role, so otherwise every grant would have to name it or they get
+nothing at all. An install whose permissions were saved before the tier existed
+has stored grants that cannot name it — and the page that would fix that is
+itself behind a permission, so one careless edit could lock the owner out of
+their own site with no way back in. Nothing is given away by it either:
+`permissions.manage` already lets its holder grant themselves everything else, so
+a revocable Ownership was never a real limit.
+
 The ladder is declared once as `STAFF_LADDER` in `src/data/permissions.js` (and
 its server mirror), and `staffFrom("admin")` slices it — so a tier added to that
 array is picked up by every "and up" grant without touching them individually.

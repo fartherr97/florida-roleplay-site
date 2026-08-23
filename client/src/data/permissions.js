@@ -276,12 +276,29 @@ export const DEFAULT_GRANTS = {
  * ------------------------------------------------------------------ */
 
 /**
+ * Ownership holds every permission, always, without being listed in a grant.
+ *
+ * This is not a shortcut — it is what stops the tier from being a lie. The rank
+ * ladder is a preview convenience; somebody who actually holds the Ownership
+ * Discord role holds *only* that role, so every grant would have to name it or
+ * they get nothing. An install that saved its permissions before this tier
+ * existed has grants that cannot name it, and a single careless edit on the
+ * permissions page could lock the owner out of their own site with no way back
+ * in — the page that fixes it is itself behind a permission.
+ *
+ * Nothing is lost by it: `permissions.manage` already lets its holder grant
+ * themselves everything else, so a revocable Ownership was never a real limit.
+ */
+export const ROOT_ROLE = "ownership";
+
+/**
  * The permissions a set of role keys satisfies. Both the client guard and the
  * server middleware call this, so a page and its API can never disagree about
  * who is allowed in.
  */
 export function permissionsFor(roleKeys = [], grants = DEFAULT_GRANTS) {
   const held = new Set(roleKeys);
+  if (held.has(ROOT_ROLE)) return new Set(Object.keys(PERMISSIONS));
   return new Set(
     Object.entries(grants)
       .filter(([, roles]) => roles.some((role) => held.has(role)))
@@ -291,8 +308,9 @@ export function permissionsFor(roleKeys = [], grants = DEFAULT_GRANTS) {
 
 /** True when any of the supplied role keys is granted `permission`. */
 export function grantsPermission(permission, roleKeys = [], grants = DEFAULT_GRANTS) {
+  const held = new Set(roleKeys);
+  if (held.has(ROOT_ROLE)) return true;
   const allowed = grants[permission];
   if (!allowed || allowed.length === 0) return false;
-  const held = new Set(roleKeys);
   return allowed.some((role) => held.has(role));
 }

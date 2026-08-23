@@ -14,6 +14,7 @@ import { Router } from "express";
 import { query, changedRows } from "../db.js";
 import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
+import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { buildNickname, renderDisplayName, resolveRole } from "../lib/roster.js";
 import { collect, isDiscordId, str } from "../validate.js";
@@ -350,9 +351,7 @@ router.post("/:id/status", requirePermission("roster.edit_status"), async (req, 
   // changes, so a Mod can mark someone inactive without granting leave.
   if (value.status === "LOA") {
     const grants = await loadGrants();
-    const held = new Set(req.user?.roles ?? []);
-    const allowed = grants["roster.manage_loa"] ?? [];
-    if (!allowed.some((role) => held.has(role))) {
+    if (!grantsPermission("roster.manage_loa", req.user?.roles ?? [], grants)) {
       return res.status(403).json({
         ok: false,
         code: "AUTH_ROLE_MISSING",

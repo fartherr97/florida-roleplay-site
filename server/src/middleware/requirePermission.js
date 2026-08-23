@@ -10,7 +10,7 @@
  * and never locked out.
  */
 import { query } from "../db.js";
-import { DEFAULT_GRANTS, PERMISSIONS } from "../permissions.js";
+import { DEFAULT_GRANTS, PERMISSIONS, grantsPermission } from "../permissions.js";
 import { resolveUser } from "./requireRole.js";
 
 /** Cached briefly: every gated request reads these, and they change rarely. */
@@ -85,11 +85,12 @@ export function requirePermission(permission, { code = "AUTH_ROLE_MISSING" } = {
       });
     }
 
+    // Through the shared helper, never a lookup of our own: it is what knows
+    // that Ownership holds everything, and a second copy of the rule here is a
+    // second copy that can disagree with the page that rendered the button.
     const grants = await loadGrants();
-    const allowed = grants[permission] ?? [];
-    const held = new Set(user.roles ?? []);
 
-    if (!allowed.some((role) => held.has(role))) {
+    if (!grantsPermission(permission, user.roles ?? [], grants)) {
       return res.status(403).json({
         ok: false,
         code,
