@@ -38,6 +38,7 @@ export const GUARDS = [
   { path: "/staff-hub/audit-log", permission: "exams.audit" },
   { path: "/staff-hub/management", permission: "exams.manage" },
   { path: "/staff-hub/permissions", permission: "permissions.manage" },
+  { path: "/staff-hub/discord-roles", permission: "discord.roles.manage" },
 
   // Civilian Hub
   { path: "/civilian-hub/home", permission: "civilian.view" },

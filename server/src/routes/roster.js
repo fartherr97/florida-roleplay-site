@@ -62,26 +62,52 @@ async function loadRoster() {
   return seed.roster;
 }
 
-/** Loads the role map, falling back to the seeded one. */
-async function loadRoleMap() {
+/**
+ * Loads the role map, falling back to the seeded one. Rank roles and the base
+ * or tag roles live in one table with a `kind` column, so a single save keeps
+ * them consistent.
+ */
+async function loadRoleMap({ withSpecial = false } = {}) {
   try {
-    const rows = await query(
-      "SELECT * FROM roster_role_map ORDER BY sort_order DESC",
-    );
+    const rows = await query("SELECT * FROM roster_role_map ORDER BY sort_order DESC");
     if (rows.length) {
-      return rows.map((row) => ({
-        roleId: row.role_id,
-        key: row.role_key,
-        department: row.department,
-        rank: row.rank_label,
-        order: row.sort_order,
-        displayTemplate: row.display_template,
-      }));
+      const roles = rows
+        .filter((row) => row.kind === "rank")
+        .map((row) => ({
+          roleId: row.role_id,
+          key: row.role_key,
+          department: row.department,
+          rank: row.rank_label,
+          rankFull: row.rank_full,
+          order: row.sort_order,
+          displayTemplate: row.display_template,
+        }));
+      if (!withSpecial) return roles;
+      return {
+        roles,
+        special: rows
+          .filter((row) => row.kind !== "rank")
+          .map((row) => ({
+            roleId: row.role_id,
+            key: row.role_key,
+            kind: row.kind,
+            label: row.rank_label,
+            detail: row.rank_full,
+          })),
+      };
     }
   } catch {
     // fall through
   }
-  return seed.ROLE_MAP;
+  return withSpecial
+    ? { roles: seed.ROLE_MAP, special: seed.SPECIAL_ROLES }
+    : seed.ROLE_MAP;
+}
+
+/** The mapped LOA tag, falling back to the seeded one. */
+async function loaRoleId() {
+  const { special } = await loadRoleMap({ withSpecial: true });
+  return special.find((role) => role.key === "loa")?.roleId ?? seed.LOA_ROLE.roleId;
 }
 
 /* -------------------------------------------------------------- reads */
@@ -96,11 +122,128 @@ router.get("/", requirePermission("roster.view"), async (_req, res) => {
  * the bot token.
  */
 router.get("/role-map", async (_req, res) => {
+  const { roles, special } = await loadRoleMap({ withSpecial: true });
   res.json({
     divisions: seed.DIVISIONS,
     departments: seed.DEPARTMENTS,
-    roles: await loadRoleMap(),
+    roles,
+    special,
   });
+});
+
+/**
+ * Replaces the whole Discord role mapping. Sending the complete set rather than
+ * a diff means the saved state is exactly what was reviewed on the page.
+ *
+ * Two things are refused outright, because either would make rank resolution
+ * arbitrary rather than merely wrong: a malformed snowflake, and the same
+ * snowflake bound to two different roles.
+ */
+router.post("/role-map", requirePermission("discord.roles.manage"), async (req, res) => {
+  const roles = Array.isArray(req.body?.roles) ? req.body.roles : null;
+  const special = Array.isArray(req.body?.special) ? req.body.special : [];
+
+  if (!roles) {
+    return res.status(400).json({ ok: false, errors: ["roles must be an array."] });
+  }
+
+  const errors = [];
+  const seenIds = new Map();
+  const seenKeys = new Set();
+
+  const check = (entry, label) => {
+    const roleId = str(entry.roleId);
+    const key = str(entry.key);
+
+    if (!/^[a-z0-9_]{2,64}$/.test(key)) {
+      errors.push(`${label}: key must be lowercase letters, numbers and underscores.`);
+      return false;
+    }
+    if (seenKeys.has(key)) {
+      errors.push(`${label}: duplicate key "${key}".`);
+      return false;
+    }
+    seenKeys.add(key);
+
+    if (!SNOWFLAKE.test(roleId)) {
+      errors.push(`${key}: "${roleId}" is not a 17–20 digit Discord role ID.`);
+      return false;
+    }
+    if (seenIds.has(roleId)) {
+      errors.push(
+        `${key}: Discord role ${roleId} is already bound to "${seenIds.get(roleId)}" — which rank a member resolves to would be arbitrary.`,
+      );
+      return false;
+    }
+    seenIds.set(roleId, key);
+    return true;
+  };
+
+  const cleanRoles = [];
+  roles.forEach((entry, index) => {
+    if (!check(entry ?? {}, `roles[${index}]`)) return;
+    const order = Number(entry.order);
+    if (!Number.isFinite(order) || order < 0 || order > 100000) {
+      errors.push(`${str(entry.key)}: order must be a number between 0 and 100000.`);
+      return;
+    }
+    if (!str(entry.rank)) {
+      errors.push(`${str(entry.key)}: a short rank is required — it appears in nicknames.`);
+      return;
+    }
+    cleanRoles.push({
+      roleId: str(entry.roleId),
+      key: str(entry.key),
+      department: str(entry.department),
+      rank: str(entry.rank),
+      rankFull: str(entry.rankFull) || str(entry.rank),
+      order,
+      displayTemplate: str(entry.displayTemplate) || "{callsign} | {rank} | {surname}",
+    });
+  });
+
+  const cleanSpecial = [];
+  special.forEach((entry, index) => {
+    if (!check(entry ?? {}, `special[${index}]`)) return;
+    cleanSpecial.push({
+      roleId: str(entry.roleId),
+      key: str(entry.key),
+      kind: str(entry.kind) || "base",
+      label: str(entry.label) || str(entry.key),
+      detail: str(entry.detail),
+    });
+  });
+
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+
+  try {
+    await query("DELETE FROM roster_role_map");
+    for (const role of cleanRoles) {
+      await query(
+        `INSERT INTO roster_role_map
+           (role_id, role_key, kind, department, rank_label, rank_full, sort_order, display_template)
+         VALUES (?, ?, 'rank', ?, ?, ?, ?, ?)`,
+        [role.roleId, role.key, role.department, role.rank, role.rankFull, role.order, role.displayTemplate],
+      );
+    }
+    for (const role of cleanSpecial) {
+      await query(
+        `INSERT INTO roster_role_map
+           (role_id, role_key, kind, rank_label, rank_full, sort_order, display_template)
+         VALUES (?, ?, ?, ?, ?, 0, '')`,
+        [role.roleId, role.key, role.kind, role.label, role.detail],
+      );
+    }
+    return res.json({ ok: true, roles: cleanRoles, special: cleanSpecial });
+  } catch {
+    return res.json({
+      ok: true,
+      roles: cleanRoles,
+      special: cleanSpecial,
+      message:
+        "Accepted, but not persisted — no database is configured, so this will reset on reload.",
+    });
+  }
 });
 
 router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>
@@ -215,7 +358,7 @@ router.post("/:id/status", requirePermission("roster.edit_status"), async (req, 
     loaUntil: value.loaUntil,
     // The bot applies this role while someone is on leave and removes it when
     // the sweep reports the LOA expired.
-    loaRole: value.status === "LOA" ? seed.LOA_ROLE.roleId : null,
+    loaRole: value.status === "LOA" ? await loaRoleId() : null,
     ...(persisted
       ? {}
       : {
@@ -242,14 +385,14 @@ router.get("/loa/expired", requireBot, async (_req, res) => {
     return res.json({
       ok: true,
       asOf: today,
-      loaRole: seed.LOA_ROLE.roleId,
+      loaRole: await loaRoleId(),
       members: rows.map(mapRow),
     });
   } catch {
     const members = seed.roster.filter(
       (m) => m.status === "LOA" && m.loaUntil && m.loaUntil <= today,
     );
-    return res.json({ ok: true, asOf: today, loaRole: seed.LOA_ROLE.roleId, members });
+    return res.json({ ok: true, asOf: today, loaRole: await loaRoleId(), members });
   }
 });
 
@@ -278,7 +421,7 @@ router.post("/loa", requireBot, async (req, res) => {
     discordId,
     status: "LOA",
     loaUntil: value.loaUntil,
-    loaRole: seed.LOA_ROLE.roleId,
+    loaRole: await loaRoleId(),
     ...(persisted ? {} : { message: "Accepted, but not persisted — no database configured." }),
   });
 });
@@ -309,7 +452,7 @@ router.post("/loa/end", requireBot, async (req, res) => {
     discordId,
     status: "Active",
     // Remove this role in Discord.
-    removeRole: seed.LOA_ROLE.roleId,
+    removeRole: await loaRoleId(),
     ...(persisted ? {} : { message: "Accepted, but not persisted — no database configured." }),
   });
 });

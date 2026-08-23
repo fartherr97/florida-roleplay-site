@@ -108,8 +108,8 @@ shared-package overhead.
 | Exam Backend | Recent Submissions (with attempt review and manual override), Members, Audit Log, Management (thresholds and question catalog) |
 
 Ranks run Trial Mod → Mod → Sr. Mod → Jr. Admin → Admin → Sr. Admin → Head
-Admin, each granting the roles below it, over a civilian floor of Member →
-Cert. Civ. I → II → III.
+Admin → Directorship, each granting the roles below it, over a civilian floor of
+Member → Cert. Civ. I → II → III.
 
 Exam results are never edited in place. An override writes an append-only row
 carrying the reviewer and their reason, and the Audit Log renders those rows; the
@@ -189,16 +189,46 @@ unauthenticated endpoint that rewrites the roster and everyone's nickname is not
 something to leave to a default.
 
 **Role IDs are placeholders.** Every `roleId` in `client/src/data/rosterData.js`
-is a `TODO` — swap in the real Discord snowflakes before pointing the bot at a
-live guild. The keys, ranks and ordering are already correct.
+is a `TODO`. Rather than editing that file, map them on the **Discord Role
+Mapping** page before pointing the bot at a live guild — it validates the
+snowflakes and flags anything still unmapped. The keys, ranks and ordering are
+already correct.
 
-## Permissions
+## Access control
+
+Two management pages sit under each other, both Directorship-only:
+
+| Page | Answers |
+| --- | --- |
+| **Discord Role Mapping** (`/staff-hub/discord-roles`) | Which Discord role *is* each rank, tier and tag? |
+| **Permissions** (`/staff-hub/permissions`) | Which of those roles may do what? |
+
+They are both Directorship rather than Head Admin on purpose: anyone who can edit
+permissions can grant themselves everything else, so gating role mapping any
+lower would be cosmetic.
+
+### Discord Role Mapping
+
+Everything the community binds to a Discord role is edited here — base roles
+(membership, whitelisting), civilian certification tiers, the staff ladder, every
+department's ranks, and status tags like LOA. Each row carries its Discord
+snowflake, precedence order, short rank (the one that appears in nicknames), full
+label and nickname template, with a live preview of what the template produces.
+
+Two things the save refuses, because either would make rank resolution arbitrary
+rather than merely wrong: a malformed snowflake, and the same snowflake bound to
+two different roles. Rows still holding a shipped placeholder are counted and
+flagged so nothing is silently left unmapped.
+
+Precedence is highest-wins, which is why a promotion works without removing the
+old role first, and why staff ranks outrank department ranks.
+
+### Permissions
 
 Nothing in the codebase checks a rank. Every gated page, button and endpoint
 names a **permission**, and `client/src/data/permissions.js` maps each permission
 onto a set of Discord roles. That indirection is the point: access changes from
-the **Permissions page** (`/staff-hub/permissions`, Head Admin only) without a
-deploy.
+the Permissions page without a deploy.
 
 - `src/lib/guards.js` gates each route on a permission.
 - Nav entries name the same permission, so a link is hidden exactly when the

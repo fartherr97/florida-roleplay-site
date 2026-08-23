@@ -469,15 +469,20 @@ CREATE TABLE IF NOT EXISTS roster_members (
 CREATE TABLE IF NOT EXISTS roster_role_map (
   role_id           VARCHAR(20)  NOT NULL,
   role_key          VARCHAR(64)  NOT NULL,
-  department        VARCHAR(32)  NOT NULL,
+  -- 'rank' for a rostered rank, 'base' for membership/whitelisting, 'tag' for
+  -- status roles like LOA. One table so a single save keeps them consistent.
+  kind              VARCHAR(16)  NOT NULL DEFAULT 'rank',
+  department        VARCHAR(32)  NULL,
   rank_label        VARCHAR(64)  NOT NULL,
+  rank_full         VARCHAR(128) NULL,
   sort_order        INT          NOT NULL DEFAULT 0,
-  display_template  VARCHAR(128) NOT NULL DEFAULT '{first} {surname}',
+  display_template  VARCHAR(128) NOT NULL DEFAULT '{callsign} | {rank} | {surname}',
   created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (role_id),
   UNIQUE KEY uq_roster_role_key (role_key),
-  KEY idx_roster_role_department (department)
+  KEY idx_roster_role_department (department),
+  KEY idx_roster_role_kind (kind)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Append-only record of what the bot changed, so a wrong rank can be traced.

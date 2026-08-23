@@ -22,13 +22,14 @@ export const ROLES = {
   ADMIN: "admin",
   SENIOR_ADMIN: "senior_admin",
   HEAD_ADMIN: "head_admin",
+  DIRECTORSHIP: "directorship",
   DEPT_HEAD: "department_head",
 };
 
 /** Role bundles the hub gates on, mirrored in client/src/data/hubNavigation.js. */
 export const STAFF_ANY = [
   ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD, ROLES.JUNIOR_ADMIN,
-  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
+  ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN, ROLES.DIRECTORSHIP,
 ];
 export const ADMIN_PLUS = [
   ROLES.JUNIOR_ADMIN, ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
@@ -84,6 +85,11 @@ export const STAFF_RANKS = {
     ...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD,
     ROLES.JUNIOR_ADMIN, ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
   ],
+  directorship: [
+    ...CIV_BASE, ROLES.TRIAL_MOD, ROLES.MOD, ROLES.SENIOR_MOD,
+    ROLES.JUNIOR_ADMIN, ROLES.ADMIN, ROLES.SENIOR_ADMIN, ROLES.HEAD_ADMIN,
+    ROLES.DIRECTORSHIP,
+  ],
 };
 
 export const RANK_LABELS = {
@@ -98,6 +104,7 @@ export const RANK_LABELS = {
   admin: "Admin",
   senior_admin: "Sr. Admin",
   head_admin: "Head Admin",
+  directorship: "Directorship",
 };
 
 /** Every role the middleware will accept, for validation at the edges. */

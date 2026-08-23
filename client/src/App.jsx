@@ -38,6 +38,7 @@ import HubExamMembers from "./pages/hub/HubExamMembers";
 import HubAuditLog from "./pages/hub/HubAuditLog";
 import HubManagement from "./pages/hub/HubManagement";
 import HubPermissions from "./pages/hub/HubPermissions";
+import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
 import CivHome from "./pages/civ/CivHome";
 import CivCharacters from "./pages/civ/CivCharacters";
 import CivVehicles from "./pages/civ/CivVehicles";
@@ -186,6 +187,7 @@ export default function App() {
             <Route path="/staff-hub/audit-log" element={<HubAuditLog />} />
             <Route path="/staff-hub/management" element={<HubManagement />} />
             <Route path="/staff-hub/permissions" element={<HubPermissions />} />
+            <Route path="/staff-hub/discord-roles" element={<HubDiscordRoles />} />
           </Route>
 
           {/* Civilian Hub — same shape: a public landing page, then a gated

@@ -117,6 +117,7 @@ export const STAFF_HUB = {
         { to: "/staff-hub/audit-log", label: "Audit Log", icon: "ScrollText", permission: "exams.audit" },
         { to: "/staff-hub/management", label: "Management", icon: "SlidersHorizontal", permission: "exams.manage" },
         { to: "/staff-hub/permissions", label: "Permissions", icon: "KeyRound", permission: "permissions.manage" },
+        { to: "/staff-hub/discord-roles", label: "Discord Roles", icon: "Key", permission: "discord.roles.manage" },
       ],
     },
   ],

@@ -96,6 +96,19 @@ export const ROLE_MAP = [
   { roleId: "100000000000000040", key: "admin", department: "staff", rank: "Admin", rankFull: "Administrator", order: 240, displayTemplate: "{callsign} | {rank} | {surname}" },
   { roleId: "100000000000000041", key: "senior_admin", department: "staff", rank: "Sr. Admin", rankFull: "Senior Administrator", order: 250, displayTemplate: "{callsign} | {rank} | {surname}" },
   { roleId: "100000000000000042", key: "head_admin", department: "staff", rank: "Head Admin", rankFull: "Head Administrator", order: 260, displayTemplate: "{callsign} | {rank} | {surname}" },
+  { roleId: "100000000000000043", key: "directorship", department: "management", rank: "Director", rankFull: "Directorship", order: 300, displayTemplate: "{callsign} | {rank} | {surname}" },
+];
+
+/**
+ * Discord roles the community uses that are not a rostered rank: membership,
+ * whitelisting and status tags. They are mapped on the same page as the ranks —
+ * "everything tied to a Discord role" means these too.
+ */
+export const SPECIAL_ROLES = [
+  // TODO: replace every roleId with the real Discord snowflake.
+  { roleId: "100000000000000801", key: "member", kind: "base", label: "Member", detail: "Anyone in the Discord server." },
+  { roleId: "100000000000000802", key: "whitelisted", kind: "base", label: "Whitelisted", detail: "Approved onto the game server." },
+  { roleId: "100000000000000900", key: "loa", kind: "tag", label: "LOA", detail: "Applied while a member is on leave; removed by the expiry sweep." },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -114,9 +127,12 @@ export const ACTIVITY_STATUSES = [
   { id: "Suspended", label: "Suspended", tone: "rose", detail: "Access withheld pending a staff decision." },
 ];
 
-/** The Discord role the bot applies while someone is on leave. */
+/**
+ * The Discord role the bot applies while someone is on leave. Its snowflake is
+ * editable on the role mapping page like every other role; this is the fallback
+ * used before anything has been mapped.
+ */
 export const LOA_ROLE = {
-  // TODO: replace with the real LOA Discord role snowflake.
   roleId: "100000000000000900",
   key: "loa",
   label: "LOA",

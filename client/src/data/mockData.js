@@ -59,6 +59,8 @@ export const ROLES = {
   ADMIN: "admin",
   SENIOR_ADMIN: "senior_admin",
   HEAD_ADMIN: "head_admin",
+  // Above the staff ladder: ownership and community direction.
+  DIRECTORSHIP: "directorship",
   // Department command, orthogonal to the staff ladder
   DEPT_HEAD: "department_head",
 };
@@ -76,6 +78,7 @@ export const ROLE_LABELS = {
   admin: "Admin",
   senior_admin: "Sr. Admin",
   head_admin: "Head Admin",
+  directorship: "Directorship",
   department_head: "Department Head",
 };
 
@@ -119,6 +122,7 @@ const STAFF_LADDER = [
   { id: "admin", label: "Admin", role: ROLES.ADMIN, tone: "primary" },
   { id: "senior_admin", label: "Sr. Admin", role: ROLES.SENIOR_ADMIN, tone: "amber" },
   { id: "head_admin", label: "Head Admin", role: ROLES.HEAD_ADMIN, tone: "rose" },
+  { id: "directorship", label: "Directorship", role: ROLES.DIRECTORSHIP, tone: "rose" },
 ];
 
 /**

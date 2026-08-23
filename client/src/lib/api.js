@@ -217,6 +217,20 @@ export const api = {
   civVehicles: () => get("/civilian-hub/vehicles", civ.vehicles),
   civProperties: () => get("/civilian-hub/properties", civ.properties),
   civLicences: () => get("/civilian-hub/licences", civ.licences),
+  discordRoleMap: () =>
+    get("/roster/role-map", {
+      divisions: rosterMock.DIVISIONS,
+      departments: rosterMock.DEPARTMENTS,
+      roles: rosterMock.ROLE_MAP,
+      special: rosterMock.SPECIAL_ROLES,
+    }),
+  saveDiscordRoleMap: (payload) =>
+    post("/roster/role-map", payload, () => ({
+      ok: true,
+      message:
+        "Accepted, but not persisted — no database is configured, so this will reset on reload.",
+    })),
+
   permissionGrants: () => get("/permissions/grants", DEFAULT_GRANTS),
   permissionCatalogue: () =>
     get("/permissions/catalogue", {
