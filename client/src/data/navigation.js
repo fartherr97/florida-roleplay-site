@@ -87,6 +87,7 @@ export const navGroups = [
       { label: "Leadership", to: "/management/leadership", icon: "Crown" },
       { label: "Department Heads", to: "/management/department-heads", icon: "UserCog" },
       { label: "Contact Management", to: "/management/contact", icon: "Mail" },
+      { label: "Bot Dashboard", to: "/management/bot", icon: "Bot" },
     ],
   },
 ];

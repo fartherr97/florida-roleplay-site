@@ -22,6 +22,12 @@ export const GUARDS = [
     permission: "site.department_heads",
     reason: "department",
   },
+  // menuOnly: the bot dashboard authenticates against the bot API with Discord,
+  // and that API decides what anybody may do there. Blocking the route on a
+  // site permission as well would be a second, weaker copy of that decision,
+  // and it would lock out somebody the bot would have let in. So this entry
+  // only keeps the link out of menus it is no use in.
+  { path: "/management/bot", permission: "bot.dashboard", menuOnly: true },
 
   // Staff Hub
   { path: "/staff-hub/home", permission: "staff.view" },
@@ -67,4 +73,13 @@ export function guardFor(pathname) {
     GUARDS.find((guard) => matchPath({ path: guard.path, end: true }, pathname)) ??
     null
   );
+}
+
+/**
+ * The guard that gates the route itself. `menuOnly` entries are dropped here:
+ * they decide what a menu offers, and nothing else.
+ */
+export function routeGuardFor(pathname) {
+  const guard = guardFor(pathname);
+  return guard && !guard.menuOnly ? guard : null;
 }

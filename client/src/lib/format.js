@@ -40,3 +40,11 @@ export function formatDateTime(value) {
     timeZoneName: "short",
   });
 }
+
+/**
+ * "1 rank" / "2 ranks". Counts sit next to nouns all over the dashboard, and
+ * "1 members" reads as a bug even when the number is right.
+ */
+export function plural(count, singular, pluralForm = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}

@@ -3,6 +3,7 @@ import PublicLayout from "./components/layout/PublicLayout";
 import AccessDenied from "./components/auth/AccessDenied";
 import NotFound from "./components/auth/NotFound";
 import { AuthProvider } from "./context/AuthContext";
+import { BotAuthProvider } from "./context/BotAuthContext";
 
 import Landing from "./pages/Landing";
 import Rules from "./pages/Rules";
@@ -59,6 +60,14 @@ import Support from "./pages/staff/Support";
 import Leadership from "./pages/management/Leadership";
 import DepartmentHeads from "./pages/management/DepartmentHeads";
 import Contact from "./pages/management/Contact";
+import BotShell from "./components/bot/BotShell";
+import BotOverview from "./pages/management/bot/BotOverview";
+import BotRosters from "./pages/management/bot/BotRosters";
+import BotRosterDetail from "./pages/management/bot/BotRosterDetail";
+import BotPermissions from "./pages/management/bot/BotPermissions";
+import BotServers from "./pages/management/bot/BotServers";
+import BotSync from "./pages/management/bot/BotSync";
+import BotAudit from "./pages/management/bot/BotAudit";
 
 /**
  * Route table. Everything the nav points at resolves to a real page; role-gated
@@ -69,6 +78,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <BotAuthProvider>
         <Routes>
           <Route element={<PublicLayout />}>
             <Route index element={<Landing />} />
@@ -102,6 +112,21 @@ export default function App() {
             <Route path="management/department-heads" element={<DepartmentHeads />} />
             {/* Public: reaching leadership should not require a role. */}
             <Route path="management/contact" element={<Contact />} />
+
+            {/* The bot dashboard. Deliberately not behind this site's guard
+                table: authorisation belongs to the bot API, which re-checks
+                every call, and gating it here would be a second opinion that
+                could disagree. BotShell renders the sign-in and not-staff
+                states from the bot's own session instead. */}
+            <Route path="management/bot" element={<BotShell />}>
+              <Route index element={<BotOverview />} />
+              <Route path="rosters" element={<BotRosters />} />
+              <Route path="rosters/:slug" element={<BotRosterDetail />} />
+              <Route path="permissions" element={<BotPermissions />} />
+              <Route path="servers" element={<BotServers />} />
+              <Route path="sync" element={<BotSync />} />
+              <Route path="audit" element={<BotAudit />} />
+            </Route>
 
             {/* Friendly redirects for legacy paths */}
             <Route path="home" element={<Navigate to="/" replace />} />
@@ -224,6 +249,7 @@ export default function App() {
           <Route path="/403" element={<AccessDenied reason="role" />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </BotAuthProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -4,7 +4,7 @@ import Glow from "../layout/Glow";
 import Footer from "../layout/Footer";
 import HubTopBar from "./HubTopBar";
 import RequireRole from "../auth/RequireRole";
-import { guardFor } from "../../lib/guards";
+import { routeGuardFor } from "../../lib/guards";
 import { hubContainer } from "../../lib/hubLayout";
 
 /**
@@ -19,7 +19,7 @@ import { hubContainer } from "../../lib/hubLayout";
 export default function HubShell({ hub }) {
   const location = useLocation();
   const outlet = useOutlet();
-  const guard = guardFor(location.pathname);
+  const guard = routeGuardFor(location.pathname);
 
   return (
     <RequireRole permission={guard?.permission} reason={guard?.reason}>

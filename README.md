@@ -480,6 +480,70 @@ Both halves are disabled when `NODE_ENV=production`, and the panel hides itself
 as soon as the API reports a real session, so there is no flag to remember to
 turn off.
 
+## Bot dashboard — `/management/bot`
+
+A management surface for the Discord bot: its rosters, the capabilities people
+hold, the servers and role mappings it acts through, its sync issues and jobs,
+and its audit log.
+
+**It is frontend only.** It does not touch this repo's database, this repo's
+Express API, or this repo's permission model. It talks to the bot's own REST API
+over `fetch`, and that API authenticates with Discord and re-checks authorisation
+on every single call. Nothing here decides what anybody is allowed to do:
+
+- Every request sends `credentials: "include"`, which is what carries the session
+  cookie. Without it everything 401s.
+- Every `POST`/`PATCH`/`DELETE` echoes the `frm_csrf` cookie back in an
+  `x-csrf-token` header. `GET` does not.
+- The permissions screen is built from `GET /permissions/capabilities`, not from
+  a list in this repo, so a capability added on the bot side appears here without
+  a deploy. The catalogue decides what the dashboard *offers*. It never decides
+  what is *allowed* — hiding a button prevents nothing.
+- Rosters are computed from Discord roles. There is no "add member" anywhere,
+  because there is no endpoint for one and there should not be a UI implying it.
+
+### The API has to be on a subdomain of this site
+
+`VITE_API_URL` (see `client/.env.example`) is the only place the address is
+configured. In production it must be a subdomain of whatever domain serves the
+site — `api.example.com` for `example.com`.
+
+The bot's session cookies are `SameSite=Lax`. Point the dashboard at a different
+site and the browser silently declines to send them: every signed-in request
+comes back 401, there is no CORS error, and the network tab shows requests that
+look completely ordinary. `client/src/lib/botSameSite.js` checks for this at
+runtime and names it on screen, but the fix is a deployment one. The check
+compares the last two labels of each hostname, so it does not warn for
+multi-part suffixes like `example.co.uk`; it only ever warns, never blocks.
+
+### Signed in but not staff is not an error
+
+Someone can authenticate with Discord perfectly well and still get `401 "Your
+account does not have website access."` That is the API working correctly, and
+`BotGate` gives it its own page saying what is missing and who to ask — not an
+error, and not an invitation to sign in again, which would do the same thing.
+
+### The menu entry, and why it is not a route guard
+
+`bot.dashboard` keeps the Management menu entry out of everybody's menu but
+Directorship's. It is marked `menuOnly` in `src/lib/guards.js`, so it filters the
+menu and nothing else: `routeGuardFor` drops `menuOnly` entries, and the route
+opens for anyone who asks for it. Blocking the route on a site permission would
+be a second, weaker copy of a decision the bot API already makes, and it could
+lock out somebody the bot would have let in.
+
+### Async work
+
+Sync runs return `202` with a job. `JobProgress` polls until the status is
+terminal — `COMPLETED`, `PARTIAL`, `FAILED`, `CANCELLED` or `PAUSED`. `PAUSED` is
+not a failure: a safety check stopped the job before it applied anything, usually
+because it would have touched an unusual number of people at once, so it is shown
+in amber with that explanation rather than in red.
+
+`message` from the API is always safe to display. `requestId` is shown on every
+error screen with a copy button, because it is what identifies the call in the
+bot's own logs.
+
 ## Authentication
 
 Discord OAuth is **not implemented yet**. Until it is, the API resolves the
