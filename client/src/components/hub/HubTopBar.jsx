@@ -82,8 +82,12 @@ export default function HubTopBar({ hub }) {
             </span>
           </Link>
 
-          {/* Colour-coded group dropdowns */}
-          <nav className="hidden flex-1 items-center justify-center gap-3 hub:flex">
+          {/* Colour-coded group dropdowns, sitting against the brand rather than
+              centred. A hub carries only two or three groups, and centring that
+              few left them stranded mid-bar with the brand far off to one side.
+              The trailing divider goes with the centring: left-aligned, it would
+              have hung off the last group with nothing after it. */}
+          <nav className="hidden min-w-0 flex-1 items-center justify-start gap-3 hub:flex">
             <Divider />
             {groups.map((group, index) => (
               <div key={group.id} className="flex items-center gap-3">
@@ -96,7 +100,6 @@ export default function HubTopBar({ hub }) {
                 />
               </div>
             ))}
-            <Divider />
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3 hub:ml-3">

@@ -61,7 +61,9 @@ export default function DeptTopBar({ config, base, groups, saveState, saveMessag
             </span>
           </Link>
 
-          <nav className="hidden flex-1 items-center justify-center gap-3 hub:flex">
+          {/* Left-aligned for the same reason as the staff and civilian hubs —
+              see the note in components/hub/HubTopBar.jsx. */}
+          <nav className="hidden min-w-0 flex-1 items-center justify-start gap-3 hub:flex">
             <span className="h-6 w-px shrink-0 bg-white/10" aria-hidden="true" />
             {groups.map((group, index) => (
               <div key={group.id} className="flex items-center gap-3">
@@ -78,7 +80,6 @@ export default function DeptTopBar({ config, base, groups, saveState, saveMessag
                 />
               </div>
             ))}
-            <span className="h-6 w-px shrink-0 bg-white/10" aria-hidden="true" />
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3 hub:ml-3">
