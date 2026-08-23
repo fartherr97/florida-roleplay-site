@@ -1,17 +1,19 @@
 /**
- * Icon registry for the Staff Hub sidebar and cards, kept separate from the
+ * Icon registry for both hubs' navigation and cards, kept separate from the
  * public site's registry so neither pulls in the other's icons.
  */
 import {
-  Award, BookOpen, ChartColumn, Crown, FileSpreadsheet, Gavel, Home, Inbox,
-  ListChecks, ScrollText, Shield, ShieldCheck, SlidersHorizontal, Users,
-  UserSearch,
+  Award, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, Car, ChartColumn,
+  CircleDollarSign, Crown, FileSpreadsheet, Fuel, Gavel, Home, House, IdCard,
+  Inbox, Key, ListChecks, MapPin, Phone, Scale, ScrollText, Shield, ShieldCheck,
+  SlidersHorizontal, Store, Tag, Users, UserSearch, Wallet,
 } from "lucide-react";
 
 const HUB_ICONS = {
-  Award, BookOpen, ChartColumn, Crown, FileSpreadsheet, Gavel, Home, Inbox,
-  ListChecks, ScrollText, Shield, ShieldCheck, SlidersHorizontal, Users,
-  UserSearch,
+  Award, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, Car, ChartColumn,
+  CircleDollarSign, Crown, FileSpreadsheet, Fuel, Gavel, Home, House, IdCard,
+  Inbox, Key, ListChecks, MapPin, Phone, Scale, ScrollText, Shield, ShieldCheck,
+  SlidersHorizontal, Store, Tag, Users, UserSearch, Wallet,
 };
 
 export function hubIcon(name, fallback = Home) {

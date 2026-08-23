@@ -9,7 +9,7 @@
  */
 import { matchPath } from "react-router-dom";
 import { ROLES } from "../data/mockData";
-import { hubRoutes } from "../data/hubNavigation";
+import { hubRoutes } from "../data/hubs";
 
 export const STAFF_ROLES = [
   ROLES.STAFF,
@@ -47,9 +47,9 @@ export const GUARDS = [
     roles: DEPT_HEAD_ROLES,
     reason: "department",
   },
-  // The Staff Hub declares its own roles alongside its sidebar, so the sidebar
-  // and this table cannot drift apart. Its landing page stays public: it is the
-  // sign-in entry point, and it explains what the hub is.
+  // Each hub declares its own roles alongside the nav entry that links to a
+  // page, so the nav and this table cannot drift apart. Hub landing pages stay
+  // public: they are the sign-in entry point and explain what the hub is.
   ...hubRoutes,
 ];
 

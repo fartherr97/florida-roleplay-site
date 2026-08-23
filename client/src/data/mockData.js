@@ -73,9 +73,29 @@ export const ROLE_LABELS = {
 };
 
 /**
- * Staff ranks in ascending order, used by the hub's preview switcher and by the
- * rank chips on its landing page. Each rank carries the roles it grants, so
- * previewing a rank behaves exactly like holding those Discord roles.
+ * Civilian standing, below the staff ladder. Everyone who signs in with Discord
+ * is a member; whitelisting is what creates a character and therefore the
+ * personal records the Civilian Hub shows.
+ */
+export const CIVILIAN_RANKS = [
+  {
+    id: "member",
+    label: "Member",
+    tone: "slate",
+    roles: [ROLES.MEMBER],
+  },
+  {
+    id: "whitelisted",
+    label: "Whitelisted",
+    tone: "green",
+    roles: [ROLES.MEMBER, ROLES.WHITELISTED],
+  },
+];
+
+/**
+ * Staff ranks in ascending order, used by the rank chips on the Staff Hub's
+ * landing page. Each rank carries the roles it grants, so previewing a rank
+ * behaves exactly like holding those Discord roles.
  */
 export const STAFF_RANKS = [
   {
@@ -131,6 +151,13 @@ export const STAFF_RANKS = [
     ],
   },
 ];
+
+/**
+ * Every rank the preview switcher offers, civilian standing first. Keeping both
+ * ladders in one list is what lets a visitor preview the Civilian Hub as a plain
+ * member rather than only as staff.
+ */
+export const PREVIEW_RANKS = [...CIVILIAN_RANKS, ...STAFF_RANKS];
 
 /** Mock signed-in user. Set to null to preview the signed-out experience. */
 export const mockUser = {

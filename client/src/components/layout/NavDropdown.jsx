@@ -6,11 +6,14 @@ import { iconFor } from "../../lib/icons";
 import { cn } from "../../lib/cn";
 
 /**
- * One colour-coded nav group in the top bar. Opens on hover (with a short close
+ * One colour-coded nav group in a top bar. Opens on hover (with a short close
  * delay so the pointer can travel to the panel) and on click; closes on outside
  * click, Escape and route change. Arrow keys move focus between rows.
+ *
+ * `resolveIcon` lets the hubs supply their own icon registry rather than adding
+ * every hub icon to the public site's.
  */
-export default function NavDropdown({ label, tone, items }) {
+export default function NavDropdown({ label, tone, items, resolveIcon = iconFor }) {
   // Hover and click are tracked separately: a pointer that merely passes over
   // the trigger opens the panel transiently, while a click pins it open. Without
   // the split, hovering (which happens first) would open the panel and the click
@@ -148,7 +151,7 @@ export default function NavDropdown({ label, tone, items }) {
             className="absolute left-0 top-full z-40 mt-3 w-80 rounded-2xl border border-white/10 bg-[#1a2234] p-1.5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]"
           >
             {items.map((item, index) => {
-              const Icon = iconFor(item.icon);
+              const Icon = resolveIcon(item.icon);
               return (
                 <Link
                   key={item.to}

@@ -301,3 +301,140 @@ CREATE TABLE IF NOT EXISTS hub_questions (
   UNIQUE KEY uq_hub_questions_qid (question_id),
   KEY idx_hub_questions_exam (exam_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Civilian Hub
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS civ_characters (
+  id            VARCHAR(64)  NOT NULL,
+  discord_id    VARCHAR(20)  NULL,
+  name          VARCHAR(128) NOT NULL,
+  dob           DATE         NULL,
+  occupation    VARCHAR(128) NULL,
+  residence     VARCHAR(255) NULL,
+  phone         VARCHAR(32)  NULL,
+  bank_balance  INT          NOT NULL DEFAULT 0,
+  cash_balance  INT          NOT NULL DEFAULT 0,
+  status        VARCHAR(32)  NOT NULL DEFAULT 'Active',
+  is_primary    TINYINT(1)   NOT NULL DEFAULT 0,
+  joined_at     DATE         NULL,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_civ_characters_discord (discord_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_vehicles (
+  id                VARCHAR(64)  NOT NULL,
+  plate             VARCHAR(16)  NOT NULL,
+  make              VARCHAR(64)  NOT NULL,
+  model             VARCHAR(64)  NOT NULL,
+  model_year        INT          NULL,
+  colour            VARCHAR(64)  NULL,
+  owner_character   VARCHAR(64)  NULL,
+  owner_name        VARCHAR(128) NULL,
+  garage            VARCHAR(128) NULL,
+  status            VARCHAR(32)  NOT NULL DEFAULT 'Stored',
+  insured           TINYINT(1)   NOT NULL DEFAULT 0,
+  registered_until  DATE         NULL,
+  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_civ_vehicles_plate (plate),
+  KEY idx_civ_vehicles_owner (owner_character)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_properties (
+  id               VARCHAR(64)  NOT NULL,
+  address          VARCHAR(255) NOT NULL,
+  property_type    VARCHAR(64)  NULL,
+  owner_character  VARCHAR(64)  NULL,
+  owner_name       VARCHAR(128) NULL,
+  district         VARCHAR(64)  NULL,
+  purchased_at     DATE         NULL,
+  value_usd        INT          NOT NULL DEFAULT 0,
+  garage_slots     INT          NOT NULL DEFAULT 0,
+  status           VARCHAR(32)  NOT NULL DEFAULT 'Owned',
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_civ_properties_owner (owner_character)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_licences (
+  id              VARCHAR(64)  NOT NULL,
+  licence_type    VARCHAR(64)  NOT NULL,
+  holder_character VARCHAR(64) NULL,
+  holder_name     VARCHAR(128) NULL,
+  licence_number  VARCHAR(32)  NOT NULL,
+  issued_at       DATE         NULL,
+  expires_at      DATE         NULL,
+  status          VARCHAR(32)  NOT NULL DEFAULT 'Valid',
+  points          INT          NOT NULL DEFAULT 0,
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_civ_licences_number (licence_number),
+  KEY idx_civ_licences_holder (holder_character)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_businesses (
+  id          VARCHAR(64)  NOT NULL,
+  name        VARCHAR(128) NOT NULL,
+  category    VARCHAR(64)  NULL,
+  owner_name  VARCHAR(128) NULL,
+  district    VARCHAR(64)  NULL,
+  phone       VARCHAR(32)  NULL,
+  hiring      TINYINT(1)   NOT NULL DEFAULT 0,
+  blurb       TEXT         NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_civ_businesses_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_jobs (
+  id             VARCHAR(64)  NOT NULL,
+  title          VARCHAR(128) NOT NULL,
+  business_id    VARCHAR(64)  NULL,
+  business_name  VARCHAR(128) NULL,
+  category       VARCHAR(64)  NULL,
+  pay            VARCHAR(64)  NULL,
+  job_type       VARCHAR(32)  NULL,
+  posted_at      DATE         NULL,
+  blurb          TEXT         NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_civ_jobs_posted (posted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_classifieds (
+  id           VARCHAR(64)  NOT NULL,
+  title        VARCHAR(128) NOT NULL,
+  category     VARCHAR(64)  NULL,
+  price        VARCHAR(64)  NULL,
+  seller_name  VARCHAR(128) NULL,
+  phone        VARCHAR(32)  NULL,
+  posted_at    DATE         NULL,
+  blurb        TEXT         NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_civ_classifieds_posted (posted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS civ_penal_code (
+  code        VARCHAR(16)  NOT NULL,
+  title       VARCHAR(128) NOT NULL,
+  degree      VARCHAR(32)  NOT NULL,
+  fine        VARCHAR(32)  NULL,
+  jail_time   VARCHAR(32)  NULL,
+  points      INT          NOT NULL DEFAULT 0,
+  notes       TEXT         NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (code),
+  KEY idx_civ_penal_degree (degree)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -36,12 +36,21 @@ export const SENIOR_ADMIN_PLUS = [
 ];
 export const DIRECTOR_ONLY = [ROLES.DIRECTOR, ROLES.MANAGEMENT];
 
+/** Any signed-in community member; staff hold these implicitly. */
+export const MEMBER_ANY = [ROLES.MEMBER, ROLES.WHITELISTED, ...STAFF_ANY];
+
+/** Personal civilian records only exist for a whitelisted character. */
+export const WHITELISTED_ANY = [ROLES.WHITELISTED, ...STAFF_ANY];
+
 /**
- * Staff ranks and the roles each grants, mirroring STAFF_RANKS in
- * client/src/data/mockData.js. Used only by the development preview path in
- * middleware/requireRole.js, which is hard-disabled in production.
+ * Every rank the preview switcher offers and the roles each grants, mirroring
+ * PREVIEW_RANKS in client/src/data/mockData.js. Used only by the development
+ * preview path in middleware/requireRole.js, which is hard-disabled in
+ * production.
  */
 export const STAFF_RANKS = {
+  member: [ROLES.MEMBER],
+  whitelisted: [ROLES.MEMBER, ROLES.WHITELISTED],
   trial_mod: [ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD],
   moderator: [
     ROLES.MEMBER, ROLES.WHITELISTED, ROLES.STAFF, ROLES.TRIAL_MOD,
@@ -67,6 +76,8 @@ export const STAFF_RANKS = {
 };
 
 export const RANK_LABELS = {
+  member: "Member",
+  whitelisted: "Whitelisted",
   trial_mod: "Trial Mod",
   moderator: "Moderator",
   senior_mod: "Senior Mod",

@@ -1,6 +1,7 @@
 import { cn } from "../../lib/cn";
 
-/** Small uppercase status pill with an optional glowing leading dot. */
+/** Small uppercase status pill with an optional glowing leading dot. Polymorphic
+ * via `as` so it can render a link without wrapping. */
 const TONES = {
   primary: "text-primary-300 bg-primary-500/10 ring-primary-400/25",
   brand: "text-brand-300 bg-brand-500/10 ring-brand-400/25",
@@ -11,6 +12,7 @@ const TONES = {
 };
 
 export default function Badge({
+  as: Tag = "span",
   tone = "slate",
   dot = false,
   className,
@@ -18,7 +20,7 @@ export default function Badge({
   ...props
 }) {
   return (
-    <span
+    <Tag
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ring-1 ring-inset",
         TONES[tone] ?? TONES.slate,
@@ -30,6 +32,6 @@ export default function Badge({
         <span className="size-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
       )}
       {children}
-    </span>
+    </Tag>
   );
 }

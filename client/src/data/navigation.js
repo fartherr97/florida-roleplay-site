@@ -11,13 +11,30 @@ export const primaryLinks = [
   { label: "Applications", to: "/applications" },
   { label: "Discord", href: SITE.discordInvite, external: true },
   { label: "Store", to: "/store" },
-  { label: "Supporters", to: "/supporters" },
   { label: "Knowledge Base", to: "/knowledge-base" },
   { label: "Events", to: "/events" },
   { label: "Reports / Complaints", to: "/reports" },
 ];
 
 export const navGroups = [
+  {
+    id: "civilian",
+    label: "Civilian",
+    tone: {
+      text: "text-emerald-400",
+      tile: "bg-emerald-500/10 text-emerald-400 ring-emerald-400/20",
+    },
+    items: [
+      { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
+      { label: "Vehicles", to: "/civilian-hub/vehicles", icon: "Car" },
+      { label: "Properties", to: "/civilian-hub/properties", icon: "House" },
+      { label: "Business Directory", to: "/civilian-hub/businesses", icon: "Store" },
+      { label: "Job Board", to: "/civilian-hub/jobs", icon: "Briefcase" },
+      { label: "Classifieds", to: "/civilian-hub/classifieds", icon: "Tag" },
+      { label: "Penal Code", to: "/civilian-hub/penal-code", icon: "Scale" },
+      { label: "Supporters", to: "/supporters", icon: "Heart" },
+    ],
+  },
   {
     id: "emergency",
     label: "Emergency Services",

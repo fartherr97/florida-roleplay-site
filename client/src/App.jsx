@@ -21,8 +21,19 @@ import Join from "./pages/Join";
 import PatchNotes from "./pages/PatchNotes";
 import SignIn from "./pages/SignIn";
 import CreateAccount from "./pages/CreateAccount";
-import HubLayout from "./components/hub/HubLayout";
+import HubShell from "./components/hub/HubShell";
 import HubLanding from "./pages/hub/HubLanding";
+import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
+
+/** Chips on the Civilian Hub landing — what the hub covers, not a rank ladder. */
+const CIVILIAN_CHIPS = [
+  { id: "characters", label: "Characters", tone: "green" },
+  { id: "vehicles", label: "Vehicles", tone: "brand" },
+  { id: "property", label: "Property", tone: "primary" },
+  { id: "licences", label: "Licences", tone: "amber" },
+  { id: "business", label: "Business", tone: "slate" },
+  { id: "law", label: "Penal Code", tone: "rose" },
+];
 import HubHome from "./pages/hub/HubHome";
 import HubRoster from "./pages/hub/HubRoster";
 import HubDashboard from "./pages/hub/HubDashboard";
@@ -34,6 +45,16 @@ import HubSubmissions from "./pages/hub/HubSubmissions";
 import HubExamMembers from "./pages/hub/HubExamMembers";
 import HubAuditLog from "./pages/hub/HubAuditLog";
 import HubManagement from "./pages/hub/HubManagement";
+import CivHome from "./pages/civ/CivHome";
+import CivCharacters from "./pages/civ/CivCharacters";
+import CivVehicles from "./pages/civ/CivVehicles";
+import CivProperties from "./pages/civ/CivProperties";
+import CivLicences from "./pages/civ/CivLicences";
+import CivBusinesses from "./pages/civ/CivBusinesses";
+import CivJobs from "./pages/civ/CivJobs";
+import CivClassifieds from "./pages/civ/CivClassifieds";
+import CivPenalCode from "./pages/civ/CivPenalCode";
+import CivGuides from "./pages/civ/CivGuides";
 import Moderation from "./pages/staff/Moderation";
 import Support from "./pages/staff/Support";
 import Leadership from "./pages/management/Leadership";
@@ -99,6 +120,10 @@ export default function App() {
             <Route path="staff-roster" element={<Navigate to="/staff-hub/roster" replace />} />
             <Route path="trial-mod-checklist" element={<Navigate to="/staff-hub/trial-checklist" replace />} />
             <Route path="staff-da-database" element={<Navigate to="/staff-hub/da-database" replace />} />
+            <Route path="civilian-portal" element={<Navigate to="/civilian-hub" replace />} />
+            <Route path="penal-code" element={<Navigate to="/civilian-hub/penal-code" replace />} />
+            <Route path="jobs" element={<Navigate to="/civilian-hub/jobs" replace />} />
+            <Route path="businesses" element={<Navigate to="/civilian-hub/businesses" replace />} />
             <Route path="connect" element={<Navigate to="/join" replace />} />
             <Route path="login" element={<Navigate to="/sign-in" replace />} />
             <Route path="register" element={<Navigate to="/create-account" replace />} />
@@ -108,10 +133,10 @@ export default function App() {
               Footer wraps it. The landing page is public (it is the sign-in
               entry point); every inner route is rank-gated by src/lib/guards.js
               alongside the sidebar that lists it. */}
-          <Route path="/staff-hub" element={<HubLanding />} />
+          <Route path="/staff-hub" element={<HubLanding hub={STAFF_HUB} />} />
           {/* A pathless layout route, so the landing above can own /staff-hub
               itself without two siblings competing for the same path. */}
-          <Route element={<HubLayout />}>
+          <Route element={<HubShell hub={STAFF_HUB} />}>
             <Route path="/staff-hub/home" element={<HubHome />} />
             <Route path="/staff-hub/roster" element={<HubRoster />} />
             <Route path="/staff-hub/dashboard" element={<HubDashboard />} />
@@ -163,6 +188,22 @@ export default function App() {
             <Route path="/staff-hub/exam-members" element={<HubExamMembers />} />
             <Route path="/staff-hub/audit-log" element={<HubAuditLog />} />
             <Route path="/staff-hub/management" element={<HubManagement />} />
+          </Route>
+
+          {/* Civilian Hub — same shape: a public landing page, then a gated
+              shell over its sections. */}
+          <Route path="/civilian-hub" element={<HubLanding hub={CIVILIAN_HUB} chips={CIVILIAN_CHIPS} chipNote="Personal records need a whitelisted character; the community pages are open to any member." />} />
+          <Route element={<HubShell hub={CIVILIAN_HUB} />}>
+            <Route path="/civilian-hub/home" element={<CivHome />} />
+            <Route path="/civilian-hub/characters" element={<CivCharacters />} />
+            <Route path="/civilian-hub/vehicles" element={<CivVehicles />} />
+            <Route path="/civilian-hub/properties" element={<CivProperties />} />
+            <Route path="/civilian-hub/licences" element={<CivLicences />} />
+            <Route path="/civilian-hub/businesses" element={<CivBusinesses />} />
+            <Route path="/civilian-hub/jobs" element={<CivJobs />} />
+            <Route path="/civilian-hub/classifieds" element={<CivClassifieds />} />
+            <Route path="/civilian-hub/penal-code" element={<CivPenalCode />} />
+            <Route path="/civilian-hub/guides" element={<CivGuides />} />
           </Route>
 
           {/* Registered for direct hits; guards render 403 in place instead. */}

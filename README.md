@@ -2,7 +2,7 @@
 
 Public community site and API for **Florida Roleplay**, a FiveM roleplay server —
 rules, applications, departments, store, supporters, events, knowledge base and
-reports, sitting in front of a rank-gated **Staff Hub**.
+reports, plus two gated sub-applications: a **Staff Hub** and a **Civilian Hub**.
 
 ```
 florida-roleplay/
@@ -68,24 +68,38 @@ are hand-written and always parameterised.
   bar reads the same table to hide unreachable destinations.
   That hiding is a convenience, not a boundary: `server/src/middleware/requireRole.js`
   is the real check, and it answers `403 { ok, code, message }` with one of
-  `AUTH_SIGNED_OUT`, `AUTH_ROLE_MISSING` or `AUTH_DEPT_MISMATCH` — the code the
-  Access Denied panel prints in its footer.
+  `AUTH_SIGNED_OUT`, `AUTH_ROLE_MISSING`, `AUTH_DEPT_MISMATCH` or
+  `AUTH_NOT_WHITELISTED` — the code the Access Denied panel prints in its footer.
+  Each maps to a distinct denial page, so add a code only when the copy the user
+  should read genuinely differs.
 - **Roles** — the role list is deliberately duplicated between
   `server/src/seed.js` and `client/src/data/mockData.js`; both files say so. Add
   a role to one, add it to the other. The same applies to the hub's seed data
-  (`server/src/staffHubSeed.js` mirrors `client/src/data/staffHubData.js`).
+  (`server/src/staffHubSeed.js` mirrors `client/src/data/staffHubData.js`, and
+  `server/src/civilianHubSeed.js` mirrors `client/src/data/civilianHubData.js`).
 - **Validation** — POST bodies are re-validated server-side in
   `server/src/validate.js`. Client-side checks are for feedback only.
 - **Navigation breakpoint** — the full mega-nav carries nine links, three
   dropdown groups, the Connect CTA and the user chip. Measured, that needs more
   room than `xl` provides, so `src/index.css` defines a `nav` breakpoint
-  (1700px) where it un-collapses; below that everything lives in the drawer.
+  (1700px) where it un-collapses; below that everything lives in the drawer. The
+  hubs carry far less, so they get their own `hub` breakpoint at 1120px.
 
-## Staff Hub
+## The hubs
 
-The Staff dropdown leads into `/staff-hub`, a rank-gated sub-application with its
-own shell — a sidebar and slim bar, no public TopBar or Footer. Its landing page
-is public: it is the sign-in entry point and explains what the hub is.
+Both hubs are gated sub-applications living in this repo alongside the public
+site, sharing its design system, UI primitives, auth context and guard table.
+Each has a **public landing page** — the sign-in entry point, which explains what
+the hub is — and behind it a shell with its own top bar carrying that hub's
+sections. Both are defined in `client/src/data/hubs.js`; adding a section is a
+one-line change there.
+
+They are deliberately self-contained (own data module, own server router, own
+seed file) so either could be lifted into its own repo if the staff tooling ever
+needs to be private. Until then one repo means one build, one deploy, and no
+shared-package overhead.
+
+### Staff Hub — `/staff-hub`
 
 | Group | Pages |
 | --- | --- |
@@ -93,20 +107,39 @@ is public: it is the sign-in entry point and explains what the hub is.
 | Rank Access | Resources, Administrators, Senior Admins+, Director panel |
 | Exam Backend | Recent Submissions (with attempt review and manual override), Members, Audit Log, Management (thresholds and question catalog) |
 
-Ranks run Trial Mod → Moderator → Senior Mod → Administrator → Senior Admin →
-Director, each granting the roles below it. `client/src/data/hubNavigation.js`
-declares the roles for each page next to the sidebar entry that lists it, and
-`src/lib/guards.js` folds those into the shared guard table — so the sidebar, the
-route gate and the server middleware cannot drift apart.
+Ranks run Member → Whitelisted → Trial Mod → Moderator → Senior Mod →
+Administrator → Senior Admin → Director, each granting the roles below it.
 
 Exam results are never edited in place. An override writes an append-only row
 carrying the reviewer and their reason, and the Audit Log renders those rows; the
 attempt keeps its original score alongside the new one.
 
+### Civilian Hub — `/civilian-hub`
+
+| Group | Pages |
+| --- | --- |
+| My Records | Overview, Characters, Vehicles, Properties, Licences |
+| Community | Business Directory, Job Board, Classifieds |
+| Resources | Penal Code, Civilian Guides |
+
+Two gates apply. Personal records need a **whitelisted** character; the community
+and resource pages are open to any signed-in member, because someone deciding
+whether to apply should be able to read the penal code and see who is hiring. A
+member who simply is not whitelisted yet gets its own denial page
+(`AUTH_NOT_WHITELISTED`) pointing at the whitelist application rather than the
+staff copy about contacting a supervisor.
+
+### Where roles are declared
+
+`client/src/data/hubs.js` declares the roles for a page next to the nav entry
+that links to it, and `src/lib/guards.js` folds those into the shared guard
+table — so the nav, the route gate and the server middleware cannot drift apart.
+
 ### Preview mode
 
-Because Discord OAuth is still stubbed, the hub landing offers a rank switcher so
-the whole portal can be reviewed as any rank. The chosen rank is kept in
+Because Discord OAuth is still stubbed, each hub landing offers a rank switcher —
+covering the whole ladder from Member upward — so either portal can be reviewed
+as any rank. The chosen rank is kept in
 `sessionStorage` and sent as an `x-preview-rank` header, which the API honours —
 otherwise a previewed Director would see the page and then a 403 for its data.
 Both halves are disabled when `NODE_ENV=production`, and the panel hides itself

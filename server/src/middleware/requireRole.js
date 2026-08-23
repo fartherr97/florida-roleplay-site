@@ -1,7 +1,9 @@
 /**
  * Role authorisation. The `code` returned on failure is what the client's
  * AccessDenied page renders in its footer, so the set is deliberately small and
- * stable: AUTH_SIGNED_OUT, AUTH_ROLE_MISSING, AUTH_DEPT_MISMATCH.
+ * stable: AUTH_SIGNED_OUT, AUTH_ROLE_MISSING, AUTH_DEPT_MISMATCH and
+ * AUTH_NOT_WHITELISTED. Each one maps to a distinct denial page, so add a code
+ * only when the copy the user should read genuinely differs.
  */
 import { query } from "../db.js";
 import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
@@ -49,9 +51,11 @@ export async function resolveUser(req) {
     // Database unavailable — fall through to the seed caller below.
   }
 
-  // Without a database, the seeded id resolves to the seeded roles and any
-  // other valid snowflake resolves to a signed-in user holding none — so both
-  // the AUTH_SIGNED_OUT and AUTH_ROLE_MISSING paths stay testable.
+  // Without a database, the seeded id resolves to the seeded roles and any other
+  // valid snowflake resolves to a plain member — signing in with Discord is what
+  // makes someone a member, while whitelisting and staff roles are earned. That
+  // keeps AUTH_SIGNED_OUT, AUTH_ROLE_MISSING and the member-only gates all
+  // reachable from a header.
   if (devId === devUser.id) return { ...devUser };
   if (/^\d{17,20}$/.test(devId)) {
     return {
@@ -59,7 +63,8 @@ export async function resolveUser(req) {
       username: "dev-user",
       displayName: "Dev User",
       avatar: null,
-      roles: [],
+      rank: "Member",
+      roles: ["member"],
     };
   }
   return null;
@@ -79,6 +84,15 @@ export async function attachUser(req, _res, next) {
  * Gate factory. `requireRole(["staff", "admin"])` passes when the caller holds
  * any of the listed roles.
  */
+const MESSAGES = {
+  AUTH_ROLE_MISSING:
+    "Your Discord account doesn't have any roles that associate you as a Staff member on this portal.",
+  AUTH_DEPT_MISMATCH:
+    "Your Discord roles don't place you in the department that owns this page.",
+  AUTH_NOT_WHITELISTED:
+    "Your Discord account isn't whitelisted yet, so there's no character record for this page to show.",
+};
+
 export function requireRole(roles = [], { code = "AUTH_ROLE_MISSING" } = {}) {
   return async (req, res, next) => {
     const user = req.user ?? (await resolveUser(req));
@@ -97,8 +111,7 @@ export function requireRole(roles = [], { code = "AUTH_ROLE_MISSING" } = {}) {
       return res.status(403).json({
         ok: false,
         code,
-        message:
-          "Your Discord account doesn't have any roles that associate you as a Staff member on this portal.",
+        message: MESSAGES[code] ?? MESSAGES.AUTH_ROLE_MISSING,
       });
     }
 

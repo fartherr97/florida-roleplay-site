@@ -5,6 +5,7 @@
  */
 import * as mock from "../data/mockData";
 import * as hub from "../data/staffHubData";
+import * as civ from "../data/civilianHubData";
 
 export const USE_API = true;
 
@@ -208,6 +209,25 @@ export const api = {
       ok: true,
     })),
 
+  /* --------------------------- Civilian Hub --------------------------- */
+
+  civCharacters: () => get("/civilian-hub/characters", civ.characters),
+  civVehicles: () => get("/civilian-hub/vehicles", civ.vehicles),
+  civProperties: () => get("/civilian-hub/properties", civ.properties),
+  civLicences: () => get("/civilian-hub/licences", civ.licences),
+  civBusinesses: () => get("/civilian-hub/businesses", civ.businesses),
+  civJobs: () => get("/civilian-hub/jobs", civ.jobs),
+  civClassifieds: () => get("/civilian-hub/classifieds", civ.classifieds),
+  civPenalCode: (q = "") => {
+    const trimmed = q.trim();
+    const fallback = trimmed ? filterPenalCode(civ.penalCode, trimmed) : civ.penalCode;
+    return get(
+      `/civilian-hub/penal-code${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ""}`,
+      fallback,
+    );
+  },
+  civGuides: () => get("/civilian-hub/guides", civ.guides),
+
   assistant: (message) =>
     post("/assistant", { message }, () => ({
       reply:
@@ -285,6 +305,17 @@ function filterMembers(members, q) {
     (m) =>
       m.name.toLowerCase().includes(needle) ||
       String(m.discordId).includes(needle),
+  );
+}
+
+function filterPenalCode(entries, q) {
+  const needle = q.toLowerCase();
+  return entries.filter(
+    (entry) =>
+      entry.title.toLowerCase().includes(needle) ||
+      entry.code.toLowerCase().includes(needle) ||
+      entry.degree.toLowerCase().includes(needle) ||
+      entry.notes.toLowerCase().includes(needle),
   );
 }
 

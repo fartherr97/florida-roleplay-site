@@ -1,6 +1,6 @@
 import { Eye } from "lucide-react";
 import { useAuth } from "../../context/useAuth";
-import { STAFF_RANKS } from "../../data/mockData";
+import { PREVIEW_RANKS } from "../../data/mockData";
 import { cn } from "../../lib/cn";
 
 /**
@@ -49,7 +49,7 @@ export default function PreviewModePanel({ className }) {
       </p>
 
       <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {STAFF_RANKS.map((rank) => {
+        {PREVIEW_RANKS.map((rank) => {
           const active = previewRank === rank.id;
           return (
             <button

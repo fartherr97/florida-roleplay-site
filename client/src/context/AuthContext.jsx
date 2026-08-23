@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthContext from "./authContext";
 import { api } from "../lib/api";
-import { STAFF_RANKS } from "../data/mockData";
+import { PREVIEW_RANKS } from "../data/mockData";
 
 const PREVIEW_KEY = "flrp.previewRank";
 
@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
     // A real Discord session ends preview mode outright.
     const previewAvailable = !user?.authenticated;
     const rank = previewAvailable
-      ? STAFF_RANKS.find((r) => r.id === previewRank) ?? null
+      ? PREVIEW_RANKS.find((r) => r.id === previewRank) ?? null
       : null;
 
     const effectiveUser = rank

@@ -100,3 +100,10 @@ button:disabled { cursor: not-allowed; }
 @theme {
   --breakpoint-nav: 1700px;
 }
+
+/* Breakpoint for a hub's top bar. A hub carries three group dropdowns plus the
+   rank badges and user chip — far less than the public mega-nav, so it
+   un-collapses much earlier. */
+@theme {
+  --breakpoint-hub: 1120px;
+}

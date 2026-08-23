@@ -9,7 +9,7 @@ import { useAuth } from "../../context/useAuth";
 import { SITE, STAFF_RANKS } from "../../data/mockData";
 import { cn } from "../../lib/cn";
 
-/** Rank chip colours, matching the tones the preview switcher uses. */
+/** Chip colours, matching the tones the preview switcher uses. */
 const CHIP_TONES = {
   slate: "text-slate-300 ring-slate-400/30 bg-slate-500/[0.07]",
   brand: "text-brand-300 ring-brand-400/30 bg-brand-500/[0.07]",
@@ -20,16 +20,16 @@ const CHIP_TONES = {
 };
 
 /**
- * Entry point for the Staff Hub. It is its own shell — a slim portal bar over a
- * centred column — rather than a page inside the public site, so the hub reads
- * as a separate tool the way the community's other portals do.
+ * Entry point for a hub. It is deliberately its own shell — a slim portal bar
+ * over a centred column — rather than a page inside either the site or the hub
+ * chrome, so each hub reads as a distinct tool the way the community's other
+ * portals do. One component serves both hubs; only the copy and the chips differ.
  */
-export default function HubLanding() {
+export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
   const { user, previewRank } = useAuth();
 
   return (
     <div className="landing-bg flex min-h-screen flex-col">
-      {/* Slim portal bar */}
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-[#0a0e1a]/80 px-4 backdrop-blur-xl sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-3" title="Back to the main site">
           <Logo />
@@ -40,7 +40,7 @@ export default function HubLanding() {
             Florida <span className="text-primary-500">Roleplay</span>
           </p>
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-brand-400">
-            Staff Hub
+            {hub.name}
           </p>
         </div>
 
@@ -66,19 +66,18 @@ export default function HubLanding() {
 
           <p className="animate-fade-up delay-100 mt-8 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-400 ring-1 ring-inset ring-primary-400/40">
             <Zap className="size-3.5" />
-            Staff Hub
+            {hub.eyebrow}
           </p>
 
           <h1 className="animate-fade-up delay-100 mt-6 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
             Florida Roleplay
           </h1>
           <p className="animate-fade-up delay-100 mt-1 text-2xl font-extrabold tracking-tight text-brand-400 sm:text-3xl">
-            Staff Hub
+            {hub.tagline}
           </p>
 
           <p className="animate-fade-up delay-200 mx-auto mt-5 max-w-md text-slate-400">
-            Tools, resources and documentation for the staff team — roster, shift
-            metrics, disciplinary records and the exam backend, all in one place.
+            {hub.description}
           </p>
 
           <div className="animate-fade-up delay-300 mt-8 space-y-3">
@@ -94,8 +93,14 @@ export default function HubLanding() {
               <MessageCircle className="size-5" />
               Connect Discord
             </Button>
-            <Button as={Link} to="/staff-hub/home" variant="secondary" size="lg" block>
-              Enter Hub
+            <Button
+              as={Link}
+              to={`${hub.base}/home`}
+              variant="secondary"
+              size="lg"
+              block
+            >
+              Enter {hub.name === "Staff Hub" ? "Hub" : hub.name}
               <ArrowRight className="size-5" />
             </Button>
           </div>
@@ -103,24 +108,28 @@ export default function HubLanding() {
           <p className="animate-fade-up delay-300 mt-4 text-sm text-slate-500">
             {previewRank
               ? `Previewing as ${user?.rank}. Your Discord roles will replace this once OAuth is live.`
-              : "Connect with Discord to load your rank and unlock the tools it grants."}
+              : "Connect with Discord to load your roles and unlock what they grant."}
           </p>
 
-          {/* Rank chips */}
           <div className="animate-fade-up delay-400 mt-9 flex flex-wrap justify-center gap-2">
-            {STAFF_RANKS.map((rank) => (
+            {chips.map((chip) => (
               <span
-                key={rank.id}
+                key={chip.id}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ring-1 ring-inset",
-                  CHIP_TONES[rank.tone] ?? CHIP_TONES.slate,
+                  CHIP_TONES[chip.tone] ?? CHIP_TONES.slate,
                 )}
               >
                 <span className="size-2.5 rounded-[3px] bg-current" />
-                {rank.label}
+                {chip.label}
               </span>
             ))}
           </div>
+          {chipNote && (
+            <p className="animate-fade-up delay-400 mt-3 text-xs text-slate-600">
+              {chipNote}
+            </p>
+          )}
 
           <PreviewModePanel className="animate-fade-up delay-400 mt-10 text-left sm:text-center" />
 
