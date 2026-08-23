@@ -60,8 +60,9 @@ export const ROLES = {
   ADMIN: "admin",
   SENIOR_ADMIN: "senior_admin",
   HEAD_ADMIN: "head_admin",
-  // Above the staff ladder: ownership and community direction.
+  // Above the staff ladder: community direction, then the people who own it.
   DIRECTORSHIP: "directorship",
+  OWNERSHIP: "ownership",
   // Department command, orthogonal to the staff ladder
   DEPT_HEAD: "department_head",
 };
@@ -80,6 +81,7 @@ export const ROLE_LABELS = {
   senior_admin: "Sr. Admin",
   head_admin: "Head Admin",
   directorship: "Directorship",
+  ownership: "Ownership",
   department_head: "Department Head",
 };
 
@@ -124,6 +126,7 @@ const STAFF_LADDER = [
   { id: "senior_admin", label: "Sr. Admin", role: ROLES.SENIOR_ADMIN, tone: "amber" },
   { id: "head_admin", label: "Head Admin", role: ROLES.HEAD_ADMIN, tone: "rose" },
   { id: "directorship", label: "Directorship", role: ROLES.DIRECTORSHIP, tone: "rose" },
+  { id: "ownership", label: "Ownership", role: ROLES.OWNERSHIP, tone: "amber" },
 ];
 
 /**
@@ -151,9 +154,11 @@ export const mockUser = {
   username: "sunshine.dev",
   displayName: "Sunshine Dev",
   avatar: null,
-  rank: "Sr. Mod",
+  rank: "Ownership",
   roles: [
     "member", "whitelisted", "cert_civ_1", "trial_mod", "mod", "senior_mod",
+    "junior_admin", "admin", "senior_admin", "head_admin", "directorship",
+    "ownership",
   ],
 };
 

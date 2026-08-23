@@ -30,7 +30,7 @@ const TRIAL_EXAM = {
   feedback: false,
   anonymous: false,
   submitRoles: ["trial_mod"],
-  reviewRoles: ["senior_admin", "head_admin", "directorship"],
+  reviewRoles: ["senior_admin", "head_admin", "directorship", "ownership"],
   completionMessage:
     "Submitted. A Senior Admin will grade the written answers and your result appears in the Exam Backend.",
   resourceLinks: [
@@ -106,7 +106,7 @@ const SENIOR_EXAM = {
   feedback: false,
   anonymous: false,
   submitRoles: ["mod", "senior_mod"],
-  reviewRoles: ["senior_admin", "head_admin", "directorship"],
+  reviewRoles: ["senior_admin", "head_admin", "directorship", "ownership"],
   completionMessage: "Submitted. Your result appears in the Exam Backend once it has been graded.",
   resourceLinks: [{ label: "Rulebook", url: "/rules" }],
   questions: [
@@ -168,7 +168,7 @@ const ADMIN_EXAM = {
   feedback: false,
   anonymous: false,
   submitRoles: ["senior_mod", "junior_admin"],
-  reviewRoles: ["head_admin", "directorship"],
+  reviewRoles: ["head_admin", "directorship", "ownership"],
   completionMessage: "Submitted. Head Admin reviews these directly.",
   resourceLinks: [],
   questions: [
@@ -210,14 +210,14 @@ const STAFF_FEEDBACK = {
   audience: "staff",
   title: "Staff Team Feedback",
   description:
-    "Anonymous, ungraded and read by Directorship only. Say what is working and what is not.",
+    "Anonymous, ungraded and read by Directorship and Ownership only. Say what is working and what is not.",
   icon: "Megaphone",
   passThreshold: 0,
   published: true,
   feedback: true,
   anonymous: true,
   submitRoles: [],
-  reviewRoles: ["directorship"],
+  reviewRoles: ["directorship", "ownership"],
   completionMessage: "Thank you. Nothing about this response identifies you.",
   resourceLinks: [],
   questions: [
@@ -265,7 +265,7 @@ const WHITELIST_CHECK = {
   feedback: false,
   anonymous: false,
   submitRoles: [],
-  reviewRoles: ["senior_mod", "junior_admin", "admin", "senior_admin", "head_admin", "directorship"],
+  reviewRoles: ["senior_mod", "junior_admin", "admin", "senior_admin", "head_admin", "directorship", "ownership"],
   completionMessage:
     "Submitted. Your result is attached to your whitelist application — staff review both together.",
   resourceLinks: [
@@ -344,7 +344,7 @@ const CERT_CIV_TEST = {
   feedback: false,
   anonymous: false,
   submitRoles: ["cert_civ_1", "cert_civ_2"],
-  reviewRoles: ["senior_mod", "admin", "senior_admin", "head_admin", "directorship"],
+  reviewRoles: ["senior_mod", "admin", "senior_admin", "head_admin", "directorship", "ownership"],
   completionMessage: "Submitted. Watch your Discord DMs for your practical booking.",
   resourceLinks: [
     { label: "Civilian guides", url: "/civilian-hub/guides" },
@@ -395,7 +395,7 @@ const CIV_FEEDBACK = {
   feedback: true,
   anonymous: true,
   submitRoles: [],
-  reviewRoles: ["head_admin", "directorship"],
+  reviewRoles: ["head_admin", "directorship", "ownership"],
   completionMessage: "Thank you — this goes to the leadership team unattributed.",
   resourceLinks: [],
   questions: [

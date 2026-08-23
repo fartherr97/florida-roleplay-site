@@ -20,6 +20,8 @@ export const STAFF_ANY = [
   ROLES.ADMIN,
   ROLES.SENIOR_ADMIN,
   ROLES.HEAD_ADMIN,
+  ROLES.DIRECTORSHIP,
+  ROLES.OWNERSHIP,
 ];
 
 /** Jr. Admin and up. */

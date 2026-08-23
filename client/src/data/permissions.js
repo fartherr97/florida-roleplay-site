@@ -145,14 +145,14 @@ export const PERMISSION_GROUPS = [
         key: "permissions.manage",
         label: "Manage permissions",
         detail:
-          "Edit this page. Anyone with it can grant themselves everything else, so it belongs with Directorship only.",
+          "Edit this page. Anyone with it can grant themselves everything else, so it belongs with Directorship and Ownership only.",
         sensitive: true,
       },
       {
         key: "discord.roles.manage",
         label: "Map Discord roles",
         detail:
-          "Bind each rank, tier and tag to its Discord role. Getting this wrong mis-ranks the whole community, so it belongs with Directorship only.",
+          "Bind each rank, tier and tag to its Discord role. Getting this wrong mis-ranks the whole community, so it belongs with Directorship and Ownership only.",
         sensitive: true,
       },
     ],
@@ -193,6 +193,7 @@ const STAFF_LADDER = [
   "senior_admin",
   "head_admin",
   "directorship",
+  "ownership",
 ];
 
 /** Every staff role from `key` upward — the ladder is ordered lowest first. */
@@ -232,42 +233,42 @@ export const DEFAULT_GRANTS = {
   "staff.da_view": staffFrom("junior_admin"),
   "staff.links.admin": staffFrom("junior_admin"),
   "staff.links.senior": staffFrom("senior_admin"),
-  "staff.portal.manage": ["head_admin", "directorship"],
+  "staff.portal.manage": ["head_admin", "directorship", "ownership"],
 
   "departments.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "departments.roster.edit": staffFrom("admin"),
   "departments.structure.edit": staffFrom("admin"),
   "departments.log.manage": staffFrom("senior_admin"),
   "departments.audit.view": staffFrom("senior_admin"),
-  "departments.access.manage": ["head_admin", "directorship"],
-  "departments.manage": ["head_admin", "directorship"],
+  "departments.access.manage": ["head_admin", "directorship", "ownership"],
+  "departments.manage": ["head_admin", "directorship", "ownership"],
 
   "exams.view": staffFrom("junior_admin"),
   "exams.override": staffFrom("senior_admin"),
   "exams.audit": staffFrom("senior_admin"),
-  "exams.manage": ["head_admin", "directorship"],
+  "exams.manage": ["head_admin", "directorship", "ownership"],
 
   "forms.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "forms.submit": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "forms.review": staffFrom("senior_mod"),
-  "forms.manage": ["head_admin", "directorship"],
+  "forms.manage": ["head_admin", "directorship", "ownership"],
 
   "promotions.view": STAFF_LADDER,
   "promotions.vote": staffFrom("mod"),
   "promotions.nominate": staffFrom("senior_mod"),
-  "promotions.manage": ["head_admin", "directorship"],
+  "promotions.manage": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),
   "site.support": STAFF_LADDER,
-  "site.leadership": ["head_admin", "directorship"],
-  "site.department_heads": ["head_admin", "directorship", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief", "dhs_director"],
+  "site.leadership": ["head_admin", "directorship", "ownership"],
+  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief", "dhs_director"],
 
   // Both of these can be used to grant everything else, so they sit at the top
   // of the ladder. Gating role mapping lower would be cosmetic: anyone able to
   // edit permissions could simply grant it to themselves.
-  "permissions.manage": ["directorship"],
-  "discord.roles.manage": ["directorship"],
+  "permissions.manage": ["directorship", "ownership"],
+  "discord.roles.manage": ["directorship", "ownership"],
 };
 
 /* ------------------------------------------------------------------ *

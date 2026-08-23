@@ -173,7 +173,7 @@ export default function HubDiscordRoles() {
         subtitle="Every rank, tier and tag bound to its Discord role. The bot reads this to decide who belongs where and what their nickname should be."
         actions={
           <>
-            <Badge tone="rose">Directorship only</Badge>
+            <Badge tone="rose">Directorship and Ownership only</Badge>
             {dirty && <Badge tone="amber" dot>Unsaved</Badge>}
           </>
         }

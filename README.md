@@ -109,8 +109,13 @@ shared-package overhead.
 | Exam Backend | Recent Submissions (with attempt review and manual override), Members, Audit Log, Management (thresholds and question catalog) |
 
 Ranks run Trial Mod → Mod → Sr. Mod → Jr. Admin → Admin → Sr. Admin → Head
-Admin → Directorship, each granting the roles below it, over a civilian floor of
-Member → Cert. Civ. I → II → III.
+Admin → Directorship → Ownership, each granting the roles below it, over a
+civilian floor of Member → Cert. Civ. I → II → III. Ownership sits at the top and
+holds every permission there is.
+
+The ladder is declared once as `STAFF_LADDER` in `src/data/permissions.js` (and
+its server mirror), and `staffFrom("admin")` slices it — so a tier added to that
+array is picked up by every "and up" grant without touching them individually.
 
 Exam results are never edited in place. An override writes an append-only row
 carrying the reviewer and their reason, and the Audit Log renders those rows; the
@@ -372,16 +377,17 @@ already correct.
 
 ## Access control
 
-Two management pages sit under each other, both Directorship-only:
+Two management pages sit under each other, both restricted to Directorship and
+Ownership:
 
 | Page | Answers |
 | --- | --- |
 | **Discord Role Mapping** (`/staff-hub/discord-roles`) | Which Discord role *is* each rank, tier and tag? |
 | **Permissions** (`/staff-hub/permissions`) | Which of those roles may do what? |
 
-They are both Directorship rather than Head Admin on purpose: anyone who can edit
-permissions can grant themselves everything else, so gating role mapping any
-lower would be cosmetic.
+They sit at the top of the ladder rather than with Head Admin on purpose: anyone
+who can edit permissions can grant themselves everything else, so gating role
+mapping any lower would be cosmetic.
 
 ### Discord Role Mapping
 
@@ -550,6 +556,11 @@ Discord OAuth is **not implemented yet**. Until it is, the API resolves the
 caller from `DEV_USER_ID` (or an `x-discord-id` header) and logs a warning at
 boot. That path is hard-disabled when `NODE_ENV=production`, so it cannot become
 a live bypass. `/sign-in` and `/create-account` are stubs that link to Discord.
+
+That development caller (`devUser` in `server/src/seed.js`, mirrored by `mockUser`
+in `client/src/data/mockData.js`) holds **Ownership**, so browsing locally shows
+the whole site rather than a moderator's slice of it. The preview switcher on
+either hub landing page is how you see it as anything lower.
 
 ## Placeholders
 

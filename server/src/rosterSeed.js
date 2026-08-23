@@ -95,6 +95,7 @@ export const ROLE_MAP = [
   { roleId: "100000000000000041", key: "senior_admin", department: "staff", rank: "Sr. Admin", rankFull: "Senior Administrator", order: 250, displayTemplate: "{callsign} | {rank} | {surname}" },
   { roleId: "100000000000000042", key: "head_admin", department: "staff", rank: "Head Admin", rankFull: "Head Administrator", order: 260, displayTemplate: "{callsign} | {rank} | {surname}" },
   { roleId: "100000000000000043", key: "directorship", department: "management", rank: "Director", rankFull: "Directorship", order: 300, displayTemplate: "{callsign} | {rank} | {surname}" },
+  { roleId: "100000000000000044", key: "ownership", department: "management", rank: "Owner", rankFull: "Ownership", order: 320, displayTemplate: "{callsign} | {rank} | {surname}" },
 ];
 
 /**
