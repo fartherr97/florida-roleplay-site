@@ -20,7 +20,7 @@ export default function PublicLayout() {
   const guard = guardFor(pathname);
 
   return (
-    <RequireRole roles={guard?.roles ?? []} reason={guard?.reason}>
+    <RequireRole permission={guard?.permission} reason={guard?.reason}>
       <div className="flex min-h-full flex-col">
         <Glow />
         <TopBar />

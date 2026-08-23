@@ -3,21 +3,15 @@
  * the database, and on any failure serve the seed shape — so the hub works
  * end-to-end before MariaDB is provisioned.
  *
- * Every route here is rank-gated. The role bundles come from seed.js and are
- * mirrored in client/src/data/hubNavigation.js, so the sidebar, the client route
- * guard and this middleware all agree on who may open what. Hiding a link is a
- * convenience; this file is the boundary.
+ * Every route here names a permission rather than a rank. The grants behind
+ * those permissions are editable from the Permissions page, and the client gates
+ * the matching route on the same key — so the nav, the route guard and this file
+ * cannot disagree. Hiding a link is a convenience; this file is the boundary.
  */
 import { Router } from "express";
 import { query } from "../db.js";
 import * as seed from "../staffHubSeed.js";
-import {
-  ADMIN_PLUS,
-  HEAD_ADMIN_ONLY,
-  SENIOR_ADMIN_PLUS,
-  STAFF_ANY,
-} from "../seed.js";
-import { requireRole } from "../middleware/requireRole.js";
+import { requirePermission } from "../middleware/requirePermission.js";
 import { collect, str } from "../validate.js";
 
 const router = Router();
@@ -48,7 +42,7 @@ function isoDate(value) {
 
 /* ------------------------------------------------------------- portal */
 
-router.get("/portal", requireRole(STAFF_ANY), async (_req, res) => {
+router.get("/portal", requirePermission("staff.view"), async (_req, res) => {
   try {
     const rows = await query(
       "SELECT section, payload FROM hub_portal WHERE id = 1 OR section IS NOT NULL",
@@ -77,7 +71,7 @@ const PORTAL_SECTIONS = {
   links: "links",
 };
 
-router.post("/portal/:section", requireRole(HEAD_ADMIN_ONLY), async (req, res) => {
+router.post("/portal/:section", requirePermission("staff.portal.manage"), async (req, res) => {
   const key = PORTAL_SECTIONS[req.params.section];
   if (!key) {
     return res.status(400).json({ ok: false, errors: ["Unknown portal section."] });
@@ -117,7 +111,7 @@ router.post("/portal/:section", requireRole(HEAD_ADMIN_ONLY), async (req, res) =
 
 /* -------------------------------------------------------------- roster */
 
-router.get("/roster", requireRole(STAFF_ANY), (_req, res) =>
+router.get("/roster", requirePermission("staff.view"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -143,18 +137,18 @@ router.get("/roster", requireRole(STAFF_ANY), (_req, res) =>
 
 /* ----------------------------------------------------------- dashboard */
 
-router.get("/dashboard", requireRole(STAFF_ANY), (_req, res) =>
+router.get("/dashboard", requirePermission("staff.view"), (_req, res) =>
   // TODO: derive these from the live ticket system once it exposes an API.
   res.json(seed.dashboard),
 );
 
-router.get("/checklist", requireRole(STAFF_ANY), (_req, res) =>
+router.get("/checklist", requirePermission("staff.view"), (_req, res) =>
   safe(res, async () => [], seed.checklist),
 );
 
 /* ------------------------------------------------------- disciplinary */
 
-router.get("/disciplinary", requireRole(ADMIN_PLUS), (_req, res) =>
+router.get("/disciplinary", requirePermission("staff.da_view"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -261,11 +255,11 @@ function buildMembers(list) {
   });
 }
 
-router.get("/exams/dashboard", requireRole(ADMIN_PLUS), async (_req, res) => {
+router.get("/exams/dashboard", requirePermission("exams.view"), async (_req, res) => {
   res.json(buildExamDashboard(await loadAttempts()));
 });
 
-router.get("/exams/attempts/:id", requireRole(ADMIN_PLUS), async (req, res) => {
+router.get("/exams/attempts/:id", requirePermission("exams.view"), async (req, res) => {
   const list = await loadAttempts();
   const attempt = list.find((a) => a.attemptId === req.params.id) ?? null;
   if (!attempt) return res.status(404).json({ ok: false, error: "Attempt not found" });
@@ -279,7 +273,7 @@ const OVERRIDE_STATUSES = ["Pass", "Needs Review", "Fail"];
 
 router.post(
   "/exams/attempts/:id/override",
-  requireRole(SENIOR_ADMIN_PLUS),
+  requirePermission("exams.override"),
   async (req, res) => {
     const body = req.body ?? {};
     const overrideScore = str(body.overrideScore);
@@ -345,7 +339,7 @@ router.post(
   },
 );
 
-router.get("/exams/members", requireRole(ADMIN_PLUS), async (req, res) => {
+router.get("/exams/members", requirePermission("exams.view"), async (req, res) => {
   const members = buildMembers(await loadAttempts());
   const q = String(req.query.q || "").trim().toLowerCase();
   res.json(
@@ -358,7 +352,7 @@ router.get("/exams/members", requireRole(ADMIN_PLUS), async (req, res) => {
   );
 });
 
-router.get("/exams/members/:identifier", requireRole(ADMIN_PLUS), async (req, res) => {
+router.get("/exams/members/:identifier", requirePermission("exams.view"), async (req, res) => {
   const identifier = String(req.params.identifier).toLowerCase();
   const member = buildMembers(await loadAttempts()).find(
     (m) =>
@@ -369,7 +363,7 @@ router.get("/exams/members/:identifier", requireRole(ADMIN_PLUS), async (req, re
   res.json(member);
 });
 
-router.get("/exams/audit-log", requireRole(SENIOR_ADMIN_PLUS), (_req, res) =>
+router.get("/exams/audit-log", requirePermission("exams.audit"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -399,7 +393,7 @@ router.get("/exams/audit-log", requireRole(SENIOR_ADMIN_PLUS), (_req, res) =>
 
 /* -------------------------------------------------------- exam config */
 
-router.get("/exams/settings", requireRole(HEAD_ADMIN_ONLY), async (_req, res) => {
+router.get("/exams/settings", requirePermission("exams.manage"), async (_req, res) => {
   try {
     const rows = await query("SELECT * FROM hub_exam_settings");
     if (rows.length) {
@@ -423,7 +417,7 @@ router.get("/exams/settings", requireRole(HEAD_ADMIN_ONLY), async (_req, res) =>
   return res.json(seed.examSettings);
 });
 
-router.post("/exams/settings", requireRole(HEAD_ADMIN_ONLY), async (req, res) => {
+router.post("/exams/settings", requirePermission("exams.manage"), async (req, res) => {
   const body = req.body ?? {};
   const errors = [];
 
@@ -469,7 +463,7 @@ router.post("/exams/settings", requireRole(HEAD_ADMIN_ONLY), async (req, res) =>
   }
 });
 
-router.get("/exams/question-catalog", requireRole(HEAD_ADMIN_ONLY), (_req, res) =>
+router.get("/exams/question-catalog", requirePermission("exams.manage"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -493,7 +487,7 @@ router.get("/exams/question-catalog", requireRole(HEAD_ADMIN_ONLY), (_req, res) 
 
 router.post(
   "/exams/question-catalog/:row",
-  requireRole(HEAD_ADMIN_ONLY),
+  requirePermission("exams.manage"),
   async (req, res) => {
     const rowNumber = Number(req.params.row);
     const body = req.body ?? {};

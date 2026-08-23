@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import Button from "../ui/Button";
 import { useAuth } from "../../context/useAuth";
-import { STAFF_ANY } from "../../data/hubs";
+
 import { cn } from "../../lib/cn";
 
 /**
@@ -10,7 +10,7 @@ import { cn } from "../../lib/cn";
  * below `sm` so the chip stays a bare avatar on narrow phones.
  */
 export default function UserChip({ className }) {
-  const { user, loading, hasRole } = useAuth();
+  const { user, loading, hasPermission } = useAuth();
 
   if (loading) {
     return (
@@ -44,7 +44,7 @@ export default function UserChip({ className }) {
     .join("");
 
   // Only staff have somewhere to go from the chip; everyone else gets a plain pill.
-  const staff = hasRole(STAFF_ANY);
+  const staff = hasPermission("staff.view");
   const Tag = staff ? Link : "span";
 
   return (

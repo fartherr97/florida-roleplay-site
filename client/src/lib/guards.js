@@ -1,51 +1,58 @@
 /**
- * Single source of truth for which routes are role-gated. PublicLayout consults
- * it to decide whether to render the shell or the Access Denied page, and the
- * top bar consults it to hide destinations a user cannot open.
+ * Which permission each gated route needs.
  *
- * Hidden links are a convenience only — the server middleware in
- * server/src/middleware/requireRole.js is the actual security boundary, and the
- * two must agree on role names.
+ * Routes name a permission, never a rank. src/data/permissions.js maps that
+ * permission onto Discord roles, and the configuration page edits that mapping —
+ * so access changes without touching this file or shipping a deploy.
+ *
+ * The server enforces the same permission on the matching endpoint. Hiding a
+ * link is a convenience; the API is the boundary.
  */
 import { matchPath } from "react-router-dom";
-import { ROLES } from "../data/mockData";
-import { hubRoutes } from "../data/hubs";
-
-export const STAFF_ROLES = [
-  ROLES.TRIAL_MOD,
-  ROLES.MOD,
-  ROLES.SENIOR_MOD,
-  ROLES.JUNIOR_ADMIN,
-  ROLES.ADMIN,
-  ROLES.SENIOR_ADMIN,
-  ROLES.HEAD_ADMIN,
-];
-export const MOD_ROLES = [
-  ROLES.MOD,
-  ROLES.SENIOR_MOD,
-  ROLES.JUNIOR_ADMIN,
-  ROLES.ADMIN,
-  ROLES.SENIOR_ADMIN,
-  ROLES.HEAD_ADMIN,
-];
-export const MANAGEMENT_ROLES = [ROLES.HEAD_ADMIN];
-export const DEPT_HEAD_ROLES = [ROLES.HEAD_ADMIN, ROLES.DEPT_HEAD];
 
 /** Matched with `end: true`, so each entry gates exactly its own path. */
 export const GUARDS = [
-  { path: "/staff", roles: STAFF_ROLES },
-  { path: "/staff/moderation", roles: MOD_ROLES },
-  { path: "/staff/support", roles: STAFF_ROLES },
-  { path: "/management/leadership", roles: MANAGEMENT_ROLES },
+  // Public site
+  { path: "/staff", permission: "site.staff_directory" },
+  { path: "/staff/moderation", permission: "site.moderation" },
+  { path: "/staff/support", permission: "site.support" },
+  { path: "/management/leadership", permission: "site.leadership" },
   {
     path: "/management/department-heads",
-    roles: DEPT_HEAD_ROLES,
+    permission: "site.department_heads",
     reason: "department",
   },
-  // Each hub declares its own roles alongside the nav entry that links to a
-  // page, so the nav and this table cannot drift apart. Hub landing pages stay
-  // public: they are the sign-in entry point and explain what the hub is.
-  ...hubRoutes,
+
+  // Staff Hub
+  { path: "/staff-hub/home", permission: "staff.view" },
+  { path: "/staff-hub/roster", permission: "staff.view" },
+  { path: "/staff-hub/dashboard", permission: "staff.view" },
+  { path: "/staff-hub/trial-checklist", permission: "staff.view" },
+  { path: "/staff-hub/resources", permission: "staff.view" },
+  { path: "/staff-hub/da-database", permission: "staff.da_view" },
+  { path: "/staff-hub/administrators", permission: "staff.links.admin" },
+  { path: "/staff-hub/senior-admins", permission: "staff.links.senior" },
+  { path: "/staff-hub/head-admin", permission: "staff.portal.manage" },
+  { path: "/staff-hub/submissions", permission: "exams.view" },
+  { path: "/staff-hub/exam-members", permission: "exams.view" },
+  { path: "/staff-hub/audit-log", permission: "exams.audit" },
+  { path: "/staff-hub/management", permission: "exams.manage" },
+  { path: "/staff-hub/permissions", permission: "permissions.manage" },
+
+  // Civilian Hub
+  { path: "/civilian-hub/home", permission: "civilian.view" },
+  { path: "/civilian-hub/roster", permission: "roster.view" },
+  { path: "/civilian-hub/businesses", permission: "civilian.view" },
+  { path: "/civilian-hub/jobs", permission: "civilian.view" },
+  { path: "/civilian-hub/classifieds", permission: "civilian.view" },
+  { path: "/civilian-hub/penal-code", permission: "civilian.view" },
+  { path: "/civilian-hub/guides", permission: "civilian.view" },
+  // A member who is simply not whitelisted yet gets its own denial copy,
+  // pointing at the application rather than at a supervisor.
+  { path: "/civilian-hub/characters", permission: "civilian.records", reason: "whitelist" },
+  { path: "/civilian-hub/vehicles", permission: "civilian.records", reason: "whitelist" },
+  { path: "/civilian-hub/properties", permission: "civilian.records", reason: "whitelist" },
+  { path: "/civilian-hub/licences", permission: "civilian.records", reason: "whitelist" },
 ];
 
 /** The guard covering `pathname`, or null when the route is public. */

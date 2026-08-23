@@ -8,19 +8,25 @@ import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Select from "../../components/ui/Select";
 import { TextInput } from "../../components/ui/TextInput";
+import StatusEditor, { StatusPill } from "../../components/hub/StatusEditor";
 import { api } from "../../lib/api";
+import { useAuth } from "../../context/useAuth";
 import { formatDate } from "../../lib/format";
 import {
+  ACTIVITY_STATUSES,
   DEPARTMENTS,
   DIVISIONS,
   roster as seedRoster,
 } from "../../data/rosterData";
 
-const STATUS_TONES = { Active: "green", Leave: "amber", Inactive: "slate" };
-
 const DIVISION_OPTIONS = [
   { value: "all", label: "All divisions" },
   ...DIVISIONS.map((d) => ({ value: d.id, label: d.label })),
+];
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  ...ACTIVITY_STATUSES.map((s) => ({ value: s.id, label: s.label })),
 ];
 
 /** Relative time, so a stale sync is obvious without doing date arithmetic. */
@@ -40,10 +46,17 @@ function sinceLabel(iso) {
  * staff roster in the Staff Hub is a different view for a different job.
  */
 export default function CivRoster() {
+  const { hasPermission } = useAuth();
   const [entries, setEntries] = useState(seedRoster);
   const [query, setQuery] = useState("");
   const [division, setDivision] = useState("all");
   const [department, setDepartment] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [editing, setEditing] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  const canEditStatus = hasPermission("roster.edit_status");
+  const canManageLoa = hasPermission("roster.manage_loa");
 
   useEffect(() => {
     let active = true;
@@ -72,13 +85,14 @@ export default function CivRoster() {
       const dept = DEPARTMENTS.find((d) => d.id === entry.department);
       if (division !== "all" && dept?.division !== division) return false;
       if (department !== "all" && entry.department !== department) return false;
+      if (status !== "all" && entry.status !== status) return false;
       if (!needle) return true;
       return [entry.characterName, entry.displayName, entry.rank, entry.callsign]
         .concat(" ", entry.rankFull ?? "")
         .toLowerCase()
         .includes(needle);
     });
-  }, [entries, query, division, department]);
+  }, [entries, query, division, department, status]);
 
   const byDivision = useMemo(
     () =>
@@ -154,9 +168,7 @@ export default function CivRoster() {
       key: "status",
       label: "Status",
       render: (e) => (
-        <Badge tone={STATUS_TONES[e.status] ?? "slate"} dot={e.status === "Active"}>
-          {e.status}
-        </Badge>
+        <StatusPill member={e} editable={canEditStatus} onEdit={setEditing} />
       ),
     },
   ];
@@ -179,8 +191,21 @@ export default function CivRoster() {
         <p className="min-w-0 flex-1 text-xs text-slate-500">
           Ranks and display names are maintained by the roster bot. If yours is
           wrong, your Discord roles are the thing to fix — the roster follows them.
+          {canEditStatus && " Activity status is set here, and the bot mirrors LOA into Discord."}
         </p>
       </Card>
+
+      {notice && (
+        <Card className="mb-6 p-4">
+          <p
+            className={
+              notice.tone === "green" ? "text-sm font-semibold text-emerald-300" : "text-sm font-semibold text-amber-300"
+            }
+          >
+            {notice.text}
+          </p>
+        </Card>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
         {byDivision.map((d) => (
@@ -218,7 +243,13 @@ export default function CivRoster() {
           value={department}
           onChange={setDepartment}
           options={departmentOptions}
-          className="lg:w-64"
+          className="lg:w-56"
+        />
+        <Select
+          value={status}
+          onChange={setStatus}
+          options={STATUS_OPTIONS}
+          className="lg:w-44"
         />
       </div>
 
@@ -227,6 +258,28 @@ export default function CivRoster() {
         rows={rows}
         rowKey={(e) => e.id}
         empty="No members match that search."
+      />
+
+      <StatusEditor
+        key={editing?.id}
+        member={editing}
+        open={Boolean(editing)}
+        canManageLoa={canManageLoa}
+        onClose={() => setEditing(null)}
+        onSave={async (payload) => {
+          const result = await api.updateRosterStatus(editing.id, payload);
+          setEntries((prev) =>
+            prev.map((entry) =>
+              entry.id === editing.id ? { ...entry, ...payload } : entry,
+            ),
+          );
+          setNotice({
+            tone: result?.message ? "amber" : "green",
+            text:
+              result?.message ??
+              `${editing.characterName} set to ${payload.status}.`,
+          });
+        }}
       />
 
       <p className="mt-6 text-center text-xs text-slate-500">

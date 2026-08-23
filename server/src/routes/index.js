@@ -6,10 +6,12 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import * as seed from "../seed.js";
-import { attachUser, requireRole } from "../middleware/requireRole.js";
+import { attachUser } from "../middleware/requireRole.js";
+import { requirePermission } from "../middleware/requirePermission.js";
 import staffHubRouter from "./staffHub.js";
 import civilianHubRouter from "./civilianHub.js";
 import rosterRouter from "./roster.js";
+import permissionsRouter from "./permissions.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -17,7 +19,6 @@ import {
 } from "../validate.js";
 
 const router = Router();
-const STAFF_ROLES = seed.STAFF_ANY;
 
 router.use(attachUser);
 
@@ -28,6 +29,8 @@ router.use("/civilian-hub", civilianHubRouter);
 // The roster is read by members and written by the Discord bot, so it sits
 // alongside the hubs rather than inside either one.
 router.use("/roster", rosterRouter);
+// Access control is itself configurable, so it gets its own router.
+router.use("/permissions", permissionsRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {
@@ -193,7 +196,7 @@ router.get("/rules", (req, res) => {
  * without a staff role gets a 403 carrying the code the client's AccessDenied
  * page renders.
  */
-router.get("/staff", requireRole(STAFF_ROLES), (_req, res) =>
+router.get("/staff", requirePermission("site.staff_directory"), (_req, res) =>
   safe(
     res,
     async () => {

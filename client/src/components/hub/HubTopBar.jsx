@@ -32,7 +32,7 @@ export default function HubTopBar({ hub }) {
     () => typeof window !== "undefined" && window.scrollY > 8,
   );
   const location = useLocation();
-  const { user, hasRole, loading, previewRank } = useAuth();
+  const { user, hasPermission, loading, previewRank } = useAuth();
 
   const [lastPath, setLastPath] = useState(location.pathname);
   if (lastPath !== location.pathname) {
@@ -49,7 +49,9 @@ export default function HubTopBar({ hub }) {
   const groups = hub.groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => loading || hasRole(item.roles)),
+      items: group.items.filter(
+        (item) => loading || hasPermission(item.permission),
+      ),
     }))
     .filter((group) => group.items.length > 0);
 

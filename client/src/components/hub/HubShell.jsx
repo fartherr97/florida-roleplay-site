@@ -21,7 +21,7 @@ export default function HubShell({ hub }) {
   const guard = guardFor(location.pathname);
 
   return (
-    <RequireRole roles={guard?.roles ?? []} reason={guard?.reason}>
+    <RequireRole permission={guard?.permission} reason={guard?.reason}>
       <div className="flex min-h-full flex-col">
         <Glow />
         <HubTopBar hub={hub} />

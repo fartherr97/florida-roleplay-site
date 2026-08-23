@@ -4,9 +4,9 @@
  * this single object, so adding a section is a one-line change here rather than
  * an edit in four files.
  *
- * Roles are declared next to the nav entry that links to a page, and
- * src/lib/guards.js folds them into the shared guard table. The nav, the route
- * gate and the server middleware therefore cannot drift apart.
+ * Each nav entry names the permission it needs. src/lib/guards.js gates the
+ * matching route on the same permission and the server enforces it on the
+ * matching endpoint, so the nav, the route gate and the API cannot disagree.
  */
 import { ROLES } from "./mockData";
 
@@ -89,11 +89,11 @@ export const STAFF_HUB = {
       label: "Staff Portal",
       tone: TONES.primary,
       items: [
-        { to: "/staff-hub/home", label: "Overview", icon: "Home", roles: STAFF_ANY },
-        { to: "/staff-hub/roster", label: "Staff Roster", icon: "Users", roles: STAFF_ANY },
-        { to: "/staff-hub/dashboard", label: "Staff Dashboard", icon: "ChartColumn", roles: STAFF_ANY },
-        { to: "/staff-hub/trial-checklist", label: "Trial Mod Checklist", icon: "ListChecks", roles: STAFF_ANY },
-        { to: "/staff-hub/da-database", label: "Staff DA Database", icon: "Gavel", roles: ADMIN_PLUS },
+        { to: "/staff-hub/home", label: "Overview", icon: "Home", permission: "staff.view" },
+        { to: "/staff-hub/roster", label: "Staff Roster", icon: "Users", permission: "staff.view" },
+        { to: "/staff-hub/dashboard", label: "Staff Dashboard", icon: "ChartColumn", permission: "staff.view" },
+        { to: "/staff-hub/trial-checklist", label: "Trial Mod Checklist", icon: "ListChecks", permission: "staff.view" },
+        { to: "/staff-hub/da-database", label: "Staff DA Database", icon: "Gavel", permission: "staff.da_view" },
       ],
     },
     {
@@ -101,10 +101,10 @@ export const STAFF_HUB = {
       label: "Rank Access",
       tone: TONES.brand,
       items: [
-        { to: "/staff-hub/resources", label: "Resources", icon: "BookOpen", roles: STAFF_ANY },
-        { to: "/staff-hub/administrators", label: "Administrators", icon: "Shield", roles: ADMIN_PLUS },
-        { to: "/staff-hub/senior-admins", label: "Senior Admins+", icon: "ShieldCheck", roles: SENIOR_ADMIN_PLUS },
-        { to: "/staff-hub/head-admin", label: "Head Admin", icon: "Crown", roles: HEAD_ADMIN_ONLY },
+        { to: "/staff-hub/resources", label: "Resources", icon: "BookOpen", permission: "staff.view" },
+        { to: "/staff-hub/administrators", label: "Administrators", icon: "Shield", permission: "staff.links.admin" },
+        { to: "/staff-hub/senior-admins", label: "Senior Admins+", icon: "ShieldCheck", permission: "staff.links.senior" },
+        { to: "/staff-hub/head-admin", label: "Head Admin", icon: "Crown", permission: "staff.portal.manage" },
       ],
     },
     {
@@ -112,10 +112,11 @@ export const STAFF_HUB = {
       label: "Exam Backend",
       tone: TONES.rose,
       items: [
-        { to: "/staff-hub/submissions", label: "Recent Submissions", icon: "Inbox", roles: ADMIN_PLUS },
-        { to: "/staff-hub/exam-members", label: "Members", icon: "UserSearch", roles: ADMIN_PLUS },
-        { to: "/staff-hub/audit-log", label: "Audit Log", icon: "ScrollText", roles: SENIOR_ADMIN_PLUS },
-        { to: "/staff-hub/management", label: "Management", icon: "SlidersHorizontal", roles: HEAD_ADMIN_ONLY },
+        { to: "/staff-hub/submissions", label: "Recent Submissions", icon: "Inbox", permission: "exams.view" },
+        { to: "/staff-hub/exam-members", label: "Members", icon: "UserSearch", permission: "exams.view" },
+        { to: "/staff-hub/audit-log", label: "Audit Log", icon: "ScrollText", permission: "exams.audit" },
+        { to: "/staff-hub/management", label: "Management", icon: "SlidersHorizontal", permission: "exams.manage" },
+        { to: "/staff-hub/permissions", label: "Permissions", icon: "KeyRound", permission: "permissions.manage" },
       ],
     },
   ],
@@ -135,13 +136,13 @@ export const CIVILIAN_HUB = {
       label: "My Records",
       tone: TONES.green,
       items: [
-        { to: "/civilian-hub/home", label: "Overview", icon: "Home", roles: MEMBER_ANY },
+        { to: "/civilian-hub/home", label: "Overview", icon: "Home", permission: "civilian.view" },
         // A member who simply is not whitelisted yet gets its own denial copy,
         // pointing at the application rather than at a supervisor.
-        { to: "/civilian-hub/characters", label: "Characters", icon: "IdCard", roles: WHITELISTED_ANY, reason: "whitelist" },
-        { to: "/civilian-hub/vehicles", label: "Vehicles", icon: "Car", roles: WHITELISTED_ANY, reason: "whitelist" },
-        { to: "/civilian-hub/properties", label: "Properties", icon: "House", roles: WHITELISTED_ANY, reason: "whitelist" },
-        { to: "/civilian-hub/licences", label: "Licences", icon: "BadgeCheck", roles: WHITELISTED_ANY, reason: "whitelist" },
+        { to: "/civilian-hub/characters", label: "Characters", icon: "IdCard", permission: "civilian.records" },
+        { to: "/civilian-hub/vehicles", label: "Vehicles", icon: "Car", permission: "civilian.records" },
+        { to: "/civilian-hub/properties", label: "Properties", icon: "House", permission: "civilian.records" },
+        { to: "/civilian-hub/licences", label: "Licences", icon: "BadgeCheck", permission: "civilian.records" },
       ],
     },
     {
@@ -149,10 +150,10 @@ export const CIVILIAN_HUB = {
       label: "Community",
       tone: TONES.brand,
       items: [
-        { to: "/civilian-hub/roster", label: "Community Roster", icon: "Users", roles: MEMBER_ANY },
-        { to: "/civilian-hub/businesses", label: "Business Directory", icon: "Store", roles: MEMBER_ANY },
-        { to: "/civilian-hub/jobs", label: "Job Board", icon: "Briefcase", roles: MEMBER_ANY },
-        { to: "/civilian-hub/classifieds", label: "Classifieds", icon: "Tag", roles: MEMBER_ANY },
+        { to: "/civilian-hub/roster", label: "Community Roster", icon: "Users", permission: "roster.view" },
+        { to: "/civilian-hub/businesses", label: "Business Directory", icon: "Store", permission: "civilian.view" },
+        { to: "/civilian-hub/jobs", label: "Job Board", icon: "Briefcase", permission: "civilian.view" },
+        { to: "/civilian-hub/classifieds", label: "Classifieds", icon: "Tag", permission: "civilian.view" },
       ],
     },
     {
@@ -160,8 +161,8 @@ export const CIVILIAN_HUB = {
       label: "Resources",
       tone: TONES.primary,
       items: [
-        { to: "/civilian-hub/penal-code", label: "Penal Code", icon: "Scale", roles: MEMBER_ANY },
-        { to: "/civilian-hub/guides", label: "Civilian Guides", icon: "BookOpen", roles: MEMBER_ANY },
+        { to: "/civilian-hub/penal-code", label: "Penal Code", icon: "Scale", permission: "civilian.view" },
+        { to: "/civilian-hub/guides", label: "Civilian Guides", icon: "BookOpen", permission: "civilian.view" },
       ],
     },
   ],
@@ -169,16 +170,6 @@ export const CIVILIAN_HUB = {
 
 export const HUBS = [STAFF_HUB, CIVILIAN_HUB];
 
-/** Flat list of every gated hub route, for the shared guard table. */
-export const hubRoutes = HUBS.flatMap((hub) =>
-  hub.groups.flatMap((group) =>
-    group.items.map((item) => ({
-      path: item.to,
-      roles: item.roles,
-      reason: item.reason,
-    })),
-  ),
-);
 
 /** The hub that owns a pathname, or null for a page outside both. */
 export function hubFor(pathname) {

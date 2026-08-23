@@ -13,8 +13,7 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import * as seed from "../rosterSeed.js";
-import { MEMBER_ANY } from "../seed.js";
-import { requireRole } from "../middleware/requireRole.js";
+import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { buildNickname, renderDisplayName, resolveRole } from "../lib/roster.js";
 import { collect, isDiscordId, str } from "../validate.js";
@@ -45,6 +44,8 @@ function mapRow(row) {
     joinedAt: isoDate(row.joined_at),
     syncedAt: isoStamp(row.synced_at),
     source: row.source,
+    loaUntil: isoDate(row.loa_until),
+    loaReason: row.loa_reason,
   };
 }
 
@@ -85,7 +86,7 @@ async function loadRoleMap() {
 
 /* -------------------------------------------------------------- reads */
 
-router.get("/", requireRole(MEMBER_ANY), async (_req, res) => {
+router.get("/", requirePermission("roster.view"), async (_req, res) => {
   res.json(await loadRoster());
 });
 
@@ -102,7 +103,7 @@ router.get("/role-map", async (_req, res) => {
   });
 });
 
-router.get("/sync-log", requireRole(MEMBER_ANY), (_req, res) =>
+router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>
   (async () => {
     try {
       const rows = await query(
@@ -127,6 +128,191 @@ router.get("/sync-log", requireRole(MEMBER_ANY), (_req, res) =>
     return res.json(seed.syncLog);
   })(),
 );
+
+/* ----------------------------------------------------- status and LOA */
+
+const STATUS_IDS = seed.ACTIVITY_STATUSES.map((s) => s.id);
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Today in YYYY-MM-DD, compared as strings since both are ISO dates. */
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function validateStatus(body) {
+  const status = str(body.status);
+  const loaUntil = body.loaUntil == null ? "" : str(body.loaUntil);
+  const needsDate = seed.ACTIVITY_STATUSES.find((s) => s.id === status)?.requiresDate;
+
+  return {
+    errors: collect([
+      [STATUS_IDS.includes(status), `status must be one of: ${STATUS_IDS.join(", ")}.`],
+      [!needsDate || ISO_DATE.test(loaUntil), "loaUntil must be a YYYY-MM-DD date."],
+      [
+        !needsDate || !ISO_DATE.test(loaUntil) || loaUntil >= todayIso(),
+        "loaUntil cannot be in the past.",
+      ],
+      [str(body.loaReason).length <= 500, "loaReason must be under 500 characters."],
+    ]),
+    value: {
+      status,
+      loaUntil: needsDate ? loaUntil : null,
+      loaReason: needsDate ? str(body.loaReason) : "",
+    },
+  };
+}
+
+async function writeStatus(id, value, actor) {
+  try {
+    await query(
+      `UPDATE roster_members
+          SET status = ?, loa_until = ?, loa_reason = ?, synced_at = CURRENT_TIMESTAMP
+        WHERE id = ? OR discord_id = ?`,
+      [value.status, value.loaUntil, value.loaReason, id, id],
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PATCH-by-POST of one member's activity status. LOA carries a return date,
+ * which is the only thing the bot's expiry sweep reads — Discord schedules
+ * nothing, so a bot restart cannot lose a pending return.
+ */
+router.post("/:id/status", requirePermission("roster.edit_status"), async (req, res) => {
+  const { errors, value } = validateStatus(req.body ?? {});
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+
+  // Placing someone on leave is a separate permission from ordinary status
+  // changes, so a Mod can mark someone inactive without granting leave.
+  if (value.status === "LOA") {
+    const grants = await loadGrants();
+    const held = new Set(req.user?.roles ?? []);
+    const allowed = grants["roster.manage_loa"] ?? [];
+    if (!allowed.some((role) => held.has(role))) {
+      return res.status(403).json({
+        ok: false,
+        code: "AUTH_ROLE_MISSING",
+        permission: "roster.manage_loa",
+        message: "Granting LOA needs the roster.manage_loa permission.",
+      });
+    }
+  }
+
+  const persisted = await writeStatus(req.params.id, value, req.user?.id);
+  await logSync({
+    discordId: req.params.id,
+    characterName: str(req.body?.characterName),
+    action: "status",
+    detail: `Set to ${value.status}${value.loaUntil ? ` until ${value.loaUntil}` : ""}.`,
+  });
+
+  return res.json({
+    ok: true,
+    status: value.status,
+    loaUntil: value.loaUntil,
+    // The bot applies this role while someone is on leave and removes it when
+    // the sweep reports the LOA expired.
+    loaRole: value.status === "LOA" ? seed.LOA_ROLE.roleId : null,
+    ...(persisted
+      ? {}
+      : {
+          message:
+            "Accepted, but not persisted — no database is configured, so this will reset on reload.",
+        }),
+  });
+});
+
+/**
+ * GET /api/roster/loa/expired — the bot polls this on a timer and removes the
+ * LOA tag from everyone it returns, then POSTs their status back to Active.
+ *
+ * Keeping the schedule here rather than in the bot means a restart, a redeploy
+ * or an outage cannot silently drop a pending return.
+ */
+router.get("/loa/expired", requireBot, async (_req, res) => {
+  const today = todayIso();
+  try {
+    const rows = await query(
+      "SELECT * FROM roster_members WHERE status = 'LOA' AND loa_until IS NOT NULL AND loa_until <= ?",
+      [today],
+    );
+    return res.json({
+      ok: true,
+      asOf: today,
+      loaRole: seed.LOA_ROLE.roleId,
+      members: rows.map(mapRow),
+    });
+  } catch {
+    const members = seed.roster.filter(
+      (m) => m.status === "LOA" && m.loaUntil && m.loaUntil <= today,
+    );
+    return res.json({ ok: true, asOf: today, loaRole: seed.LOA_ROLE.roleId, members });
+  }
+});
+
+/**
+ * POST /api/roster/loa — the bot's own entry point, for the `/loa` command.
+ * Same validation as the page, addressed by Discord id rather than roster id.
+ */
+router.post("/loa", requireBot, async (req, res) => {
+  const discordId = str(req.body?.discordId);
+  const { errors, value } = validateStatus({ ...req.body, status: "LOA" });
+  if (!isDiscordId(discordId)) {
+    errors.unshift("A valid 17–20 digit Discord user ID is required.");
+  }
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+
+  const persisted = await writeStatus(discordId, value, "roster-bot");
+  await logSync({
+    discordId,
+    characterName: str(req.body?.characterName),
+    action: "loa",
+    detail: `LOA until ${value.loaUntil}.`,
+  });
+
+  return res.json({
+    ok: true,
+    discordId,
+    status: "LOA",
+    loaUntil: value.loaUntil,
+    loaRole: seed.LOA_ROLE.roleId,
+    ...(persisted ? {} : { message: "Accepted, but not persisted — no database configured." }),
+  });
+});
+
+/** POST /api/roster/loa/end — bring someone back, early or on schedule. */
+router.post("/loa/end", requireBot, async (req, res) => {
+  const discordId = str(req.body?.discordId);
+  if (!isDiscordId(discordId)) {
+    return res
+      .status(400)
+      .json({ ok: false, errors: ["A valid 17–20 digit Discord user ID is required."] });
+  }
+
+  const persisted = await writeStatus(
+    discordId,
+    { status: "Active", loaUntil: null, loaReason: "" },
+    "roster-bot",
+  );
+  await logSync({
+    discordId,
+    characterName: str(req.body?.characterName),
+    action: "loa-end",
+    detail: "LOA ended; back to Active.",
+  });
+
+  return res.json({
+    ok: true,
+    discordId,
+    status: "Active",
+    // Remove this role in Discord.
+    removeRole: seed.LOA_ROLE.roleId,
+    ...(persisted ? {} : { message: "Accepted, but not persisted — no database configured." }),
+  });
+});
 
 /* ---------------------------------------------------------- bot sync */
 

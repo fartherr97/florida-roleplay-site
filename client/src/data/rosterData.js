@@ -99,6 +99,30 @@ export const ROLE_MAP = [
 ];
 
 /* ------------------------------------------------------------------ *
+ * Activity status
+ * ------------------------------------------------------------------ *
+ *
+ * LOA is special: it carries a return date, and the bot mirrors it with a
+ * Discord tag it removes when that date passes. Everything else is a plain
+ * label someone with `roster.edit_status` can set.
+ */
+export const ACTIVITY_STATUSES = [
+  { id: "Active", label: "Active", tone: "green", detail: "Playing and taking calls as normal." },
+  { id: "Semi-Active", label: "Semi-Active", tone: "brand", detail: "Around, but not meeting full activity requirements." },
+  { id: "LOA", label: "LOA", tone: "amber", detail: "On leave with an agreed return date.", requiresDate: true },
+  { id: "Inactive", label: "Inactive", tone: "slate", detail: "Not currently playing. Subject to removal after 30 days." },
+  { id: "Suspended", label: "Suspended", tone: "rose", detail: "Access withheld pending a staff decision." },
+];
+
+/** The Discord role the bot applies while someone is on leave. */
+export const LOA_ROLE = {
+  // TODO: replace with the real LOA Discord role snowflake.
+  roleId: "100000000000000900",
+  key: "loa",
+  label: "LOA",
+};
+
+/* ------------------------------------------------------------------ *
  * Roster entries
  * ------------------------------------------------------------------ */
 

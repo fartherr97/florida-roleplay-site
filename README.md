@@ -192,11 +192,76 @@ something to leave to a default.
 is a `TODO` — swap in the real Discord snowflakes before pointing the bot at a
 live guild. The keys, ranks and ordering are already correct.
 
-### Where roles are declared
+## Permissions
 
-`client/src/data/hubs.js` declares the roles for a page next to the nav entry
-that links to it, and `src/lib/guards.js` folds those into the shared guard
-table — so the nav, the route gate and the server middleware cannot drift apart.
+Nothing in the codebase checks a rank. Every gated page, button and endpoint
+names a **permission**, and `client/src/data/permissions.js` maps each permission
+onto a set of Discord roles. That indirection is the point: access changes from
+the **Permissions page** (`/staff-hub/permissions`, Head Admin only) without a
+deploy.
+
+- `src/lib/guards.js` gates each route on a permission.
+- Nav entries name the same permission, so a link is hidden exactly when the
+  route would deny it.
+- `server/src/middleware/requirePermission.js` enforces it on the matching
+  endpoint. The client is a convenience; this is the boundary.
+
+Grants live in `permission_grants`. An empty table means the shipped defaults
+apply, so a fresh install is neither wide open nor locked out. Two things the
+save refuses outright: an unknown permission or role key, and leaving
+`permissions.manage` granted to nobody — that last one would need a database edit
+to undo.
+
+Grants reference a role by its `key` from `ROLE_MAP`, which is one-to-one with a
+Discord role snowflake. The key is the stable handle; the snowflake is the actual
+binding, and the page shows both.
+
+## Activity status and LOA
+
+Roster entries carry an activity status — Active, Semi-Active, LOA, Inactive or
+Suspended — editable in place on the roster by anyone with `roster.edit_status`.
+Granting leave is a separate permission (`roster.manage_loa`), so a Mod can mark
+someone inactive without being able to hand out LOA.
+
+**LOA carries a return date, and the site owns it.** The bot does not schedule
+anything: it polls `GET /api/roster/loa/expired`, removes the Discord tag from
+whoever comes back, and POSTs them to Active. A bot restart, redeploy or outage
+therefore cannot lose a pending return — which a `setTimeout` in the bot would.
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| POST | `/api/roster/:id/status` | `roster.edit_status` | Set status from the roster page |
+| POST | `/api/roster/loa` | bot | The `/loa` command |
+| POST | `/api/roster/loa/end` | bot | Return early or on schedule |
+| GET | `/api/roster/loa/expired` | bot | Everyone whose LOA has run out |
+
+### Writing the `/loa` command
+
+Discord has no native date option type, so take a **string option with
+autocomplete** rather than a modal. Autocomplete fires as the user types and you
+return up to 25 choices, so the value that reaches your handler is one *you*
+generated rather than whatever they typed:
+
+```
+/loa user:@member until:<autocomplete> reason:[optional]
+```
+
+Suggest `Tomorrow (26 Aug)`, `In 7 days (1 Sep)`, `In 30 days (24 Sep)` and a
+parse of their partial input. Add a `days:` integer option (min 1, max 180) as an
+alternative that cannot be got wrong.
+
+A modal is the worse choice here: it is still free text, validates no earlier,
+and adds a step. Either way, parse leniently server-side and reply ephemerally
+with "pick one of the suggestions" rather than storing a date you had to guess at
+— `POST /api/roster/loa` rejects anything that is not `YYYY-MM-DD` or is in the
+past, so a bad value fails loudly rather than silently rostering someone until
+the year 2026.
+
+### Where permissions are declared
+
+`client/src/data/permissions.js` is the catalogue and the defaults;
+`server/src/permissions.js` mirrors it. Nav entries and `src/lib/guards.js` name
+permission keys, never ranks.
 
 ### Preview mode
 

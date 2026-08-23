@@ -7,6 +7,7 @@ import * as mock from "../data/mockData";
 import * as hub from "../data/staffHubData";
 import * as civ from "../data/civilianHubData";
 import * as rosterMock from "../data/rosterData";
+import { BASE_ROLES, DEFAULT_GRANTS, PERMISSION_GROUPS } from "../data/permissions";
 
 export const USE_API = true;
 
@@ -216,7 +217,28 @@ export const api = {
   civVehicles: () => get("/civilian-hub/vehicles", civ.vehicles),
   civProperties: () => get("/civilian-hub/properties", civ.properties),
   civLicences: () => get("/civilian-hub/licences", civ.licences),
+  permissionGrants: () => get("/permissions/grants", DEFAULT_GRANTS),
+  permissionCatalogue: () =>
+    get("/permissions/catalogue", {
+      groups: PERMISSION_GROUPS,
+      baseRoles: BASE_ROLES,
+      roles: rosterMock.ROLE_MAP,
+      departments: rosterMock.DEPARTMENTS,
+    }),
+  savePermissionGrants: (grants) =>
+    post("/permissions/grants", { grants }, () => ({
+      ok: true,
+      message:
+        "Accepted, but not persisted — no database is configured, so this will reset on reload.",
+    })),
+
   roster: () => get("/roster", rosterMock.roster),
+  updateRosterStatus: (id, payload) =>
+    post(`/roster/${encodeURIComponent(id)}/status`, payload, () => ({
+      ok: true,
+      message:
+        "Accepted, but not persisted — no database is configured, so this will reset on reload.",
+    })),
   rosterRoleMap: () =>
     get("/roster/role-map", {
       divisions: rosterMock.DIVISIONS,

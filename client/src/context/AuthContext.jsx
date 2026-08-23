@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthContext from "./authContext";
 import { api } from "../lib/api";
 import { PREVIEW_RANKS } from "../data/mockData";
+import { DEFAULT_GRANTS, grantsPermission } from "../data/permissions";
 
 const PREVIEW_KEY = "flrp.previewRank";
 
@@ -41,13 +42,18 @@ export function AuthProvider({ children }) {
   // synchronously, so a refresh cannot cascade an extra render.
   const [reloadKey, setReloadKey] = useState(0);
   const [previewRank, setPreviewRankState] = useState(readStoredPreview);
+  // Grants are configuration, not identity, so they load alongside the user and
+  // fall back to the defaults rather than locking everyone out if the API is
+  // unreachable.
+  const [grants, setGrants] = useState(DEFAULT_GRANTS);
 
   useEffect(() => {
     let active = true;
-    api
-      .me()
-      .then((me) => {
-        if (active) setUser(me ?? null);
+    Promise.all([api.me(), api.permissionGrants()])
+      .then(([me, nextGrants]) => {
+        if (!active) return;
+        setUser(me ?? null);
+        if (nextGrants && Object.keys(nextGrants).length) setGrants(nextGrants);
       })
       .catch(() => {
         if (active) setUser(null);
@@ -88,6 +94,18 @@ export function AuthProvider({ children }) {
         if (!effectiveUser) return false;
         return required.some((role) => roles.includes(role));
       },
+      /**
+       * True when one of the user's Discord roles is granted `permission`.
+       * This is what routes and buttons should ask; ranks are an implementation
+       * detail of the grants.
+       */
+      hasPermission: (permission) => {
+        if (!permission) return Boolean(effectiveUser);
+        if (!effectiveUser) return false;
+        return grantsPermission(permission, roles, grants);
+      },
+      grants,
+      setGrants,
       // Signing out is local-only until OAuth lands.
       signOut: () => {
         setPreviewRank(null);
@@ -98,7 +116,7 @@ export function AuthProvider({ children }) {
       previewRank: rank?.id ?? null,
       setPreviewRank,
     };
-  }, [user, loading, refresh, previewRank, setPreviewRank]);
+  }, [user, loading, refresh, previewRank, setPreviewRank, grants]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

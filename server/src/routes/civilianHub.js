@@ -10,8 +10,7 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import * as seed from "../civilianHubSeed.js";
-import { MEMBER_ANY, WHITELISTED_ANY } from "../seed.js";
-import { requireRole } from "../middleware/requireRole.js";
+import { requirePermission } from "../middleware/requirePermission.js";
 
 const router = Router();
 
@@ -21,7 +20,7 @@ const router = Router();
  * the "apply for whitelist" denial rather than the staff one.
  */
 const requireWhitelist = () =>
-  requireRole(WHITELISTED_ANY, { code: "AUTH_NOT_WHITELISTED" });
+  requirePermission("civilian.records", { code: "AUTH_NOT_WHITELISTED" });
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {
@@ -132,7 +131,7 @@ router.get("/licences", requireWhitelist(), (_req, res) =>
 
 /* ------------------------------- community ------------------------------ */
 
-router.get("/businesses", requireRole(MEMBER_ANY), (_req, res) =>
+router.get("/businesses", requirePermission("civilian.view"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -152,7 +151,7 @@ router.get("/businesses", requireRole(MEMBER_ANY), (_req, res) =>
   ),
 );
 
-router.get("/jobs", requireRole(MEMBER_ANY), (_req, res) =>
+router.get("/jobs", requirePermission("civilian.view"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -172,7 +171,7 @@ router.get("/jobs", requireRole(MEMBER_ANY), (_req, res) =>
   ),
 );
 
-router.get("/classifieds", requireRole(MEMBER_ANY), (_req, res) =>
+router.get("/classifieds", requirePermission("civilian.view"), (_req, res) =>
   safe(
     res,
     async () => {
@@ -208,7 +207,7 @@ function filterPenalCode(entries, q) {
   );
 }
 
-router.get("/penal-code", requireRole(MEMBER_ANY), (req, res) => {
+router.get("/penal-code", requirePermission("civilian.view"), (req, res) => {
   const q = String(req.query.q || "").trim();
   const fallback = q ? filterPenalCode(seed.penalCode, q) : seed.penalCode;
 
@@ -244,7 +243,7 @@ function mapPenalRow(row) {
   };
 }
 
-router.get("/guides", requireRole(MEMBER_ANY), (_req, res) =>
+router.get("/guides", requirePermission("civilian.view"), (_req, res) =>
   safe(res, async () => [], seed.guides),
 );
 

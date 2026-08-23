@@ -2,7 +2,8 @@ import AccessDenied from "./AccessDenied";
 import { useAuth } from "../../context/useAuth";
 
 /**
- * Route guard. Roles match as "any of"; an empty list means the route is public
+ * Route guard. Takes either a `permission` (preferred — see src/lib/guards.js)
+ * or a list of `roles` matched as "any of". Neither means the route is public
  * and children render untouched.
  *
  * The denial renders in place at the requested URL rather than redirecting, so
@@ -11,10 +12,15 @@ import { useAuth } from "../../context/useAuth";
  * required roles from each route's `handle`), which is what lets AccessDenied
  * replace the TopBar and Footer instead of appearing between them.
  */
-export default function RequireRole({ roles = [], reason = "role", children }) {
-  const { user, loading, hasRole } = useAuth();
+export default function RequireRole({
+  roles = [],
+  permission,
+  reason = "role",
+  children,
+}) {
+  const { user, loading, hasRole, hasPermission } = useAuth();
 
-  if (roles.length === 0) return children;
+  if (!permission && roles.length === 0) return children;
 
   // Skeleton while /api/me resolves — never flash a denial at a signed-in user.
   if (loading) {
@@ -29,7 +35,9 @@ export default function RequireRole({ roles = [], reason = "role", children }) {
   }
 
   if (!user) return <AccessDenied reason="signed-out" />;
-  if (!hasRole(roles)) return <AccessDenied reason={reason} />;
+
+  const allowed = permission ? hasPermission(permission) : hasRole(roles);
+  if (!allowed) return <AccessDenied reason={reason} />;
 
   return children;
 }

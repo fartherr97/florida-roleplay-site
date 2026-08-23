@@ -30,7 +30,7 @@ export default function TopBar() {
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
-  const { hasRole, loading } = useAuth();
+  const { hasPermission, loading } = useAuth();
   const [lastPath, setLastPath] = useState(location.pathname);
 
   // Dismiss the drawer on navigation, adjusted during render so the new page
@@ -60,11 +60,11 @@ export default function TopBar() {
           ...group,
           items: group.items.filter((item) => {
             const guard = guardFor(item.to);
-            return !guard || loading || hasRole(guard.roles);
+            return !guard || loading || hasPermission(guard.permission);
           }),
         }))
         .filter((group) => group.items.length > 0),
-    [hasRole, loading],
+    [hasPermission, loading],
   );
 
   const solid = scrolled || !overHero;

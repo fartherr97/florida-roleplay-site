@@ -493,3 +493,24 @@ CREATE TABLE IF NOT EXISTS roster_sync_log (
   KEY idx_roster_log_discord (discord_id),
   KEY idx_roster_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Permission grants (edited from the Permissions page)
+-- ---------------------------------------------------------------------------
+
+-- One row per (permission, Discord role) pair. An empty table means the shipped
+-- defaults apply, so a fresh install is neither wide open nor locked out.
+CREATE TABLE IF NOT EXISTS permission_grants (
+  permission_key  VARCHAR(64) NOT NULL,
+  role_key        VARCHAR(64) NOT NULL,
+  granted_by      VARCHAR(20) NULL,
+  granted_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (permission_key, role_key),
+  KEY idx_permission_grants_role (role_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- LOA is stored on the roster row: the return date lives here rather than in the
+-- bot, so a restart or redeploy cannot lose a pending return.
+ALTER TABLE roster_members
+  ADD COLUMN IF NOT EXISTS loa_until  DATE NULL,
+  ADD COLUMN IF NOT EXISTS loa_reason TEXT NULL;
