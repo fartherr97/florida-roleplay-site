@@ -57,7 +57,6 @@ export const portalLinks = {
  * ------------------------------------------------------------------ */
 
 export const STAFF_TEAMS = [
-  { id: "ownership", label: "Ownership", color: "#e879f9", rankIds: ["ownership"] },
   { id: "directorship", label: "Directorship", color: "#f59e0b", rankIds: ["directorship"] },
   { id: "head-admin", label: "Head Administration Team", color: "#22d3ee", rankIds: ["head_admin"] },
   { id: "senior-admin", label: "Senior Administration Team", color: "#f43f5e", rankIds: ["senior_admin"] },

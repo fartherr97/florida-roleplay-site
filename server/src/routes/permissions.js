@@ -15,7 +15,7 @@ import {
   PERMISSIONS,
   PERMISSION_GROUPS,
 } from "../permissions.js";
-import { DEPARTMENTS, ROLE_MAP } from "../rosterSeed.js";
+import { DEPARTMENTS, ROLE_MAP, SPECIAL_ROLES } from "../rosterSeed.js";
 import {
   requirePermission,
   invalidateGrantCache,
@@ -27,10 +27,15 @@ import { attachUser } from "../middleware/requireRole.js";
 const router = Router();
 router.use(attachUser);
 
-/** Every role a permission may be granted to. */
+/**
+ * Every role a permission may be granted to: the base roles, every rostered
+ * rank, and the tiers that are mapped to a Discord role without being rostered.
+ * Tags like LOA are not grantable — they describe a state, not a standing.
+ */
 const GRANTABLE = new Set([
   ...BASE_ROLES.map((role) => role.key),
   ...ROLE_MAP.map((role) => role.key),
+  ...SPECIAL_ROLES.filter((role) => role.kind === "tier").map((role) => role.key),
 ]);
 
 router.get("/catalogue", (_req, res) =>

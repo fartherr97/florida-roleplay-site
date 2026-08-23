@@ -113,6 +113,12 @@ Admin → Directorship → Ownership, each granting the roles below it, over a
 civilian floor of Member → Cert. Civ. I → II → III. Ownership sits at the top and
 holds every permission there is.
 
+**Ownership is never rostered.** It is not a rank in `ROLE_MAP`, so it appears on
+no roster — not the staff roster, not the community roster, not a department's.
+It lives in `SPECIAL_ROLES` as a `tier` instead: bound to a Discord role like
+everything else, and grantable, but not a seat on a team. That is also what
+distinguishes it from Directorship, which *is* rostered under Management.
+
 The ladder is declared once as `STAFF_LADDER` in `src/data/permissions.js` (and
 its server mirror), and `staffFrom("admin")` slices it — so a tier added to that
 array is picked up by every "and up" grant without touching them individually.

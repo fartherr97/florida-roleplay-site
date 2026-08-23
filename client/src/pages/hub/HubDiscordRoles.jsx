@@ -20,6 +20,10 @@ const SNOWFLAKE = /^\d{17,20}$/;
 /** The placeholder ids shipped with the repo, so unmapped rows can be flagged. */
 const PLACEHOLDER = /^10000000000000\d{4}$/;
 
+/** Badge copy for the kinds of role that are mapped but never rostered. */
+const KIND_LABELS = { tag: "Tag", tier: "Tier", base: "Base" };
+const KIND_TONES = { tag: "amber", tier: "rose", base: "slate" };
+
 const DEPARTMENT_OPTIONS = DEPARTMENTS.map((d) => ({
   value: d.id,
   label: d.label,
@@ -76,7 +80,7 @@ export default function HubDiscordRoles() {
 
   const scopeOptions = useMemo(
     () => [
-      { value: "special", label: `Base & tags (${special.length})` },
+      { value: "special", label: `Base, tiers & tags (${special.length})` },
       ...DIVISIONS.filter((division) =>
         departments.some((d) => d.division === division.id),
       ).map((division) => {
@@ -269,10 +273,11 @@ export default function HubDiscordRoles() {
       {scope === "special" ? (
         <Card className="overflow-hidden">
           <div className="border-b border-white/[0.06] px-5 py-4">
-            <h2 className="text-sm font-bold text-white">Base roles and tags</h2>
+            <h2 className="text-sm font-bold text-white">Base roles, tiers and tags</h2>
             <p className="mt-1 text-xs text-slate-500">
               Not ranks, but everything else keys off them — membership,
-              whitelisting and the LOA tag the bot applies and removes.
+              whitelisting, the LOA tag the bot applies and removes, and tiers
+              that carry permissions without occupying a seat on a roster.
             </p>
           </div>
           <ul className="divide-y divide-white/[0.06]">
@@ -281,8 +286,8 @@ export default function HubDiscordRoles() {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-sm font-semibold text-white">
                     {role.label}
-                    <Badge tone={role.kind === "tag" ? "amber" : "slate"}>
-                      {role.kind === "tag" ? "Tag" : "Base"}
+                    <Badge tone={KIND_TONES[role.kind] ?? "slate"}>
+                      {KIND_LABELS[role.kind] ?? "Base"}
                     </Badge>
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500">{role.detail}</p>
