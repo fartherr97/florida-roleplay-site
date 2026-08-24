@@ -169,7 +169,56 @@ is not Railway.
 
 ---
 
-## Moving to Northflank
+## Deploying on Northflank
+
+Northflank ignores `railway.json` and its buildpacks do not cleanly handle a
+monorepo that has to run `db:init` before start, so the repo carries a
+`Dockerfile`. It builds the client, installs the server's production
+dependencies, and starts `db:init && start` — nothing platform-specific, so the
+same image runs anywhere.
+
+1. **Project.** Create a Northflank project (pick a region near your players).
+2. **Postgres addon.** Addons → **PostgreSQL** → create it. When it is ready,
+   open it and note the **connection details**: Northflank exposes them as a
+   secret you can link into the service, including a `DATABASE_URL`/`POSTGRES_URI`.
+3. **Combined service.** Create a **Combined service** (build + deploy) from the
+   GitHub repo, branch `claude/florida-roleplay-site-nih7ub`.
+   - **Build type: Dockerfile**, path `/Dockerfile`, context `/`.
+   - **Port:** `4000`, public, HTTP. That is what the container listens on.
+   - **Health check:** HTTP `GET /healthz`.
+4. **Link the database.** In the service's **Environment**, add the Postgres
+   addon as a linked secret so its connection variables are injected. Make sure
+   one of them is named **`DATABASE_URL`** — if the addon only provides
+   `POSTGRES_URI` (or similar), add `DATABASE_URL` yourself referencing it. The
+   app reads `DATABASE_URL` and nothing else for the connection.
+5. **Variables.** Set the rest as service environment variables:
+
+   | Variable | Value |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `CORS_ORIGIN` | `https://flrp.us` |
+   | `TRUST_PROXY` | `1` — **recount it**; it is the number of proxies in front of the process on Northflank + Cloudflare, and wrong by default |
+   | `DB_SSL` | `disable` if you connect over the project's **private** network (plaintext, trusted); leave unset for an external/TLS endpoint |
+   | `BOT_TOKEN` | the roster-sync shared secret |
+   | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_BOT_TOKEN` / `DISCORD_GUILD_ID` | from the Discord app |
+   | `DISCORD_REDIRECT_URI` | `https://flrp.us/api/auth/callback` |
+
+   Do **not** copy Railway's `DB_SSL_REJECT_UNAUTHORIZED=false`; that was for
+   Railway's internal certificate. On Northflank either the private network is
+   plaintext (`DB_SSL=disable`) or the endpoint presents a valid cert (leave the
+   SSL vars unset and it verifies).
+6. **Deploy.** Northflank builds the image and starts it. Check
+   `https://<northflank-url>/healthz` → `{"ok":true,"database":true}`.
+7. **Domain.** Add `flrp.us` under the service's **Domains**, then point
+   Cloudflare's `@` CNAME at the Northflank target. SSL/TLS mode **Full
+   (strict)**. Lower the DNS TTL to 60s a day before if you are cutting over
+   from another host.
+
+`db:init` runs on every start and is idempotent (every statement is
+`IF NOT EXISTS`), so the first deploy creates the schema with no manual step —
+see **Schema changes** for why it never *alters* an existing table.
+
+## Migrating an existing Railway deployment to Northflank
 
 The app was written so this is configuration, not a rewrite. What actually
 changes:
