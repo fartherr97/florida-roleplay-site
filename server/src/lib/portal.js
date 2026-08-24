@@ -19,7 +19,7 @@
 import { ROLE_MAP } from "../rosterSeed.js";
 
 /** The departments a member can transfer between — emergency services only. */
-export const TRANSFER_DEPT_IDS = ["fhp", "hcso", "tpd", "hcfr", "dhs"];
+export const TRANSFER_DEPT_IDS = ["fhp", "hcso", "tpd", "hcfr"];
 
 /** Abbreviation → department id, the key the rest of the site uses. */
 export const DEPTS = {
@@ -27,7 +27,6 @@ export const DEPTS = {
   HCSO: "hcso",
   TPD: "tpd",
   HCFR: "hcfr",
-  DHS: "dhs",
 };
 
 /** The Discord role key that commands each department. */
@@ -36,7 +35,6 @@ export const DEPT_COMMAND_KEYS = {
   HCSO: "hcso_sheriff",
   TPD: "tpd_chief",
   HCFR: "hcfr_fire_chief",
-  DHS: "dhs_director",
 };
 
 export const DEPT_KEYS = Object.keys(DEPTS);

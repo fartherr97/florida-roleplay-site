@@ -337,31 +337,6 @@ export const departments = [
     ],
     applicationType: "hcfr",
   },
-  {
-    id: "dhs",
-    name: "Department of Homeland Security",
-    abbr: "DHS",
-    tone: "amber",
-    icon: "Siren",
-    tagline: "Federal task force, port security and investigations.",
-    mission:
-      "DHS oversees federal enforcement in the state — port and airport security, multi-agency task force operations and long-form criminal investigations that cross county lines.",
-    roster: 19,
-    hiring: false,
-    ranks: [
-      "Special Agent",
-      "Senior Special Agent",
-      "Supervisory Agent",
-      "Assistant Director",
-      "Director",
-    ],
-    fleet: [
-      "Unmarked Tahoe",
-      "Federal Transport Van",
-      "Port Authority Interceptor",
-    ],
-    applicationType: "dhs",
-  },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -570,15 +545,6 @@ export const applicationTypes = [
     estimate: "3–5 days",
     icon: "Flame",
     tone: "rose",
-  },
-  {
-    type: "dhs",
-    name: "Department of Homeland Security",
-    blurb: "Federal task force work. Opens periodically by invitation.",
-    status: "Closed",
-    estimate: "—",
-    icon: "Siren",
-    tone: "amber",
   },
   {
     type: "staff",
@@ -1027,6 +993,6 @@ export const heroCopy = {
   headline: "Welcome to",
   brand: "Florida Roleplay",
   subtitle:
-    "A whitelisted FiveM community built around serious, character-driven roleplay on Florida's Gulf Coast — custom scripts, five emergency services and a story that keeps running when you log off.",
+    "A whitelisted FiveM community built around serious, character-driven roleplay on Florida's Gulf Coast — custom scripts, four emergency services and a story that keeps running when you log off.",
   tagline: "Serious RP · Custom Framework · Active Every Night",
 };

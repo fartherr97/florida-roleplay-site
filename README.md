@@ -224,7 +224,7 @@ staff copy about contacting a supervisor.
 ## Department hubs
 
 Every department runs its own internal site at `/departments/<id>/hub` — FHP,
-HCSO, TPD, HCFR and DHS ship with one, and more are created from the Builder
+HCSO, TPD and HCFR ship with one, and more are created from the Builder
 Portal without a deploy.
 
 **One engine, many sites.** A department site *is* a config document. There is a
@@ -540,7 +540,7 @@ the Discord bot's `/bgcheck` command reads the same rows folded into an embed.
 A department write-up the staff team cannot see is how somebody with four of
 them keeps getting hired, and a background check covering half the community is
 worse than none — it reads as a clean record rather than an incomplete one. So
-the staff team, the directorship and all five departments file into the same
+the staff team, the directorship and every department file into the same
 table, and `body_id` says who filed it.
 
 ### Verbal versus non-verbal is the line that matters
@@ -638,9 +638,9 @@ Four things, each forced rather than chosen:
   Management is Directorship; a department's command role makes its head.
 - **Departments and ranks.** Upstream hard-codes four departments and invents a
   rank ladder for each. `DEPTS` here is built from `DEPARTMENTS` and `RANKS`
-  from `ROLE_MAP`, so the portal covers all five including DHS, the ranks are
-  the real ones, and a rank renamed on the Discord Role Mapping page is renamed
-  here with no second list to update.
+  from `ROLE_MAP`, so the portal covers every department this community runs and
+  a rank renamed on the Discord Role Mapping page is renamed here with no second
+  list to update.
 - **Department artwork.** Upstream serves per-department images from
   `cdn.ssrp.us`. There is no equivalent here yet, so `DeptLogo` falls back to
   the abbreviation on a tile in the department's colour. Put a URL in `logo` in

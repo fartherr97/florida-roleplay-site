@@ -176,7 +176,6 @@ export const DEPARTMENT_COMMAND_KEYS = {
   hcso: "hcso_sheriff",
   tpd: "tpd_chief",
   hcfr: "hcfr_fire_chief",
-  dhs: "dhs_director",
 };
 
 /** Reading somebody else's record is its own grant from filing one. */

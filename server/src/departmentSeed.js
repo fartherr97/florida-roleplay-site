@@ -360,37 +360,7 @@ const HCFR = department({
   ]),
 });
 
-const DHS = department({
-  id: "dhs",
-  name: "Department of Homeland Security",
-  shortName: "DHS",
-  accent: "amber",
-  tagline: "Federal Operations",
-  description:
-    "Federal investigations, port security and joint task force operations across the district.",
-  hero: {
-    heroKicker: "Department of Homeland Security",
-    heroTitle: "Field Office",
-    heroSubtitle: "Active caseload, agent roster and joint operations with local agencies.",
-    blocks: [
-      {
-        id: "dhs-b0",
-        type: "callout",
-        title: "Access is compartmentalised",
-        body: "Case material stays inside the field office. Coordinate through a Supervisory Agent before briefing a local agency.",
-      },
-    ],
-  },
-  categories: [
-    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["dhs_director"] },
-    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["dhs_supervisor"] },
-    { id: "cat-agents", name: "Agents", color: "#22c55e", roleKeys: ["dhs_senior_agent", "dhs_agent"] },
-  ],
-  grants: access("dhs_director", "Director", [{ key: "dhs_supervisor", label: "Supervisory Agent" }]),
-});
-
-/** Keyed by department id — the same key the URL and the Discord role map use. */
-export const DEPARTMENT_CONFIGS = { fhp: FHP, hcso: HCSO, tpd: TPD, hcfr: HCFR, dhs: DHS };
+export const DEPARTMENT_CONFIGS = { fhp: FHP, hcso: HCSO, tpd: TPD, hcfr: HCFR };
 
 export const DEPARTMENT_IDS = Object.keys(DEPARTMENT_CONFIGS);
 

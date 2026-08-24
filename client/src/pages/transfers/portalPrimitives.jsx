@@ -99,7 +99,7 @@ function ToastItem({ toast, onDismiss }) {
  * The original renders `<Image src={d.logo}>`. There is no department artwork
  * in this repo yet, so an empty `logo` falls back to the abbreviation on a tile
  * in the department's own colour — which reads as a badge rather than as a
- * broken image, and keeps the five departments distinguishable at 14px.
+ * broken image, and keeps the departments distinguishable at 14px.
  */
 export function DeptLogo({ dept, size = 14, className = "" }) {
   const d = DEPTS[dept];

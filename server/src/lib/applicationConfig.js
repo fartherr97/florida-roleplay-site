@@ -500,7 +500,6 @@ export const DEPARTMENT_COMMAND = {
   hcso: "hcso_sheriff",
   tpd: "tpd_chief",
   hcfr: "hcfr_fire_chief",
-  dhs: "dhs_director",
 };
 
 /** True when these roles and permissions may edit this department's applications. */

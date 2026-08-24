@@ -192,7 +192,7 @@ export default function Landing() {
       <Section
         reveal
         eyebrow="Emergency Services"
-        title="Five agencies, one county"
+        title="Four agencies, one county"
         subtitle="Every department runs its own command structure, fleet and hiring process."
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

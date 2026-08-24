@@ -42,10 +42,6 @@ export const SUBDIVISIONS = {
     { id: "hazmat", label: "Hazmat" },
     { id: "als", label: "ALS / Paramedic" },
   ],
-  dhs: [
-    { id: "swat", label: "Special Response Team" },
-    { id: "intel", label: "Intelligence" },
-  ],
 };
 
 export function subdivisionsFor(departmentId) {
@@ -99,7 +95,7 @@ const FHP_TROOPER = {
       fields: [
         { id: "f_prior", type: "multiple", label: "Have you done law enforcement roleplay before?", required: true, options: ["No, this would be my first", "Yes, on another server", "Yes, here in another department"] },
         { id: "f_prior_detail", type: "paragraph", label: "Tell us where, and what rank you reached.", required: true, minLength: 40, showIf: { fieldId: "f_prior", equals: "Yes, on another server" } },
-        { id: "f_dept", type: "dropdown", label: "Which department were you in?", required: true, options: ["HCSO", "TPD", "HCFR", "DHS"], showIf: { fieldId: "f_prior", equals: "Yes, here in another department" } },
+        { id: "f_dept", type: "dropdown", label: "Which department were you in?", required: true, options: ["HCSO", "TPD", "HCFR"], showIf: { fieldId: "f_prior", equals: "Yes, here in another department" } },
         { id: "f_why", type: "paragraph", label: "Why the Highway Patrol specifically?", help: "There are three law enforcement departments — tell us why this one.", required: true, minLength: 120, maxLength: 2000 },
       ],
     },

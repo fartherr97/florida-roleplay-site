@@ -39,7 +39,7 @@ export default function Leadership() {
         <ul className="mt-5 space-y-3">
           {[
             "Whitelist review SLA stays at 48 hours through the season.",
-            "DHS recruitment remains invitation-only until the task force script ships.",
+            "Department transfers need both commands to sign before anybody moves.",
             "Store perks are quality-of-life only — no pay-to-win proposals are considered.",
           ].map((item) => (
             <li key={item} className="flex items-start gap-2.5">

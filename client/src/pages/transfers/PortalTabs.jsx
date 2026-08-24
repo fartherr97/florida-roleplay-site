@@ -53,6 +53,22 @@ import { useToast } from "./usePortalToast";
 
 const DEPT_KEYS = Object.keys(DEPTS);
 
+/**
+ * The department selector's column count at `lg`, chosen by how many there are.
+ *
+ * Written as whole class names rather than composed at runtime: Tailwind scans
+ * source text, so `lg:grid-cols-${n}` would compile to nothing and the grid
+ * would silently fall back to three columns.
+ */
+const DEPT_GRID =
+  {
+    2: "lg:grid-cols-2",
+    3: "lg:grid-cols-3",
+    4: "lg:grid-cols-4",
+    5: "lg:grid-cols-5",
+    6: "lg:grid-cols-6",
+  }[DEPT_KEYS.length] ?? "lg:grid-cols-4";
+
 /* ─── Dept Selector ────────────────────────────────────────────────────────── */
 
 export function DeptSelector({ label, value, onChange, exclude, locked }) {
@@ -61,9 +77,11 @@ export function DeptSelector({ label, value, onChange, exclude, locked }) {
       <span className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
         {label}
       </span>
-      {/* Sized off the department count rather than fixed at four, so adding a
-          sixth department does not leave one stranded on its own row. */}
-      <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Sized off the department count rather than fixed at four, so adding or
+          retiring one does not leave a tile stranded on its own row — or, worse,
+          leave the rest squeezed into a width their names do not fit. The class
+          names are literals in DEPT_GRID below so Tailwind can see them. */}
+      <div className={`grid w-full grid-cols-2 gap-2 sm:grid-cols-3 ${DEPT_GRID}`}>
         {Object.entries(DEPTS).map(([key, d]) => {
           const selected = value === key;
           const excluded = exclude === key;

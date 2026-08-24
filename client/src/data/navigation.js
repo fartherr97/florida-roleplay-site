@@ -54,7 +54,6 @@ export const navGroups = [
       { label: "Hillsborough County SO", to: "/departments/hcso", icon: "Shield" },
       { label: "Tampa Police Department", to: "/departments/tpd", icon: "Building2" },
       { label: "Hillsborough County Fire Rescue", to: "/departments/hcfr", icon: "Flame" },
-      { label: "Homeland Security", to: "/departments/dhs", icon: "Siren" },
       { label: "Transfer Portal", to: "/transfers", icon: "ArrowLeftRight" },
     ],
   },

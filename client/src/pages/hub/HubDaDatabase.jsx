@@ -135,7 +135,7 @@ export default function HubDaDatabase() {
         icon="Search"
         eyebrow="Staff Hub"
         title="DA Database"
-        subtitle="Every action on record, across the staff team and all five departments. Paste a Discord ID for the same summary /bgcheck gives in Discord."
+        subtitle="Every action on record, across the staff team and every department. Paste a Discord ID for the same summary /bgcheck gives in Discord."
         actions={
           <div className="flex items-center gap-3">
             <Badge tone="rose">Handle with discretion</Badge>

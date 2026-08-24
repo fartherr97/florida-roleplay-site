@@ -273,27 +273,6 @@ export const departments = [
     ],
     applicationType: "hcfr",
   },
-  {
-    id: "dhs",
-    name: "Department of Homeland Security",
-    abbr: "DHS",
-    tone: "amber",
-    icon: "Siren",
-    tagline: "Federal task force, port security and investigations.",
-    mission:
-      "DHS oversees federal enforcement in the state — port and airport security, multi-agency task force operations and long-form criminal investigations that cross county lines.",
-    roster: 19,
-    hiring: false,
-    ranks: [
-      "Special Agent",
-      "Senior Special Agent",
-      "Supervisory Agent",
-      "Assistant Director",
-      "Director",
-    ],
-    fleet: ["Unmarked Tahoe", "Federal Transport Van", "Port Authority Interceptor"],
-    applicationType: "dhs",
-  },
 ];
 
 export const rules = [
@@ -454,7 +433,6 @@ export const applicationTypes = [
   { type: "hcso", name: "Hillsborough County Sheriff's Office", blurb: "County patrol, K9, marine and aviation divisions.", status: "Open", estimate: "3–5 days", icon: "Shield", tone: "green" },
   { type: "tpd", name: "Tampa Police Department", blurb: "City patrol, investigations and tactical response.", status: "Open", estimate: "3–5 days", icon: "Building2", tone: "brand" },
   { type: "hcfr", name: "Hillsborough County Fire Rescue", blurb: "Fire suppression, technical rescue and advanced life support.", status: "Open", estimate: "3–5 days", icon: "Flame", tone: "rose" },
-  { type: "dhs", name: "Department of Homeland Security", blurb: "Federal task force work. Opens periodically by invitation.", status: "Closed", estimate: "—", icon: "Siren", tone: "amber" },
   { type: "staff", name: "Staff Team", blurb: "Moderation, ticket handling and community support.", status: "Open", estimate: "7–10 days", icon: "Wrench", tone: "primary" },
 ];
 
@@ -703,9 +681,9 @@ export const assistantReplies = [
       "Start with the community whitelist application — everything else needs an approved whitelist behind it. Reviews take 24 to 48 hours and the outcome arrives as a Discord DM. Read the rules first; the interview references them directly.",
   },
   {
-    match: ["department", "police", "fhp", "hcso", "tpd", "fire", "hcfr", "dhs"],
+    match: ["department", "police", "fhp", "hcso", "tpd", "fire", "hcfr"],
     reply:
-      "We run five agencies: FHP, HCSO, TPD, HCFR and DHS. Four are hiring right now — DHS opens by invitation only. Each department page lists its rank structure, fleet and a direct link to its application.",
+      "We run four agencies: FHP, HCSO, TPD and HCFR. Each department page lists its rank structure, fleet and a direct link to its application.",
   },
   {
     match: ["crash", "fps", "lag", "performance", "connect"],

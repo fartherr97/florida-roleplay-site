@@ -11,11 +11,7 @@
 // process modal, analytics, the webhook settings cards — indexes into these, so
 // adding a department is still a one-line change here.
 //
-// Two things differ from SSRP, both forced:
-//
-//   • Five departments, not four. SSRP has TPD/HCSO/FHP/HCFR; Florida Roleplay
-//     adds DHS. Every grid the original sized at four columns is sized off
-//     Object.keys(DEPTS).length instead, so a sixth would not break the layout.
+// One thing differs from SSRP, and it is forced:
 //
 //   • `logo` is empty. SSRP serves per-department images from cdn.ssrp.us; this
 //     community has no equivalent yet, so DeptLogo falls back to the
@@ -30,7 +26,7 @@
 import { DEPARTMENTS, ROLE_MAP } from "../../data/rosterData";
 
 /** The departments a member can transfer between — emergency services only. */
-const TRANSFER_DEPT_IDS = ["fhp", "hcso", "tpd", "hcfr", "dhs"];
+const TRANSFER_DEPT_IDS = ["fhp", "hcso", "tpd", "hcfr"];
 
 /**
  * Each department's brand hex.
@@ -44,23 +40,21 @@ const DEPT_COLORS = {
   hcso: "#1f8b4c",
   tpd: "#2e69f1",
   hcfr: "#e74c3c",
-  dhs: "#f2800d",
 };
 
 /**
  * The line under the abbreviation on a department tile.
  *
  * The original derives this from the full name with two string replacements.
- * That works for four short SSRP names and not for these: "Florida Highway
- * Patrol" and "Department of Homeland Security" both truncate mid-word in a
- * five-across grid, which reads as broken rather than as abbreviated.
+ * That works for SSRP's names and not for these: "Florida Highway Patrol" and
+ * "Hillsborough County Sheriff's Office" both truncate mid-word on a tile,
+ * which reads as broken rather than as abbreviated.
  */
 const DEPT_SHORT = {
   fhp: "Highway Patrol",
   hcso: "Sheriff's Office",
   tpd: "Police Dept",
   hcfr: "Fire Rescue",
-  dhs: "Homeland Security",
 };
 
 /** DEPTS — keyed by abbreviation, exactly as the original. */
@@ -117,7 +111,6 @@ export const DEPT_COMMAND_KEYS = {
   HCSO: "hcso_sheriff",
   TPD: "tpd_chief",
   HCFR: "hcfr_fire_chief",
-  DHS: "dhs_director",
 };
 
 export const STATUS_CFG = {

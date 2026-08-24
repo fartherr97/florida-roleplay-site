@@ -297,7 +297,6 @@ const DEPARTMENT_ROLES = [
   "tpd_lieutenant", "tpd_captain", "tpd_chief",
   "hcfr_probationary", "hcfr_firefighter", "hcfr_paramedic", "hcfr_engineer",
   "hcfr_lieutenant", "hcfr_battalion_chief", "hcfr_fire_chief",
-  "dhs_agent", "dhs_senior_agent", "dhs_supervisor", "dhs_director",
 ];
 
 /**
@@ -307,8 +306,8 @@ const DEPARTMENT_ROLES = [
  */
 export const DEFAULT_GRANTS = {
   "roster.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
-  "roster.edit_status": [...staffFrom("senior_mod"), "dhs_director", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
-  "roster.manage_loa": [...staffFrom("senior_mod"), "dhs_director", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
+  "roster.edit_status": [...staffFrom("senior_mod"), "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
+  "roster.manage_loa": [...staffFrom("senior_mod"), "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
   "roster.edit_member": staffFrom("junior_admin"),
   "roster.remove": staffFrom("admin"),
 
@@ -376,7 +375,7 @@ export const DEFAULT_GRANTS = {
   "site.moderation": staffFrom("mod"),
   "site.support": STAFF_LADDER,
   "site.leadership": ["head_admin", "directorship", "ownership"],
-  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief", "dhs_director"],
+  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
 
   // Both of these can be used to grant everything else, so they sit at the top
   // of the ladder. Gating role mapping lower would be cosmetic: anyone able to
