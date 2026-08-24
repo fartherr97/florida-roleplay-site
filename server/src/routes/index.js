@@ -17,6 +17,7 @@ import formsRouter from "./forms.js";
 import promotionsRouter from "./promotions.js";
 import applyRouter from "./applications.js";
 import transfersRouter from "./transfers.js";
+import disciplineRouter from "./discipline.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -54,6 +55,10 @@ router.use("/apply", applyRouter);
 // es-transfer-portal app. It shares this site's session and permission model
 // rather than carrying the Discord OAuth and role-map file it used to.
 router.use("/transfers", transfersRouter);
+// Disciplinary actions. One store for the staff team and every department,
+// because a background check that covers half the community reads as a clean
+// record rather than an incomplete one.
+router.use("/discipline", disciplineRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

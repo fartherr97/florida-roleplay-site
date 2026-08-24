@@ -123,6 +123,34 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "discipline",
+    label: "Disciplinary actions",
+    description:
+      "Filing and reading actions against a member. One record spans the staff team and every department — it is what /bgcheck reads in Discord.",
+    permissions: [
+      {
+        key: "discipline.file",
+        label: "File an action anywhere",
+        detail:
+          "Record an action on behalf of any department or the staff team. Department command already file against their own department without this.",
+      },
+      {
+        key: "discipline.view",
+        label: "Read the whole record",
+        detail:
+          "See every action and run a background check on any member. Without it somebody sees only the ones they filed themselves.",
+        sensitive: true,
+      },
+      {
+        key: "discipline.manage",
+        label: "Correct or void any action",
+        detail:
+          "Edit or withdraw somebody else's entry. Whoever filed one can already fix their own.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "transfers",
     label: "Transfer portal",
     description:
@@ -307,6 +335,14 @@ export const DEFAULT_GRANTS = {
   // department command sign for their own side without it.
   "transfers.view": ["member", "whitelisted", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "transfers.manage": ["directorship", "ownership"],
+
+  // Department command file against their own department without a grant, the
+  // same way they build their own applications. These are the community-wide
+  // versions — and reading somebody's whole record is its own grant from
+  // filing one, because the two are not the same act.
+  "discipline.file": ["senior_admin", "head_admin", "directorship", "ownership"],
+  "discipline.view": ["senior_admin", "head_admin", "directorship", "ownership"],
+  "discipline.manage": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

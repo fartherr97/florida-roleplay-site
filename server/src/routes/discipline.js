@@ -1,0 +1,316 @@
+/**
+ * The /api/discipline router — the DA Hub's store, and the record `/bgcheck`
+ * reads in Discord.
+ *
+ * The rule that matters: **who filed it is taken from the session, never from
+ * the body.** An action is a record about a person, and a record that can be
+ * filed under somebody else's name is not a record.
+ *
+ * The second rule: nothing here is ever deleted outright. Voiding marks the row
+ * and keeps it, because an action that was withdrawn is part of the history and
+ * a background check that silently omits it reads as a clean sheet.
+ */
+import { Router } from "express";
+import { query, changedRows } from "../db.js";
+import * as seed from "../disciplineSeed.js";
+import { loadGrants } from "../middleware/requirePermission.js";
+import { resolveUser } from "../middleware/requireRole.js";
+import { permissionsFor } from "../permissions.js";
+import { requireBot } from "../middleware/requireBot.js";
+import { str } from "../validate.js";
+import {
+  ACTION_TYPE_MAP,
+  ACTION_BODY_MAP,
+  DEFAULT_WINDOW_DAYS,
+  backgroundFor,
+  buildBackgroundEmbed,
+  canEditAction,
+  canFileFor,
+  canViewAll,
+  normalizeAction,
+  validateAction,
+} from "../lib/discipline.js";
+
+const router = Router();
+
+/* ------------------------------------------------------------------ *
+ * Context and loading
+ * ------------------------------------------------------------------ */
+
+async function contextFor(req) {
+  const user = req.user ?? (await resolveUser(req));
+  req.user = user;
+  const roleKeys = user?.roles ?? [];
+  return { user, roleKeys, permissions: permissionsFor(roleKeys, await loadGrants()) };
+}
+
+const COLUMNS = `
+  id, type, body_id AS bodyId, target_name AS targetName,
+  target_discord_id AS targetDiscordId, issued_by_name AS issuedByName,
+  issued_by_discord_id AS issuedByDiscordId, reason, expires_at AS expiresAt,
+  voided, void_reason AS voidReason, created_at AS createdAt, updated_at AS updatedAt`;
+
+async function loadActions({ targetDiscordId, since } = {}) {
+  const where = [];
+  const params = [];
+  if (targetDiscordId) { where.push("target_discord_id = ?"); params.push(targetDiscordId); }
+  if (since) { where.push("created_at >= ?"); params.push(since); }
+  try {
+    const rows = await query(
+      `SELECT ${COLUMNS} FROM disciplinary_actions${where.length ? ` WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY created_at DESC LIMIT 2000`,
+      params,
+    );
+    if (rows.length) return rows.map((row) => normalizeAction({ ...row, voided: Boolean(row.voided) }));
+  } catch {
+    // No database — the seeds stand, so the hub and the embed both render.
+  }
+  return seed.ACTIONS.map(normalizeAction).filter(
+    (a) => !targetDiscordId || a.targetDiscordId === targetDiscordId,
+  );
+}
+
+function noStore(res) {
+  return res.status(503).json({
+    ok: false,
+    code: "DA_NO_STORE",
+    message: "Disciplinary actions need a database to record. Nothing was written.",
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Reading
+ * ------------------------------------------------------------------ */
+
+/**
+ * The hub's two tabs in one call: everything the caller may read, plus the
+ * subset they filed themselves.
+ *
+ * `mine` is computed here rather than filtered in the browser, because somebody
+ * who may only see their own must not receive everybody else's to filter.
+ */
+router.get("/", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (!ctx.user) {
+    return res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in to open the DA Hub." });
+  }
+  const all = await loadActions();
+  const mine = all.filter((a) => a.issuedByDiscordId === ctx.user.id);
+
+  if (!canViewAll(ctx)) {
+    return res.json({ actions: mine, mine, canViewAll: false, totals: { mine: mine.length, all: mine.length } });
+  }
+  res.json({
+    actions: all,
+    mine,
+    canViewAll: true,
+    totals: { mine: mine.length, all: all.length },
+  });
+});
+
+/** One member's folded record — the same shape /bgcheck renders. */
+router.get("/background/:discordId", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (!canViewAll(ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Reading somebody's record needs discipline.view." });
+  }
+  const discordId = str(req.params.discordId);
+  if (!/^\d{17,20}$/.test(discordId)) {
+    return res.status(400).json({ ok: false, message: "That is not a Discord ID." });
+  }
+  const windowDays = clampWindow(req.query.days);
+  const actions = await loadActions({ targetDiscordId: discordId });
+  res.json({ background: backgroundFor(actions, { discordId, windowDays }) });
+});
+
+function clampWindow(value) {
+  const days = Number(value);
+  return Number.isFinite(days) ? Math.min(3650, Math.max(1, Math.trunc(days))) : DEFAULT_WINDOW_DAYS;
+}
+
+/* ------------------------------------------------------------------ *
+ * Filing
+ * ------------------------------------------------------------------ */
+
+router.post("/", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (!ctx.user) {
+    return res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in to file an action." });
+  }
+
+  const body = req.body ?? {};
+  const draft = {
+    type: str(body.type),
+    bodyId: str(body.bodyId),
+    targetName: str(body.targetName).slice(0, 128),
+    targetDiscordId: str(body.targetDiscordId).trim(),
+    reason: str(body.reason).slice(0, 1000),
+    expiresAt: body.expiresAt || null,
+  };
+
+  const { errors, ok } = validateAction(draft);
+  if (!ok) return res.status(400).json({ ok: false, code: "DA_INVALID", errors });
+
+  if (!canFileFor(draft.bodyId, ctx)) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: `You cannot file on behalf of ${ACTION_BODY_MAP[draft.bodyId]?.label ?? "that body"}.`,
+    });
+  }
+
+  // Filing one against yourself is always a mistake — either a misread ID or
+  // somebody papering their own record.
+  if (draft.targetDiscordId === ctx.user.id) {
+    return res.status(400).json({
+      ok: false,
+      code: "DA_INVALID",
+      errors: { targetDiscordId: "That is your own Discord ID." },
+    });
+  }
+
+  let insertId = null;
+  try {
+    const result = await query(
+      `INSERT INTO disciplinary_actions
+         (type, body_id, target_name, target_discord_id, issued_by_name, issued_by_discord_id, reason, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        draft.type, draft.bodyId, draft.targetName, draft.targetDiscordId,
+        ctx.user.displayName ?? ctx.user.username ?? "Unknown", ctx.user.id,
+        draft.reason, draft.expiresAt ? new Date(draft.expiresAt) : null,
+      ],
+    );
+    insertId = Number(result?.insertId ?? 0) || null;
+  } catch {
+    return noStore(res);
+  }
+
+  res.status(201).json({
+    ok: true,
+    action: normalizeAction({
+      ...draft,
+      id: insertId,
+      issuedByName: ctx.user.displayName ?? ctx.user.username,
+      issuedByDiscordId: ctx.user.id,
+      createdAt: new Date().toISOString(),
+    }),
+  });
+});
+
+/** Correct one. Whoever filed it may fix their own; `discipline.manage` may fix any. */
+router.put("/:id", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (!ctx.user) {
+    return res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in first." });
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ ok: false, message: "Invalid id." });
+
+  const existing = (await loadActions()).find((a) => Number(a.id) === id);
+  if (!existing) return res.status(404).json({ ok: false, message: "No such action." });
+  if (!canEditAction(existing, ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That is not yours to edit." });
+  }
+
+  const body = req.body ?? {};
+  const next = {
+    type: ACTION_TYPE_MAP[body.type] ? body.type : existing.type,
+    bodyId: ACTION_BODY_MAP[body.bodyId] ? body.bodyId : existing.bodyId,
+    targetName: str(body.targetName).slice(0, 128) || existing.targetName,
+    reason: str(body.reason).slice(0, 1000) || existing.reason,
+    expiresAt: body.expiresAt === null ? null : body.expiresAt || existing.expiresAt,
+  };
+  // Moving an action to a body you cannot file for would be filing for it.
+  if (next.bodyId !== existing.bodyId && !canFileFor(next.bodyId, ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "You cannot move it to that body." });
+  }
+
+  try {
+    const result = await query(
+      `UPDATE disciplinary_actions
+          SET type = ?, body_id = ?, target_name = ?, reason = ?, expires_at = ?
+        WHERE id = ?`,
+      [next.type, next.bodyId, next.targetName, next.reason, next.expiresAt ? new Date(next.expiresAt) : null, id],
+    );
+    if (!changedRows(result)) return res.status(404).json({ ok: false, message: "Nothing was updated." });
+  } catch {
+    return noStore(res);
+  }
+  res.json({ ok: true, action: normalizeAction({ ...existing, ...next, id }) });
+});
+
+/**
+ * Void one.
+ *
+ * This is what the hub's delete button does. The row stays and the record keeps
+ * showing it, struck through with the reason — an action that quietly vanished
+ * is indistinguishable from one that never happened, and the difference matters
+ * to whoever it was filed against.
+ */
+router.post("/:id/void", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (!ctx.user) {
+    return res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in first." });
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ ok: false, message: "Invalid id." });
+
+  const existing = (await loadActions()).find((a) => Number(a.id) === id);
+  if (!existing) return res.status(404).json({ ok: false, message: "No such action." });
+  if (!canEditAction(existing, ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That is not yours to void." });
+  }
+
+  const reason = str(req.body?.reason).slice(0, 500).trim();
+  if (reason.length < 5) {
+    return res.status(400).json({ ok: false, code: "DA_INVALID", errors: { reason: "Say why it is being withdrawn." } });
+  }
+
+  try {
+    const result = await query(
+      "UPDATE disciplinary_actions SET voided = 1, void_reason = ? WHERE id = ? AND voided = 0",
+      [reason, id],
+    );
+    if (!changedRows(result)) {
+      return res.status(409).json({ ok: false, message: "That one was already voided." });
+    }
+  } catch {
+    return noStore(res);
+  }
+  res.json({ ok: true, action: normalizeAction({ ...existing, voided: true, voidReason: reason }) });
+});
+
+/* ------------------------------------------------------------------ *
+ * The bot
+ * ------------------------------------------------------------------ */
+
+/**
+ * What `/bgcheck` calls.
+ *
+ * Answers with both the folded record and the finished embed. The bot may post
+ * the embed as it stands or build its own from the data — but the default costs
+ * it nothing, and it means the site owns what a record looks like rather than
+ * two renderers drifting apart.
+ */
+router.get("/bot/background/:discordId", requireBot, async (req, res) => {
+  const discordId = str(req.params.discordId);
+  if (!/^\d{17,20}$/.test(discordId)) {
+    return res.status(400).json({ ok: false, message: "That is not a Discord ID." });
+  }
+  const windowDays = clampWindow(req.query.days);
+  const actions = await loadActions({ targetDiscordId: discordId });
+  const background = backgroundFor(actions, { discordId, windowDays });
+
+  // The name off the most recent action, so the embed has something to title
+  // itself with even when the bot only had an id to go on.
+  const memberName = str(req.query.name) || actions.find((a) => a.targetName)?.targetName || null;
+
+  res.json({
+    background,
+    memberName,
+    message: buildBackgroundEmbed(background, { memberName }),
+  });
+});
+
+export default router;

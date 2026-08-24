@@ -13,7 +13,7 @@ import {
   Inbox, Key, KeyRound, Landmark, LayoutGrid, LifeBuoy, ListChecks, MapPin, Megaphone,
   Network, Phone, Plane, Radio, Scale, ScrollText, Shield, ShieldCheck, Shirt,
   Siren, SlidersHorizontal, Star, Store, Stethoscope, Tag, Truck, Users,
-  UserSearch, Wallet, Wrench,
+  Search, UserSearch, Wallet, Wrench,
 } from "lucide-react";
 
 const HUB_ICONS = {
@@ -23,7 +23,7 @@ const HUB_ICONS = {
   Inbox, Key, KeyRound, Landmark, LayoutGrid, LifeBuoy, ListChecks, MapPin, Megaphone,
   Network, Phone, Plane, Radio, Scale, ScrollText, Shield, ShieldCheck, Shirt,
   Siren, SlidersHorizontal, Star, Store, Stethoscope, Tag, Truck, Users,
-  UserSearch, Wallet, Wrench,
+  Search, UserSearch, Wallet, Wrench,
 };
 
 /** The names the Builder Portal's icon picker offers, in this order. */

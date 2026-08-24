@@ -844,3 +844,38 @@ CREATE TABLE IF NOT EXISTS transfer_webhooks (
   updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (department_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------ --
+-- Disciplinary actions
+-- ------------------------------------------------------------------ --
+
+-- Every action taken against a member, by the staff team or by a department.
+--
+-- One table for both on purpose. A department write-up the staff team cannot
+-- see is how somebody with four of them keeps getting hired, and a background
+-- check that only covers half the community is worse than none — it reads as a
+-- clean record.
+--
+-- `voided` rather than DELETE: an action that was later withdrawn is still part
+-- of the record, and dropping the row would let a reviewer conclude nothing
+-- ever happened. The row stays, marked, with the reason it was withdrawn.
+CREATE TABLE IF NOT EXISTS disciplinary_actions (
+  id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  type                 VARCHAR(32)  NOT NULL,
+  body_id              VARCHAR(32)  NOT NULL,
+  target_name          VARCHAR(128) NOT NULL,
+  target_discord_id    VARCHAR(20)  NOT NULL,
+  issued_by_name       VARCHAR(128) NOT NULL,
+  issued_by_discord_id VARCHAR(20)  NULL,
+  reason               VARCHAR(1000) NOT NULL,
+  expires_at           TIMESTAMP    NULL,
+  voided               TINYINT(1)   NOT NULL DEFAULT 0,
+  void_reason          VARCHAR(500) NULL,
+  created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  -- The index /bgcheck reads: one member, newest first, inside a date window.
+  KEY idx_discipline_target (target_discord_id, created_at),
+  KEY idx_discipline_issuer (issued_by_discord_id, created_at),
+  KEY idx_discipline_body (body_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -33,6 +33,11 @@ export const GUARDS = [
   { path: "/staff-hub/dashboard", permission: "staff.view" },
   { path: "/staff-hub/trial-checklist", permission: "staff.view" },
   { path: "/staff-hub/resources", permission: "staff.view" },
+  // The hub is the write surface: anybody who can open the Staff Hub can file
+  // against their own department, and the API decides which bodies they may
+  // file for. Reading everybody else's record is the separate, stricter grant
+  // the database below carries.
+  { path: "/staff-hub/da-hub", permission: "staff.view" },
   { path: "/staff-hub/da-database", permission: "staff.da_view" },
   { path: "/staff-hub/administrators", permission: "staff.links.admin" },
   { path: "/staff-hub/senior-admins", permission: "staff.links.senior" },

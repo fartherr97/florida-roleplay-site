@@ -400,6 +400,60 @@ Each submission stores its own copy of the application. A question edited
 tomorrow never rewrites what somebody was asked today, and deleting an
 application leaves its submissions readable.
 
+## Disciplinary actions — the DA Hub and `/bgcheck`
+
+Every action taken against a member, by the staff team or by a department, in
+one record. `/staff-hub/da-hub` files them; `/staff-hub/da-database` reads them;
+the Discord bot's `/bgcheck` command reads the same rows folded into an embed.
+
+### One store, not two
+
+A department write-up the staff team cannot see is how somebody with four of
+them keeps getting hired, and a background check covering half the community is
+worse than none — it reads as a clean record rather than an incomplete one. So
+the staff team, the directorship and all five departments file into the same
+table, and `body_id` says who filed it.
+
+### Verbal versus non-verbal is the line that matters
+
+A verbal warning is a conversation that was logged; everything else is on paper
+and follows the member. `/bgcheck` splits on that first and on staff-versus-
+department second, because that is the shape a reviewer actually reads: coaching
+in one column, history in the other.
+
+### Nothing is deleted
+
+The hub's delete button voids. The row stays, struck through with the reason it
+was withdrawn, and the background check counts it separately rather than
+dropping it. An action that quietly vanished is indistinguishable from one that
+never happened, and the difference matters to whoever it was filed against.
+
+### Who can file and who can read
+
+Department command file against their own department without a grant, the same
+way they build their own applications. `discipline.file` is the community-wide
+version. Reading somebody else's whole record is a **separate** grant
+(`discipline.view`) — filing an action and pulling a member's history are not
+the same act, and without the second somebody sees only what they filed
+themselves. Filing one against your own Discord ID is refused outright.
+
+### What the bot calls
+
+```
+GET /api/discipline/bot/background/:discordId?days=180&name=C.%20Alex
+Authorization: Bearer $BOT_TOKEN
+```
+
+Answers with the folded record **and** a finished Discord embed. The bot can
+post the embed as it stands or build its own from the data, but the default
+costs it nothing and means the site owns what a record looks like rather than
+two renderers drifting apart. `days` defaults to 180 — the six months the
+command is specified against — and is clamped to a sane range.
+
+The embed leads with anything still in effect (a suspension that has not expired
+is what stops somebody being hired mid-suspension), then the four buckets, then
+anything voided.
+
 ## Transfer portal — `/transfers`
 
 Moving a member from one emergency services department to another. Both

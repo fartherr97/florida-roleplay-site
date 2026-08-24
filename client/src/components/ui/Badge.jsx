@@ -8,6 +8,7 @@ const TONES = {
   green: "text-green-300 bg-green-500/10 ring-green-400/25",
   amber: "text-amber-300 bg-amber-500/10 ring-amber-400/25",
   rose: "text-rose-300 bg-rose-500/10 ring-rose-400/25",
+  violet: "text-violet-300 bg-violet-500/10 ring-violet-400/25",
   slate: "text-slate-300 bg-slate-500/10 ring-slate-400/25",
 };
 

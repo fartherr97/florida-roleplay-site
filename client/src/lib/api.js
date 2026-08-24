@@ -12,6 +12,7 @@ import * as formsMock from "../data/formsData";
 import * as promotionMock from "../data/promotionData";
 import * as applySeed from "../data/applicationSeed";
 import * as transferSeed from "../data/transferSeed";
+import * as disciplineSeed from "../data/disciplineSeed";
 import { gradeSubmission } from "./forms";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { normalizeApplication } from "./applicationConfig";
@@ -524,6 +525,45 @@ export const api = {
       `/apply/manage/submissions/${encodeURIComponent(reference)}/decision`,
       { decision, reason },
       () => ({ ok: false, message: "The API is unreachable, so no decision was recorded." }),
+    ),
+
+  /* ------------------------- Disciplinary actions ------------------------- */
+
+  /**
+   * The DA Hub's store. Reads fall back to the seeds; writes do not — an action
+   * that only exists in one browser is a record nobody else can see, which is
+   * the one thing a disciplinary record must never be.
+   */
+  disciplinaryActions: () =>
+    get("/discipline", {
+      actions: disciplineSeed.ACTIONS,
+      mine: [],
+      canViewAll: false,
+      totals: { mine: 0, all: disciplineSeed.ACTIONS.length },
+    }),
+
+  fileDisciplinaryAction: (payload) =>
+    post("/discipline", payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was filed.",
+    })),
+
+  updateDisciplinaryAction: (id, payload) =>
+    put(`/discipline/${encodeURIComponent(id)}`, payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was changed.",
+    })),
+
+  voidDisciplinaryAction: (id, reason) =>
+    post(`/discipline/${encodeURIComponent(id)}/void`, { reason }, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was voided.",
+    })),
+
+  background: (discordId, days) =>
+    get(
+      `/discipline/background/${encodeURIComponent(discordId)}${days ? `?days=${days}` : ""}`,
+      null,
     ),
 
   /* --------------------------- Transfer portal --------------------------- */

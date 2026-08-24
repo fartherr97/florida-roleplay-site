@@ -97,7 +97,8 @@ export const STAFF_HUB = {
         { to: "/staff-hub/trial-checklist", label: "Trial Mod Checklist", icon: "ListChecks", permission: "staff.view" },
         { to: "/staff-hub/forms", label: "Forms & Exams", icon: "ClipboardList", permission: "staff.view" },
         { to: "/staff-hub/promotion-board", label: "Promotion Board", icon: "Award", permission: "promotions.view" },
-        { to: "/staff-hub/da-database", label: "Staff DA Database", icon: "Gavel", permission: "staff.da_view" },
+        { to: "/staff-hub/da-hub", label: "DA Hub", icon: "Gavel", permission: "staff.view" },
+        { to: "/staff-hub/da-database", label: "DA Database", icon: "Search", permission: "staff.da_view" },
       ],
     },
     {
