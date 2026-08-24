@@ -288,7 +288,7 @@ replaced; the Audit page restores one.
 Departments resolve from the URL path, because the community is one site on one
 domain. `server/src/lib/tenant.js` also resolves from the `Host` header — an
 explicit `DEPARTMENT_MAP` entry, then the first label of a real subdomain — so
-pointing `fhp.floridarp.gg` at this deployment later needs no code change.
+pointing `fhp.flrp.us` at this deployment later needs no code change.
 
 ### One roster layout
 
@@ -604,104 +604,127 @@ anything voided.
 
 Moving a member from one emergency services department to another. Both
 departments' command staff have to sign before anybody moves, and the receiving
-department decides the rank they start on. It sits under Emergency Services in
-the nav.
+department decides the rank they start on.
 
-Ported from [fartherr97/es-transfer-portal](https://github.com/fartherr97/es-transfer-portal),
-which was a standalone Next.js app. Three things changed on the way across, and
-they are why this is a port rather than a second app deployed beside this one.
+This is a **port of
+[fartherr97/es-transfer-portal](https://github.com/fartherr97/es-transfer-portal)**,
+not a reimplementation of it. Upstream is a standalone Next.js app whose entire
+UI is one 2,786-line `app/page.jsx`; the screens here are that file — the
+landing page with the floating logo, the Overview / New Request / Review Queue /
+Analytics / Settings tab row, the ticket view with its approval chips and
+two-thread chat, the webhook cards with their live Discord embed preview — with
+its own top bar and footer, exactly as upstream has.
 
-### Departments and ranks come from this community
-
-The original hard-coded four departments and invented a rank ladder for each.
-Here `TRANSFER_DEPARTMENTS` is derived from `DEPARTMENTS` and every rank from
-`ROLE_MAP` — the same tables the roster and the Discord Role Mapping page read.
-So the portal covers all five departments including DHS, the ranks are the real
-ones (Trooper → Colonel, Deputy → Sheriff, Officer → Chief of Police,
-Probationary Firefighter → Fire Chief, Special Agent → Director), and a rank
-renamed on the mapping page is renamed here with no second list to update.
-
-The processing modal offers only the **receiving** department's ladder. The
-original offered every rank in the community flattened into one list, which let
-you post a Fire Chief into the Highway Patrol.
-
-### Access is this site's permission model
-
-The original carried its own Discord OAuth and a `role-map.js` full of
-`REPLACE_WITH_ROLE_ID` placeholders to work out who was a department head. Here:
-
-| Portal role | Here |
+| Upstream | Here |
 | --- | --- |
-| Department head | Holds that department's command rank — the same rule the application builder uses |
-| Management | **Directorship**, via `transfers.manage` |
-| Transferee | Everybody else, on their own tickets |
+| `app/page.jsx` — Config block | `pages/transfers/portalConfig.js` |
+| `app/page.jsx` — Utils | `pages/transfers/portalUtils.js` |
+| `app/page.jsx` — Toast + Primitives | `pages/transfers/portalPrimitives.jsx`, `usePortalToast.js` |
+| `app/page.jsx` — Tab Views | `pages/transfers/PortalTabs.jsx` |
+| `app/page.jsx` — Ticket View | `pages/transfers/TicketView.jsx` |
+| `app/page.jsx` — TopBar, Landing, Root | `pages/transfers/TransferPortalApp.jsx` |
+| `lib/access.js`, `lib/role-map.js`, `lib/webhook.js` | `server/src/lib/portal.js` |
+| `lib/transfers.js`, `lib/chat.js`, `lib/presence.js`, `lib/settings.js`, `app/api/**` | `server/src/routes/transfers.js` |
 
-Directorship sees every ticket, and is the only tier that closes or reopens one
-or edits the webhook settings. A department head sees tickets where their
-department is on either side — both have to sign, so both have to read it.
-Everybody else sees only their own, on the public thread only.
+### What had to change, and why
 
-The check is named for the permission rather than the rank, so if that oversight
-ever moves off Directorship it moves on the permissions page and nowhere else.
+Four things, each forced rather than chosen:
+
+- **Identity.** Upstream carries its own Discord OAuth and a `role-map.js` full
+  of `REPLACE_WITH_ROLE_ID` placeholders. Here `sessionFrom()` builds the same
+  `{ id, username, displayName, avatar, dept, rank, isDeptHead, isManagement }`
+  object out of this site's roles, so every rule in `lib/access.js` ports across
+  untouched and there is one answer to "who is this" rather than two.
+  Management is Directorship; a department's command role makes its head.
+- **Departments and ranks.** Upstream hard-codes four departments and invents a
+  rank ladder for each. `DEPTS` here is built from `DEPARTMENTS` and `RANKS`
+  from `ROLE_MAP`, so the portal covers all five including DHS, the ranks are
+  the real ones, and a rank renamed on the Discord Role Mapping page is renamed
+  here with no second list to update.
+- **Department artwork.** Upstream serves per-department images from
+  `cdn.ssrp.us`. There is no equivalent here yet, so `DeptLogo` falls back to
+  the abbreviation on a tile in the department's colour. Put a URL in `logo` in
+  `portalConfig.js` and every slot picks it up with no other change.
+- **Settings are a table.** Upstream keeps webhook config on `globalThis` and
+  says so in a comment. A URL a director typed in should survive a restart.
+
+Two smaller ones: the view lives in the URL (`/transfers/queue`,
+`/transfers/t/TR-123`) rather than in `useState` alone, so a ticket has an
+address you can send to the department head being asked about and Back works;
+and a webhook URL is write-only, because anyone holding it can post to that
+channel as the bot.
+
+### Two upstream bugs, fixed
+
+Both were reported from the live SSRP portal and both reproduce on upstream's
+code. Each is commented at the point it is fixed.
+
+**Transferees losing their own ticket.** `lib/access.js` decides whether you are
+looking at your own ticket by comparing your Discord username and display name
+against the strings stored on the row. Both of those change — somebody renames
+themselves, or a department head fixes a typo in the member field — and the
+comparison stops matching, so the person who opened the ticket gets a 403 on it
+while it is still open. The submitter's user id is recorded in `created_by_id`
+at creation and matched first; the name comparison stays underneath for rows
+created before the column. Verified by reproducing the 403 with the column
+nulled and watching it return 200 with it set.
+
+Two adjacent cases went with it: the ticket view treated *any* failed load as
+"you don't have access to this transfer ticket", so a lapsed session or a
+database blip read as being thrown off your own ticket — only 403 and 404 say
+that now; and `MyTransfersView` re-filtered the already-scoped list by display
+name, hiding your own ticket the moment you renamed yourself.
+
+**The unread badge forgetting what you had read.** `TicketChat` keeps the read
+baseline in a `useRef` seeded at `{ public: 0, internal: 0 }` and never persists
+it. The ref dies with the component, so leaving a ticket and coming back
+re-counts every internal note as unread: read five, close the browser, come
+back, and the badge says five again. It is wrong within a single visit too — the
+tab you are *not* on has a baseline of zero, so its whole history reads as new.
+
+The baseline lives in `transfer_reads`, per viewer per ticket, so the badge means
+"since you last looked" and follows the person rather than the browser. Counts
+rather than timestamps, because the badge is a count and two integers cannot
+disagree with the number rendered beside them the way a clock can. Marks only
+ever move forward (`GREATEST`), so a stale tab cannot un-read a thread.
+
+### Access
+
+The rules are upstream's, and the server re-checks every one:
+
+| Portal role | Sees | Can |
+| --- | --- | --- |
+| Directorship | Every ticket | Everything, including close, reopen and settings |
+| Department head | Tickets where their department is on either side | Sign for **their own side only**, reject, process |
+| Transferee | Their own ticket | The public thread |
 
 The department somebody signs for is resolved from their roles server-side, never
-read from the request body — otherwise a Fire Chief could post `{ dept: "fhp" }`
-and sign for the Highway Patrol. The Approve button says which side it signs
-for, so nobody has to guess.
+read from the request body — otherwise a Fire Chief could post `{ dept: "FHP" }`
+and sign for the Highway Patrol. Upstream reads `body.dept` for managers only,
+which is right, but its department-head branch trusts `session.dept` without
+checking the ticket involves it; this one refuses.
 
-### It is a section of the site, not an app
-
-One router, one session, one design system. The portal's own top bar, Discord
-login, toasts, buttons and inputs did not survive the move and did not need to.
+`transfers.view` is a menu gate and nothing more. There is deliberately no
+second permission for acting on a ticket: a grant table that could disagree with
+the department roles is a grant table that eventually does.
 
 ### The two threads
 
 Every ticket has a public thread the member reads and a staff-only thread the two
-departments read. They are tabs rather than the original's side-by-side panels:
-side by side works on a director's monitor and nowhere else, and the thing that
-must never happen is typing into the wrong one.
-
-The internal thread is filtered out **in the query** for anybody who may not see
-it. A staff note that reaches the browser has already leaked whatever it says;
-hiding it in the UI afterwards is not a control. Asking to post to it without the
-standing is a denial rather than a quiet downgrade to the public thread — silently
-posting a staff note where the member can read it is the worse failure.
+departments read, as tabs. The internal thread is filtered out **in the query**
+for anybody who may not see it — a staff note that reaches the browser has
+already leaked whatever it says, and hiding it in the UI afterwards is not a
+control. Asking to post to it without the standing is a denial rather than a
+quiet downgrade to the public thread: silently posting a staff note where the
+member can read it is the worse failure.
 
 ### Presence
 
 One call does both halves: the heartbeat records that you are looking and answers
-with everybody else who is. The original polled two endpoints on the same timer
-to say the same thing. A viewer counts as present for 25 seconds, and reads
-filter on `last_seen` rather than relying on anything having cleaned up.
-
-### Discord notifications
-
-Each department can point new tickets at a Discord webhook, configured under
-Settings (Directorship only) with a live preview of the embed.
-
-A webhook posts a message and nothing else, which is the right tool here: a
-transfer is decided in this portal by two department heads, so the Discord
-message is a notification rather than a control surface and needs no buttons.
-Where buttons *are* needed — applications — the bot owns them, because a webhook
-cannot carry one.
-
-**The webhook URL is write-only.** It never comes back from the API, not even to
-the Directorship that just typed it in, because anybody holding it can post
-into that channel as the department forever. The page shows whether one is set,
-never what it is, and a blank field means "leave it alone" rather than "delete
-it". Only real `discord.com/api/webhooks/…` URLs are accepted.
-
-### Two things that changed because they were wrong
-
-**The schema had fallen behind the code.** The original `schema.sql` had no
-`approvals`, `history`, `rejection_reason`, `assigned_rank`, `retired_member` or
-`employment_type` columns, and its status ENUM was missing `closed` — all of
-which `lib/transfers.js` read and wrote. Anybody running that file and then the
-app would have hit errors on the first approval. The schema here is the full set.
-
-**Settings were a process global.** `lib/settings.js` kept every webhook URL in
-`globalThis` and reset it on restart. A URL a director typed in should survive a
-deploy, so it is a table.
+with who else is — one request every eight seconds rather than two, and no
+window where the list is a beat behind the fact you are in it. A viewer counts
+as present while their last heartbeat is inside fifteen seconds, and reads
+filter on that rather than relying on anything having cleaned up.
 
 ## Promotion board
 
@@ -934,8 +957,9 @@ on every single call. Nothing here decides what anybody is allowed to do:
 ### The API has to be on a subdomain of this site
 
 `VITE_API_URL` (see `client/.env.example`) is the only place the address is
-configured. In production it must be a subdomain of whatever domain serves the
-site — `api.example.com` for `example.com`.
+configured. In production it must be a subdomain of the domain serving the site.
+The site is **flrp.us**, so the bot API belongs at **api.flrp.us** — an `api`
+record in Cloudflare pointing at wherever the bot listens.
 
 The bot's session cookies are `SameSite=Lax`. Point the dashboard at a different
 site and the browser silently declines to send them: every signed-in request
@@ -984,6 +1008,29 @@ That development caller (`devUser` in `server/src/seed.js`, mirrored by `mockUse
 in `client/src/data/mockData.js`) holds **Ownership**, so browsing locally shows
 the whole site rather than a moderator's slice of it. The preview switcher on
 either hub landing page is how you see it as anything lower.
+
+## Domain
+
+The community runs on **flrp.us**, behind Cloudflare. Three things follow from
+that, and only the first is a preference:
+
+- The site is served from the apex, `flrp.us`. `SITE.domain` and `SITE.url` in
+  `client/src/data/mockData.js` (mirrored in `server/src/seed.js`) are the one
+  place it is written down.
+- **The bot API must be `api.flrp.us`**, not a separate domain. Its session
+  cookies are `SameSite=Lax`, so anywhere else the browser silently drops them
+  and every signed-in request 401s with nothing wrong-looking in the network
+  tab. See the section above.
+- A department can have its own hostname whenever you want one:
+  `fhp.flrp.us`, `hcso.flrp.us` and so on resolve to that department with no
+  code change, because `server/src/lib/tenant.js` reads the first DNS label.
+  `DEPARTMENT_MAP` is only for hosts that do not follow that shape.
+
+Behind Cloudflare, Express sees Cloudflare's IP rather than the visitor's unless
+`app.set("trust proxy", …)` is configured, and it must be set to the number of
+proxies in front of it rather than to `true` — a blanket `true` lets any caller
+claim any address through `X-Forwarded-For`. Nothing in this repo rate-limits by
+IP yet, so it is not wrong today; it is the thing to set before anything does.
 
 ## Placeholders
 

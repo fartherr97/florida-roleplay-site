@@ -15,6 +15,12 @@
 export const SITE = {
   name: "Florida Roleplay",
   shortName: "FLRP",
+  // The community's own domain. Everything that has to live beside the site —
+  // the bot API, a department's own hostname — is a subdomain of this, because
+  // session cookies are SameSite=Lax and the browser silently drops them
+  // anywhere else. See "The API has to be on a subdomain" in the README.
+  domain: "flrp.us",
+  url: "https://flrp.us",
   // The community emblem, in client/public. Square-cropped and sized down from
   // the 1024px original so a 32px nav mark does not pull a 1.75 MB file.
   logoUrl: "/logo.png",
@@ -23,8 +29,8 @@ export const SITE = {
   heroImage:
     "https://images.unsplash.com/photo-1535498730771-e735b998cd64?auto=format&fit=crop&w=2400&q=70",
   // TODO: replace with the live FiveM connect endpoint.
-  fivemConnect: "fivem://connect/flrp.example.net",
-  serverAddress: "connect.floridaroleplay.example",
+  fivemConnect: "fivem://connect/play.flrp.us",
+  serverAddress: "play.flrp.us",
   // TODO: replace with the real Discord invite.
   discordInvite: "https://discord.gg/your-invite-here",
   // TODO: replace with the real Tebex store URL.
@@ -38,7 +44,7 @@ export const SITE = {
     x: "https://x.com/floridaroleplay",
     youtube: "https://www.youtube.com/@floridaroleplay",
   },
-  supportEmail: "support@floridaroleplay.example",
+  supportEmail: "support@flrp.us",
 };
 
 /* ------------------------------------------------------------------ *

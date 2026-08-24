@@ -773,10 +773,20 @@ CREATE TABLE IF NOT EXISTS application_dispatches (
 -- its own code — no approvals, history, rejection_reason, assigned_rank,
 -- retired_member or employment_type columns, and a status ENUM missing
 -- 'closed', all of which lib/transfers.js read and wrote. This is the full set.
+--
+-- `created_by_id` is the one column upstream does not have, and it fixes a real
+-- bug. Upstream decides whether you are looking at your own ticket by comparing
+-- your Discord username and display name against the strings stored on the row
+-- (lib/access.js, isOwnTicket). Change your Discord name — or have a department
+-- head correct a typo in the member field — and that comparison stops matching,
+-- so the person who opened the ticket is refused their own ticket while it is
+-- still open. The submitter's user id is recorded here at creation and matched
+-- first; the name comparison stays as a fallback for rows created before it.
 CREATE TABLE IF NOT EXISTS transfers (
   id                VARCHAR(32)  NOT NULL,
   member_name       VARCHAR(128) NOT NULL,
-  member_discord_id VARCHAR(20)  NULL,
+  discord_username  VARCHAR(128) NOT NULL,
+  created_by_id     VARCHAR(20)  NULL,
   current_rank      VARCHAR(128) NOT NULL,
   from_dept         VARCHAR(32)  NOT NULL,
   to_dept           VARCHAR(32)  NOT NULL,
@@ -786,6 +796,7 @@ CREATE TABLE IF NOT EXISTS transfers (
   remove_roles        TINYINT(1) NOT NULL DEFAULT 1,
   assign_visitor_pass TINYINT(1) NOT NULL DEFAULT 1,
   assign_retired      TINYINT(1) NOT NULL DEFAULT 0,
+  require_bot_confirm TINYINT(1) NOT NULL DEFAULT 1,
   -- The outcome, written when the receiving department processes it.
   assigned_rank     VARCHAR(128) NULL,
   employment_type   VARCHAR(16)  NULL,
@@ -793,13 +804,12 @@ CREATE TABLE IF NOT EXISTS transfers (
   rejection_reason  VARCHAR(512) NULL,
   approvals         JSON         NOT NULL,
   history           JSON         NOT NULL,
-  raised_by         VARCHAR(20)  NULL,
   created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_transfers_queue (status, created_at),
   KEY idx_transfers_depts (from_dept, to_dept),
-  KEY idx_transfers_member (member_discord_id)
+  KEY idx_transfers_creator (created_by_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Per-ticket chat. `internal = 1` is the staff-only thread; `internal = 0` is
@@ -812,6 +822,7 @@ CREATE TABLE IF NOT EXISTS transfer_messages (
   internal      TINYINT(1)   NOT NULL DEFAULT 0,
   author_id     VARCHAR(20)  NULL,
   author_name   VARCHAR(128) NOT NULL,
+  author_avatar VARCHAR(512) NULL,
   body          TEXT         NOT NULL,
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -824,13 +835,36 @@ CREATE TABLE IF NOT EXISTS transfer_messages (
 -- counts as present while last_seen is inside the TTL, and reads filter on it
 -- rather than relying on anything having cleaned up.
 CREATE TABLE IF NOT EXISTS transfer_viewers (
-  transfer_id VARCHAR(32)  NOT NULL,
-  viewer_id   VARCHAR(20)  NOT NULL,
-  viewer_name VARCHAR(128) NOT NULL,
-  last_seen   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  transfer_id  VARCHAR(32)  NOT NULL,
+  viewer_id    VARCHAR(20)  NOT NULL,
+  viewer_name  VARCHAR(128) NOT NULL,
+  viewer_avatar VARCHAR(512) NULL,
+  last_seen    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (transfer_id, viewer_id),
   KEY idx_transfer_viewers_seen (last_seen),
   CONSTRAINT fk_transfer_viewers FOREIGN KEY (transfer_id)
+    REFERENCES transfers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- How much of each thread a viewer has read.
+--
+-- Upstream keeps this in a React ref seeded at zero (app/page.jsx, TicketChat),
+-- so the baseline dies with the component: reopen a ticket and every internal
+-- message counts as unread again — five notes you already read still show as
+-- five. Storing it per viewer per ticket makes the badge mean "since you last
+-- looked" rather than "since this component mounted", and it follows the person
+-- rather than the browser they happened to read it in.
+--
+-- Counts, not timestamps: the badge is a count, and comparing two integers
+-- cannot disagree with the number rendered next to it the way a clock can.
+CREATE TABLE IF NOT EXISTS transfer_reads (
+  transfer_id   VARCHAR(32) NOT NULL,
+  viewer_id     VARCHAR(20) NOT NULL,
+  public_seen   INT         NOT NULL DEFAULT 0,
+  internal_seen INT         NOT NULL DEFAULT 0,
+  updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (transfer_id, viewer_id),
+  CONSTRAINT fk_transfer_reads FOREIGN KEY (transfer_id)
     REFERENCES transfers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

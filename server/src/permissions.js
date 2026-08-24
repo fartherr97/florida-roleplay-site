@@ -188,14 +188,7 @@ export const PERMISSION_GROUPS = [
         key: "transfers.view",
         label: "Open the transfer portal",
         detail:
-          "See the portal and raise a transfer. Which tickets somebody can read is decided per ticket — your own, or ones involving a department you command.",
-      },
-      {
-        key: "transfers.manage",
-        label: "Oversee every transfer",
-        detail:
-          "Read and act on every ticket regardless of department, and close or reopen one. Directorship holds this; department heads already sign for their own department without it.",
-        sensitive: true,
+          "Show the portal in the menus. Authority inside it is not this grant: a ticket is readable by whoever raised it and by the command of either department on it, Directorship sees every one, and the portal re-checks all of that on every call.",
       },
     ],
   },
@@ -357,12 +350,12 @@ export const DEFAULT_GRANTS = {
   "applications.manage": ["head_admin", "directorship", "ownership"],
   "applications.review": ["head_admin", "directorship", "ownership"],
 
-  // Anybody in a department may raise a transfer; which tickets they can then
-  // read is decided per ticket rather than by this grant. transfers.manage is
-  // the oversight tier over every department, which is Directorship — the
-  // department command sign for their own side without it.
+  // A menu gate and nothing more. The transfer portal decides who may read and
+  // act on a ticket from the department roles themselves — the way the app it
+  // was ported from does — so there is no second grant here that could disagree
+  // with it: your own ticket, or one involving a department you command, and
+  // Directorship over all of them.
   "transfers.view": ["member", "whitelisted", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
-  "transfers.manage": ["directorship", "ownership"],
 
   // Department command file against their own department without a grant, the
   // same way they build their own applications. These are the community-wide

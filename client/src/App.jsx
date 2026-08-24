@@ -30,10 +30,7 @@ import ApplySubmitted from "./pages/apply/ApplySubmitted";
 import ApplyManage from "./pages/apply/ApplyManage";
 import ApplyBuilder from "./pages/apply/ApplyBuilder";
 import ApplyReview from "./pages/apply/ApplyReview";
-import TransferPortal from "./pages/transfers/TransferPortal";
-import TransferNew from "./pages/transfers/TransferNew";
-import TransferTicket from "./pages/transfers/TransferTicket";
-import TransferSettings from "./pages/transfers/TransferSettings";
+import TransferPortalApp from "./pages/transfers/TransferPortalApp";
 import SupportHome from "./pages/support/SupportHome";
 import SupportNew from "./pages/support/SupportNew";
 import SupportQueue from "./pages/support/SupportQueue";
@@ -100,6 +97,15 @@ export default function App() {
       <AuthProvider>
         <BotAuthProvider>
         <Routes>
+          {/* The Emergency Services transfer portal, ported from
+              fartherr97/es-transfer-portal. It sits outside PublicLayout on
+              purpose: upstream is a whole application with its own top bar,
+              landing page and footer, and it is those screens the port is of.
+              /t/ prefixes the ticket id so no ticket can shadow a tab name. */}
+          <Route path="/transfers" element={<TransferPortalApp />} />
+          <Route path="/transfers/t/:ticketId" element={<TransferPortalApp />} />
+          <Route path="/transfers/:section" element={<TransferPortalApp />} />
+
           <Route element={<PublicLayout />}>
             <Route index element={<Landing />} />
             <Route path="rules" element={<Rules />} />
@@ -115,13 +121,6 @@ export default function App() {
             <Route path="apply/manage/:id" element={<ApplyBuilder />} />
             <Route path="apply/:slug" element={<ApplyForm />} />
             <Route path="apply/:slug/submitted" element={<ApplySubmitted />} />
-
-            {/* The Emergency Services transfer portal. /new and /settings sit
-                above /:id so a ticket id can never shadow them. */}
-            <Route path="transfers" element={<TransferPortal />} />
-            <Route path="transfers/new" element={<TransferNew />} />
-            <Route path="transfers/settings" element={<TransferSettings />} />
-            <Route path="transfers/:id" element={<TransferTicket />} />
 
             {/* The support portal. The named routes sit above /:id so a ticket
                 reference can never shadow them. */}

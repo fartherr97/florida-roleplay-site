@@ -11,7 +11,7 @@
  * deployment later works with no code change:
  *
  *   1. an explicit DEPARTMENT_MAP entry for the host  (host=id,host=id,…)
- *   2. the first DNS label of a real subdomain        (fhp.floridarp.gg → fhp)
+ *   2. the first DNS label of a real subdomain        (fhp.flrp.us → fhp)
  *   3. nothing — the path decides
  *
  * Whatever the source, the id is validated before it reaches a query.
@@ -38,7 +38,7 @@ export function departmentFromHost(host) {
   const mapped = parseMap(process.env.DEPARTMENT_MAP)[name];
   if (mapped) return mapped;
 
-  // A bare apex (floridarp.gg) or a www host is the community site, not a
+  // A bare apex (flrp.us) or a www host is the community site, not a
   // department; only a real third label counts as a subdomain.
   const labels = name.split(".");
   if (labels.length < 3 || labels[0] === "www") return null;

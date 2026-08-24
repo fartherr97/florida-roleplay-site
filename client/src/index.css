@@ -48,6 +48,55 @@ body {
   background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
 }
 
+/* ─── Transfer portal tokens ──────────────────────────────────────────────
+   The ported ES Transfer Portal addresses the palette through flat names
+   (`var(--color-primary)`, not `primary-500`). They are aliases of the scale
+   above rather than second copies of the hex, so the two cannot drift. */
+:root {
+  --color-primary: var(--color-primary-500);
+  --color-hover: var(--color-primary-600);
+  --color-bg: #0a0e1a;
+  --color-border: rgba(255, 255, 255, 0.07);
+}
+
+/* Nav tab underline that swipes in on hover and stays on the active tab. */
+.nav-tab { position: relative; }
+.nav-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.nav-tab:not(.nav-active):hover::after {
+  background: linear-gradient(90deg, #3b82f6, #93c5fd);
+  transform: scaleX(1);
+}
+.nav-tab.nav-active::after {
+  background: #3b82f6;
+  transform: scaleX(1);
+}
+
+@keyframes toast-in {
+  from { transform: translateY(0.6rem) scale(0.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes toast-out {
+  from { transform: translateY(0) scale(1); opacity: 1; }
+  to   { transform: translateY(0.6rem) scale(0.96); opacity: 0; }
+}
+.toast-enter { animation: toast-in  0.26s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.toast-exit  { animation: toast-out 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The toast still has to arrive and leave, so these only lose their travel. */
+  .toast-enter, .toast-exit { animation-duration: 0.01ms; }
+}
+
 .card {
   background-color: var(--color-surface-1);
   border: 1px solid rgba(255, 255, 255, 0.07);
