@@ -557,6 +557,23 @@ was withdrawn, and the background check counts it separately rather than
 dropping it. An action that quietly vanished is indistinguishable from one that
 never happened, and the difference matters to whoever it was filed against.
 
+### Filing from either page
+
+The filing form is one component (`components/hub/DaActionForm.jsx`) used by
+both the DA Hub, where it sits collapsed at the top, and the DA Database, where
+**Add DA** opens it in a dialog. Two copies of a form that must agree is how a
+field ends up required on one screen and optional on the other.
+
+Opening it from the Database while a Discord ID is in the search box seeds the
+member fields from the record already on screen, name included — filing against
+somebody whose history you are reading should not mean copying their ID back out
+of the search box.
+
+The body is auto-picked only when there is exactly one to pick. It decides
+whether an action reads as Staff or Department in `/bgcheck`, so for anybody who
+can file for several — Directorship, Ownership — a default that quietly sticks
+is worse than one more click.
+
 ### Who can file and who can read
 
 Department command file against their own department without a grant, the same

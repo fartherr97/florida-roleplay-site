@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Loader2, Plus, Search } from "lucide-react";
+import { ChevronDown, Loader2, Search } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -8,6 +8,7 @@ import Field from "../../components/ui/Field";
 import Select from "../../components/ui/Select";
 import Modal from "../../components/ui/Modal";
 import { TextArea, TextInput } from "../../components/ui/TextInput";
+import DaActionForm from "../../components/hub/DaActionForm";
 import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { cn } from "../../lib/cn";
@@ -20,10 +21,8 @@ import {
   bodyLabel,
   canEditAction,
   canFileFor,
-  validateAction,
+  filingBodiesFor,
 } from "../../lib/discipline";
-
-const BLANK = { type: "verbal_warning", bodyId: "", targetName: "", targetDiscordId: "", reason: "", expiresAt: "" };
 
 /**
  * The DA Hub — where an action is filed, and the list of what has been.
@@ -78,7 +77,7 @@ export default function HubDaHub() {
     );
   }, [data, tab, query]);
 
-  const canFileAnywhere = ACTION_BODIES.some((body) => canFileFor(body.id, ctx));
+  const canFileAnywhere = filingBodiesFor(ctx).length > 0;
   const totals = data?.totals ?? { mine: 0, all: 0 };
 
   return (
@@ -104,7 +103,7 @@ export default function HubDaHub() {
           </button>
           {formOpen && (
             <div className="border-t border-white/[0.06] px-5 py-5">
-              <ActionForm
+              <DaActionForm
                 ctx={ctx}
                 onFiled={() => {
                   setFormOpen(false);
@@ -246,120 +245,6 @@ function TabButton({ active, onClick, label, count }) {
     >
       {label} <span className="tabular-nums text-slate-500">({count})</span>
     </button>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Filing
- * ------------------------------------------------------------------ */
-
-function ActionForm({ ctx, onFiled }) {
-  // Only the bodies this person may actually file for. Offering the rest would
-  // be offering a 403.
-  const bodies = useMemo(() => ACTION_BODIES.filter((body) => canFileFor(body.id, ctx)), [ctx]);
-  const [draft, setDraft] = useState({ ...BLANK, bodyId: bodies[0]?.id ?? "" });
-  const [errors, setErrors] = useState({});
-  const [failure, setFailure] = useState(null);
-  const [busy, setBusy] = useState(false);
-
-  const set = (patch) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setErrors({});
-    setFailure(null);
-  };
-
-  // Only the ones that run out need an end date — a termination has no end.
-  const needsExpiry = ["suspension", "pto_restriction"].includes(draft.type);
-
-  async function submit(event) {
-    event.preventDefault();
-    const check = validateAction(draft);
-    if (!check.ok) {
-      setErrors(check.errors);
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await api.fileDisciplinaryAction({
-        ...draft,
-        expiresAt: needsExpiry && draft.expiresAt ? draft.expiresAt : null,
-      });
-      if (result?.ok) {
-        setDraft({ ...BLANK, bodyId: bodies[0]?.id ?? "" });
-        onFiled();
-      } else {
-        setFailure(result?.message ?? "That was not filed.");
-      }
-    } catch (err) {
-      if (err?.errors) setErrors(err.errors);
-      else setFailure(err?.message ?? "That was not filed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} noValidate className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Action" required hint={errors.type}>
-          <Select
-            value={draft.type}
-            options={ACTION_TYPES.map((t) => ({ value: t.id, label: t.label }))}
-            onChange={(type) => set({ type })}
-          />
-        </Field>
-        <Field label="Filed on behalf of" required hint={errors.bodyId}>
-          <Select
-            value={draft.bodyId}
-            options={bodies.map((b) => ({ value: b.id, label: b.label }))}
-            placeholder="Pick a body"
-            onChange={(bodyId) => set({ bodyId })}
-          />
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Member" required hint={errors.targetName}>
-          <TextInput
-            value={draft.targetName}
-            onChange={(e) => set({ targetName: e.target.value })}
-            placeholder="C. Alex"
-          />
-        </Field>
-        <Field label="Their Discord ID" required hint={errors.targetDiscordId}>
-          <TextInput
-            value={draft.targetDiscordId}
-            inputMode="numeric"
-            onChange={(e) => set({ targetDiscordId: e.target.value.trim() })}
-            className="font-mono text-sm"
-          />
-        </Field>
-      </div>
-
-      <Field label="Reason" required hint={errors.reason ?? "This is the record. Write it for somebody reading it in six months."}>
-        <TextArea rows={3} value={draft.reason} onChange={(e) => set({ reason: e.target.value })} />
-      </Field>
-
-      {needsExpiry && (
-        <Field label="Runs until" hint="Leave blank if it has no end date.">
-          <TextInput
-            type="date"
-            value={draft.expiresAt}
-            onChange={(e) => set({ expiresAt: e.target.value })}
-            className="[color-scheme:dark]"
-          />
-        </Field>
-      )}
-
-      {failure && <p className="text-sm text-rose-300">{failure}</p>}
-
-      <div className="flex justify-end">
-        <Button type="submit" disabled={busy}>
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-          File action
-        </Button>
-      </div>
-    </form>
   );
 }
 

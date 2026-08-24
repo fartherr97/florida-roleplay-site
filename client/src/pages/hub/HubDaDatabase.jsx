@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search, ShieldAlert, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, Search, ShieldAlert, TriangleAlert } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
+import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
 import Select from "../../components/ui/Select";
 import { TextInput } from "../../components/ui/TextInput";
+import DaActionForm from "../../components/hub/DaActionForm";
+import { useAuth } from "../../context/useAuth";
 import { api } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import { cn } from "../../lib/cn";
@@ -16,6 +20,7 @@ import {
   actionTone,
   backgroundFor,
   bodyLabel,
+  filingBodiesFor,
   isVerbal,
   sourceOf,
 } from "../../lib/discipline";
@@ -51,7 +56,9 @@ const WINDOWS = [
  * folding in their head, which is where a suspension gets missed.
  */
 export default function HubDaDatabase() {
+  const { user, hasPermission } = useAuth();
   const [actions, setActions] = useState(null);
+  const [adding, setAdding] = useState(false);
   // Stamped once. A window boundary that slides while somebody is reading would
   // drop a row out from under them mid-scroll.
   const [asOf] = useState(() => Date.now());
@@ -60,7 +67,7 @@ export default function HubDaDatabase() {
   const [body, setBody] = useState("all");
   const [window, setWindow] = useState(String(DEFAULT_WINDOW_DAYS));
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let active = true;
     api
       .disciplinaryActions()
@@ -70,6 +77,17 @@ export default function HubDaDatabase() {
       active = false;
     };
   }, []);
+
+  useEffect(load, [load]);
+
+  const ctx = useMemo(() => {
+    const held = ["discipline.file", "discipline.view", "discipline.manage"].filter((key) =>
+      hasPermission(key),
+    );
+    return { user, roleKeys: user?.roles ?? [], permissions: new Set(held) };
+  }, [user, hasPermission]);
+
+  const canFile = filingBodiesFor(ctx).length > 0;
 
   const windowDays = window === "all" ? 3650 : Number(window);
 
@@ -100,6 +118,17 @@ export default function HubDaDatabase() {
     [idQuery, actions, windowDays, asOf],
   );
 
+  // Filing against the record you are already reading should not mean copying
+  // the ID back out of the search box. The name comes from the newest row on
+  // that ID, so a member already on file does not get typed in a second way.
+  const prefill = useMemo(() => {
+    if (!idQuery) return undefined;
+    const seen = (actions ?? [])
+      .filter((action) => action.targetDiscordId === idQuery)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    return { targetDiscordId: idQuery, targetName: seen?.targetName ?? "" };
+  }, [idQuery, actions]);
+
   return (
     <>
       <HubPageHeader
@@ -107,7 +136,17 @@ export default function HubDaDatabase() {
         eyebrow="Staff Hub"
         title="DA Database"
         subtitle="Every action on record, across the staff team and all five departments. Paste a Discord ID for the same summary /bgcheck gives in Discord."
-        actions={<Badge tone="rose">Handle with discretion</Badge>}
+        actions={
+          <div className="flex items-center gap-3">
+            <Badge tone="rose">Handle with discretion</Badge>
+            {canFile && (
+              <Button size="sm" onClick={() => setAdding(true)}>
+                <Plus className="size-4" />
+                Add DA
+              </Button>
+            )}
+          </div>
+        }
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -180,6 +219,26 @@ export default function HubDaDatabase() {
           ))}
         </div>
       )}
+
+      <Modal
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add disciplinary action"
+        subtitle="It lands on the same record /bgcheck reads in Discord."
+        className="max-w-2xl"
+      >
+        <DaActionForm
+          // Remounted per opening so a cancelled draft is not still sitting
+          // there next time, and so a new search seeds a new prefill.
+          key={`${adding}:${prefill?.targetDiscordId ?? ""}`}
+          ctx={ctx}
+          prefill={prefill}
+          onFiled={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      </Modal>
     </>
   );
 }

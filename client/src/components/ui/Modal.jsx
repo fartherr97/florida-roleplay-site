@@ -75,7 +75,9 @@ export default function Modal({
                 <X className="size-4" />
               </button>
             </div>
-            <div className="p-5">{children}</div>
+            {/* Scrolls rather than clipping: the card sets overflow-hidden, so a
+                form taller than the window would otherwise lose its footer. */}
+            <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-5">{children}</div>
           </motion.div>
         </div>
       )}

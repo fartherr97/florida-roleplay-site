@@ -1,11 +1,18 @@
 import { cn } from "../../lib/cn";
 
-/** Uppercase micro-label wrapper for form controls, with optional hint text. */
+/**
+ * Uppercase micro-label wrapper for form controls, with optional hint text.
+ *
+ * `error` takes precedence over `hint` and renders in rose. They are separate
+ * props on purpose: a rejection styled exactly like the guidance underneath it
+ * is a rejection people scroll straight past.
+ */
 export default function Field({
   label,
   htmlFor,
   required = false,
   hint,
+  error,
   className,
   children,
 }) {
@@ -21,7 +28,13 @@ export default function Field({
         </label>
       )}
       {children}
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      {error ? (
+        <p role="alert" className="text-xs text-rose-300">
+          {error}
+        </p>
+      ) : (
+        hint && <p className="text-xs text-slate-500">{hint}</p>
+      )}
     </div>
   );
 }

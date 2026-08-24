@@ -148,6 +148,15 @@ export function canFileFor(bodyId, { roleKeys = [], permissions = new Set() } = 
   return commandRoleKeys(bodyId).some((key) => new Set(roleKeys).has(key));
 }
 
+/**
+ * The bodies a caller may file on behalf of. An empty list means no filing at
+ * all, which is what the UI keys "can this person add an action" off — offering
+ * a body they cannot use is offering a 403.
+ */
+export function filingBodiesFor(ctx) {
+  return ACTION_BODIES.filter((body) => canFileFor(body.id, ctx));
+}
+
 /** The command role keys for a department, resolved off the role map at call time. */
 let COMMAND_CACHE = null;
 function commandRoleKeys(bodyId) {
