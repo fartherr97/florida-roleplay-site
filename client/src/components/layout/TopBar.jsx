@@ -151,8 +151,16 @@ export default function TopBar() {
                 base, and utility order in the stylesheet — not in the attribute
                 — would decide the winner. The drawer carries both below sm. */}
             <span className="hidden sm:block">
-              <Button as={Link} to="/apply" variant="secondary" size="sm">
+              <Button
+                as="a"
+                href={SITE.applyUrl}
+                target="_blank"
+                rel="noreferrer"
+                variant="secondary"
+                size="sm"
+              >
                 Apply
+                <ExternalLink className="size-4" />
               </Button>
             </span>
 

@@ -33,6 +33,10 @@ export const SITE = {
   serverAddress: "play.flrp.us",
   // TODO: replace with the real Discord invite.
   discordInvite: "https://discord.gg/your-invite-here",
+  // Applications, forms and CAD are handled by Sonoran now, not by this site.
+  // TODO: replace with the community's real Sonoran apply/forms URL. Every
+  // "Apply" affordance points here, so it only needs setting in one place.
+  applyUrl: "https://flrp.sonoransoftware.com",
   // TODO: replace with the real Tebex store URL.
   storeUrl: "https://florida-roleplay.tebex.io",
   // TODO: name the AI assistant.

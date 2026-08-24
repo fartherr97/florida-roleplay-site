@@ -103,26 +103,6 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
-    id: "applications",
-    label: "Applications",
-    description:
-      "Who builds the department application forms, and who decides the submissions they bring in.",
-    permissions: [
-      {
-        key: "applications.manage",
-        label: "Build applications anywhere",
-        detail:
-          "Create and edit applications for every department, not just your own. Department command already build their own without this.",
-      },
-      {
-        key: "applications.review",
-        label: "Review every application",
-        detail:
-          "Read and decide submissions across every department. Each application also names its own reviewer roles, which the bot enforces on the Discord buttons.",
-      },
-    ],
-  },
-  {
     id: "support",
     label: "Support portal",
     description:
@@ -346,8 +326,6 @@ export const DEFAULT_GRANTS = {
   // Department command build their own department's applications without a
   // grant — canManageApplications knows the command role for each. These two are
   // the community-wide versions, for the people who oversee every department.
-  "applications.manage": ["head_admin", "directorship", "ownership"],
-  "applications.review": ["head_admin", "directorship", "ownership"],
 
   // A menu gate and nothing more. The transfer portal decides who may read and
   // act on a ticket from the department roles themselves — the way the app it
@@ -357,7 +335,7 @@ export const DEFAULT_GRANTS = {
   "transfers.view": ["member", "whitelisted", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
 
   // Department command file against their own department without a grant, the
-  // same way they build their own applications. These are the community-wide
+  // same way they run their own roster. These are the community-wide
   // versions — and reading somebody's whole record is its own grant from
   // filing one, because the two are not the same act.
   "discipline.file": ["senior_admin", "head_admin", "directorship", "ownership"],

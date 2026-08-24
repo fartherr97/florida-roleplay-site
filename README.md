@@ -119,9 +119,9 @@ shared-package overhead.
 
 ### Staff Hub — `/staff-hub`
 
-The staff bar is a **flat row of tabs**, not dropdown groups. Seventeen
+The staff bar is a **flat row of tabs**, not dropdown groups. Sixteen
 destinations do not fit in one row, so the split is by how often a page is
-opened rather than by what it is about: the eleven a moderator touches in a
+opened rather than by what it is about: the ten a moderator touches in a
 shift are tabs, and everything configured once and then left alone lives behind
 the last one.
 
@@ -136,7 +136,6 @@ the last one.
 | DA Database | Look up one member's disciplinary background | `staff.da_view` |
 | Analytics | Counted from disciplinary actions, tickets and the roster | `staff.view` |
 | Promotion Board | Nominations and the vote | `promotions.view` |
-| Applications | The review queue for `/apply` | `staff.view` |
 | Site Administration | Everything below | `staff.view` |
 
 A tab whose permission the viewer does not hold is dropped rather than rendered
@@ -157,7 +156,7 @@ Two pages the bar no longer carries — the Staff Dashboard (this week's claim
 volume and response times) and the Trial Mod Checklist — sit as cards on Home
 instead. They fall either side of the split the bar is built on: not what a
 moderator opens every shift, not what a director configures once a month. A
-twelfth tab would have cost the ten that matter more than those two gain.
+eleventh tab would have cost the ten that matter more than those two gain.
 
 **Site Administration** is a page, not a menu: four groups — access control
 (Permissions, Discord Role Mapping), the exam backend (Recent Submissions,
@@ -382,104 +381,21 @@ community-wide: `forms.review` grades anything, `forms.manage` authors. An
 anonymous form records no name and no Discord id — the identity is not stored
 rather than stored and hidden.
 
-## Applications — `/apply`
+## Applications — Sonoran
 
-Department command staff build their own application forms; anybody can fill one
-in; every submission is posted to Discord with an Approve and Deny button under
-it. The **Apply** button in the top bar is the front door.
+Applications, forms and CAD are handled by **Sonoran** now, not by this site.
+Every "Apply" affordance — the top-bar button, the mobile drawer, the nav
+Applications entry and each department's *Apply to …* CTA — links out to
+`SITE.applyUrl` (`client/src/data/mockData.js`), which is the one place the
+Sonoran URL is set.
 
-An application is one JSON document: sections, fields, who may apply, and where
-in Discord it goes. The engine is `src/lib/applicationConfig.js`, mirrored at
-`server/src/lib/applicationConfig.js`, and both sides read the same document —
-so what the builder previews is what the applicant fills in and what the bot
-receives.
-
-### Not the same thing as a form
-
-`src/lib/forms.js` is graded, lives inside a hub, and answers to somebody who is
-already a member. An application is filled in by somebody who may hold no roles
-at all, is routed to a channel for a decision, and its outcome is a yes or a no
-rather than a score. Sharing one document type would have meant every field
-carrying a `points` value nobody uses.
-
-The older fixed whitelist form at `/applications` is still there and still
-works. This system does not replace it yet; it uses its own tables
-(`custom_applications`, `application_submissions`, `application_dispatches`) and
-its own `/api/apply` router so the two do not collide.
-
-### What a department can configure
-
-Eighteen field types, including the identity fields that validate themselves —
-Discord ID, Steam hex, email, link, age. Sections, headings and read-only
-statements. Per-field length and number ranges. **Conditional fields**: any field
-can be shown only when an earlier multiple-choice, dropdown, checkbox or
-agreement field has a particular answer, which is how one form covers "have you
-done this before?" without asking everybody the follow-up.
-
-One condition per field, deliberately — a rule builder that nests is one nobody
-can read back six months later.
-
-### Who may build, and who may decide
-
-Each department's command role (Colonel, Sheriff, Chief, Fire Chief, Director)
-builds that department's applications and its subdivisions'. `applications.manage`
-and `applications.review` are the community-wide versions for people who oversee
-every department. A Sheriff editing an FHP application is refused, and so is
-moving an application into a department you do not command.
-
-Per-application **reviewer role IDs** are raw Discord snowflakes rather than the
-site's role keys, because the bot enforces them on the buttons inside Discord,
-where a key means nothing. On the site those ids are translated through the
-Discord Role Mapping page where they happen to be mapped — an unmapped reviewer
-role still works in Discord, it just cannot be recognised here.
-
-### The Discord half, and what your bot has to do
-
-**This site never talks to Discord.** It cannot: a website cannot attach an
-interactive component to a message, and it cannot receive the click either. Only
-a bot application can do both. So every message is queued and the bot owns the
-buttons.
-
-On submission the site writes a row to `application_dispatches` — always — and
-then, if `BOT_DISPATCH_URL` is set, pushes it to the bot as well. The push is an
-optimisation; the queue is the contract, and it is what makes a bot outage cost
-nothing but time.
-
-The payload is complete: channel id, the ping mentions, the embed, the two
-buttons with their `custom_id`s already built, and a `meta` block carrying the
-reviewer and on-approval role ids. Your bot has nothing to invent.
-
-| Your bot calls | To |
-| --- | --- |
-| `GET /api/apply/bot/outbox` | Collect what has not been posted yet, oldest first |
-| `POST /api/apply/bot/outbox/:id/delivered` | Confirm it posted, with `messageId` so it can edit later |
-| `POST /api/apply/bot/outbox/:id/failed` | Report a failure, so it shows up rather than vanishing |
-| `POST /api/apply/bot/submissions/:reference/decision` | Report an Approve or Deny press |
-
-All four take `Authorization: Bearer $BOT_TOKEN`, the same shared secret the
-roster sync uses. Button `custom_id`s are `app_approve:<reference>` and
-`app_deny:<reference>`, so the reference to report back is in the id.
-
-The bot is trusted to have checked the reviewer roles, because it is the only
-thing that can. What is not trusted is the transition: a decision from Discord
-and a decision from the site go through the same guarded `UPDATE ... WHERE
-status = 'pending'`, so two people deciding at once cannot both win — the second
-is told who got there first.
-
-Deciding also queues a follow-up dispatch, so the bot can edit the original
-message: the embed turns green or red, the outcome and reason are written into
-it, and the buttons come off.
-
-### Two things the site will not pretend about
-
-A submission that could not be stored is reported as **not received**. An
-application is a message to a department, and telling somebody theirs arrived
-when it did not is the one answer that costs them something real — so unlike
-every other read on this site, the apply path has no seed fallback for writes.
-
-Each submission stores its own copy of the application. A question edited
-tomorrow never rewrites what somebody was asked today, and deleting an
-application leaves its submissions readable.
+The custom application builder that used to live at `/apply` — the form
+designer, the review queue, the Discord embed dispatch — has been removed:
+pages, `applicationConfig` lib, seeds, the `/api/apply` router and the
+`custom_applications` / `application_submissions` / `application_dispatches`
+tables. The older fixed department-listing pages at `/applications` are still
+here and still render; nothing but a typed URL reaches them now, so they are the
+next thing to retire once Sonoran covers that ground too.
 
 ## Support portal — `/support`
 

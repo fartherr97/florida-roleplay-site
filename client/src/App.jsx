@@ -24,12 +24,6 @@ import SignIn from "./pages/SignIn";
 import CreateAccount from "./pages/CreateAccount";
 import HubShell from "./components/hub/HubShell";
 import DeptShell from "./components/dept/DeptShell";
-import ApplyIndex from "./pages/apply/ApplyIndex";
-import ApplyForm from "./pages/apply/ApplyForm";
-import ApplySubmitted from "./pages/apply/ApplySubmitted";
-import ApplyManage from "./pages/apply/ApplyManage";
-import ApplyBuilder from "./pages/apply/ApplyBuilder";
-import ApplyReview from "./pages/apply/ApplyReview";
 import TransferPortalApp from "./pages/transfers/TransferPortalApp";
 import SupportHome from "./pages/support/SupportHome";
 import SupportNew from "./pages/support/SupportNew";
@@ -113,14 +107,10 @@ export default function App() {
             <Route path="applications" element={<Applications />} />
             <Route path="applications/:type" element={<ApplicationForm />} />
 
-            {/* The configurable application system. /manage sits above /:slug so
-                a department cannot claim the address by naming a form "manage". */}
-            <Route path="apply" element={<ApplyIndex />} />
-            <Route path="apply/manage" element={<ApplyManage />} />
-            <Route path="apply/manage/submissions/:reference" element={<ApplyReview />} />
-            <Route path="apply/manage/:id" element={<ApplyBuilder />} />
-            <Route path="apply/:slug" element={<ApplyForm />} />
-            <Route path="apply/:slug/submitted" element={<ApplySubmitted />} />
+
+
+
+
 
             {/* The support portal. The named routes sit above /:id so a ticket
                 reference can never shadow them. */}

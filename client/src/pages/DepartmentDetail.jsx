@@ -1,6 +1,6 @@
 import { createElement, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowRight, Car, Users } from "lucide-react";
+import { ArrowRight, Car, ExternalLink, Users } from "lucide-react";
 import Section from "../components/layout/Section";
 import PageHeader from "../components/layout/PageHeader";
 import Card from "../components/ui/Card";
@@ -11,7 +11,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/useAuth";
 import { iconFor } from "../lib/icons";
 import { toneTile } from "../lib/tones";
-import { departments as seedDepartments } from "../data/mockData";
+import { SITE, departments as seedDepartments } from "../data/mockData";
 
 /** Detail page for one agency — banner, mission, ranks, fleet and recruitment. */
 export default function DepartmentDetail() {
@@ -105,12 +105,15 @@ export default function DepartmentDetail() {
           </span>
           {department.hiring && (
             <Button
-              as={Link}
-              to={`/applications/${department.applicationType}`}
+              as="a"
+              href={SITE.applyUrl}
+              target="_blank"
+              rel="noreferrer"
               size="sm"
               className="sm:ml-auto"
             >
               Apply to {department.abbr}
+              <ExternalLink className="size-4" />
             </Button>
           )}
         </div>

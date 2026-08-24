@@ -88,8 +88,8 @@ export const STAFF_HUB = {
   /**
    * A flat row of tabs rather than dropdown groups.
    *
-   * The staff team carries seventeen destinations, which is far too many for one
-   * row — so the eleven that get opened daily are tabs, and everything that is
+   * The staff team carries sixteen destinations, which is far too many for one
+   * row — so the ten that get opened daily are tabs, and everything that is
    * configured once and then left alone lives behind Site Administration. That
    * is what stops the bar becoming a menu you have to read.
    */
@@ -104,7 +104,6 @@ export const STAFF_HUB = {
     { to: "/staff-hub/da-database", label: "DA Database", icon: "Search", permission: "staff.da_view" },
     { to: "/staff-hub/analytics", label: "Analytics", icon: "ChartColumn", permission: "staff.view" },
     { to: "/staff-hub/promotion-board", label: "Promotion Board", icon: "Award", permission: "promotions.view" },
-    { to: "/apply/manage", label: "Applications", icon: "Inbox", permission: "staff.view" },
     { to: "/staff-hub/administration", label: "Site Administration", icon: "SlidersHorizontal", permission: "staff.view", accent: true },
   ],
 

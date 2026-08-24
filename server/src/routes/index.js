@@ -15,7 +15,6 @@ import permissionsRouter from "./permissions.js";
 import departmentHubRouter from "./departmentHub.js";
 import formsRouter from "./forms.js";
 import promotionsRouter from "./promotions.js";
-import applyRouter from "./applications.js";
 import transfersRouter from "./transfers.js";
 import disciplineRouter from "./discipline.js";
 import supportRouter from "./support.js";
@@ -48,10 +47,6 @@ router.use("/forms", formsRouter);
 // The promotion board spans the staff ladder rather than one hub, so it sits
 // beside them too.
 router.use("/promotions", promotionsRouter);
-// The configurable application system. Mounted at /apply rather than
-// /applications because that path already belongs to the older fixed whitelist
-// form, and the two are separate systems until that one is retired.
-router.use("/apply", applyRouter);
 // The Emergency Services transfer portal, ported from the standalone
 // es-transfer-portal app. It shares this site's session and permission model
 // rather than carrying the Discord OAuth and role-map file it used to.
