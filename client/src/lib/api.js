@@ -22,6 +22,17 @@ export const USE_API = true;
 const BASE = "/api";
 
 /**
+ * The full-page URL that starts the Discord sign-in. This is a top-level
+ * navigation, not a fetch — the browser has to follow Discord's redirects and
+ * come back with the session cookie set — so callers assign it to
+ * `window.location`, they do not await it.
+ */
+export function loginUrl(returnTo = "/") {
+  const to = typeof returnTo === "string" && returnTo.startsWith("/") ? returnTo : "/";
+  return `${BASE}/auth/login?returnTo=${encodeURIComponent(to)}`;
+}
+
+/**
  * While Discord OAuth is stubbed, the Staff Hub can browse as any rank. The
  * chosen rank rides along on every request so the API resolves the same rank the
  * UI is rendering — otherwise a previewed Head Admin would see the page and then a
@@ -233,6 +244,11 @@ export const api = {
     }),
 
   me: () => get("/me", mock.mockUser),
+
+  /* Discord OAuth. login is a full-page redirect (see loginUrl); these two are
+     the fetches the UI makes around it. */
+  authConfig: () => get("/auth/config", { configured: false }),
+  logout: () => post("/auth/logout", {}, () => ({ ok: true })),
 
   storeTiers: () => get("/store/tiers", mock.storeTiers),
   supporters: () => get("/supporters", mock.supporters),

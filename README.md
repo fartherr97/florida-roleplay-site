@@ -856,9 +856,9 @@ permission keys, never ranks.
 
 ### Preview mode
 
-Because Discord OAuth is still stubbed, each hub landing offers a rank switcher —
-covering the whole ladder from Member upward — so either portal can be reviewed
-as any rank. The chosen rank is kept in
+Each hub landing offers a rank switcher — covering the whole ladder from Member
+upward — so either portal can be reviewed as any rank without switching Discord
+accounts. The chosen rank is kept in
 `sessionStorage` and sent as an `x-preview-rank` header, which the API honours —
 otherwise a previewed Director would see the page and then a 403 for its data.
 Both halves are disabled when `NODE_ENV=production`, and the panel hides itself
@@ -932,15 +932,50 @@ bot's own logs.
 
 ## Authentication
 
-Discord OAuth is **not implemented yet**. Until it is, the API resolves the
-caller from `DEV_USER_ID` (or an `x-discord-id` header) and logs a warning at
-boot. That path is hard-disabled when `NODE_ENV=production`, so it cannot become
-a live bypass. `/sign-in` and `/create-account` are stubs that link to Discord.
+Sign-in is **Discord OAuth**. `/sign-in` sends the browser to `GET
+/api/auth/login`, which sets a short-lived CSRF `state` cookie and redirects to
+Discord's consent screen (`identify` scope only). Discord returns to `GET
+/api/auth/callback`, which:
 
-That development caller (`devUser` in `server/src/seed.js`, mirrored by `mockUser`
-in `client/src/data/mockData.js`) holds **Ownership**, so browsing locally shows
-the whole site rather than a moderator's slice of it. The preview switcher on
-either hub landing page is how you see it as anything lower.
+1. verifies the `state` cookie round-tripped, then exchanges the code for a
+   user access token;
+2. reads the user's identity (`id`, username, avatar) with that token;
+3. reads which roles they hold **in the guild** with the **bot token** — roles
+   are a property of the server, not something the browser can assert, so a
+   signed-in member cannot grant themselves a staff role;
+4. maps those Discord role IDs to this site's role keys through the same
+   `roster_role_map` the bot and the role-mapping page use (every guild member
+   is at least `member`), and writes the user and their roles;
+5. mints a session row and sets an `HttpOnly`, `SameSite=Lax`, `Secure`
+   session cookie.
+
+The cookie holds nothing but an opaque id. Identity and roles are read back from
+the database on every request (`resolveUser` in `server/src/middleware/requireRole.js`),
+so a role revoked in Discord and synced here takes effect on the next request
+rather than living frozen in a token, and signing out — or revoking a leaked
+cookie — is a single `DELETE`. `POST /api/auth/logout` does both.
+
+A member who is **not in the guild** is bounced back to `/sign-in?error=not_in_guild`
+with a "join the Discord first" line — that is the one outcome that is the user's
+to fix. Signing in with a guild account that holds no staff roles is not an error:
+it is an ordinary member, who can see the roster, the community pages, transfers
+and support, and gets a 403 with a clear denial page only where a staff
+permission is actually required.
+
+The five credentials the flow needs — `DISCORD_CLIENT_ID`,
+`DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` and
+`DISCORD_REDIRECT_URI` — live in the environment (see `server/.env.example`),
+never in the repo. If any is missing the site stays up, `GET /api/auth/config`
+reports `configured: false`, and the sign-in button says so instead of dead-ending.
+
+**Development caller.** Outside production only, the API still resolves a caller
+from `DEV_USER_ID` (or an `x-discord-id` header) when there is no session cookie,
+and logs a warning at boot. Those paths are hard-disabled when
+`NODE_ENV=production`, so none can become a live bypass. That development caller
+(`devUser` in `server/src/seed.js`, mirrored by `mockUser` in
+`client/src/data/mockData.js`) holds **Ownership**, so browsing locally shows the
+whole site rather than a moderator's slice of it. The preview switcher on either
+hub landing page is how you see it as anything lower.
 
 ## Domain
 

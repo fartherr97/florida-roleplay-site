@@ -1,21 +1,37 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus } from "lucide-react";
+import { ExternalLink, UserPlus } from "lucide-react";
 import Section from "../components/layout/Section";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import { api, loginUrl } from "../lib/api";
 import { SITE } from "../data/mockData";
 
 const STEPS = [
-  "Authorise with Discord — we only read your username, avatar and roles.",
-  "Submit the community whitelist application.",
+  "Sign in with Discord — we only read your username, avatar and roles.",
+  "Submit the community whitelist application on Sonoran.",
   "Get approved and connect to the server.",
 ];
 
 /**
- * Account creation entry point. Like sign-in, the Discord handshake is stubbed
- * until real OAuth is implemented.
+ * Account creation entry point. There is no separate registration: signing in
+ * with Discord is what creates the account, so this page is really an on-ramp —
+ * the same OAuth button as sign-in, wrapped in the three steps a newcomer walks
+ * through. The whitelist application itself now lives in Sonoran.
  */
 export default function CreateAccount() {
+  const [configured, setConfigured] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    api.authConfig().then((cfg) => {
+      if (active) setConfigured(Boolean(cfg?.configured));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <Section className="max-w-lg">
       <Card className="relative overflow-hidden p-8 text-center">
@@ -44,9 +60,8 @@ export default function CreateAccount() {
 
           <Button
             as="a"
-            href={SITE.discordInvite}
-            target="_blank"
-            rel="noreferrer noopener"
+            href={configured ? loginUrl("/") : SITE.discordInvite}
+            {...(configured ? {} : { target: "_blank", rel: "noreferrer noopener" })}
             variant="discord"
             size="lg"
             block
@@ -55,11 +70,20 @@ export default function CreateAccount() {
             Continue with Discord
           </Button>
 
-          <p className="mt-6 text-xs text-slate-500">
-            {/* TODO: replace with the real OAuth redirect once the flow is live. */}
-            OAuth is not wired up yet — this button opens our Discord instead.
-          </p>
-          <p className="mt-4 text-sm text-slate-400">
+          <Button
+            as="a"
+            href={SITE.applyUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            variant="secondary"
+            block
+            className="mt-3"
+          >
+            Whitelist application
+            <ExternalLink className="size-4" />
+          </Button>
+
+          <p className="mt-6 text-sm text-slate-400">
             Already set up?{" "}
             <Link to="/sign-in" className="font-semibold text-primary-400 hover:underline">
               Sign in

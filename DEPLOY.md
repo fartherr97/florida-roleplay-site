@@ -60,6 +60,11 @@ On the **site** service:
 | `TRUST_PROXY` | `2` | Cloudflare, then Railway's router. |
 | `DB_SSL_REJECT_UNAUTHORIZED` | `false` | Railway's internal hostname presents a cert that does not match it. The traffic is still encrypted — this relaxes verification, it does not turn TLS off. |
 | `BOT_TOKEN` | a long random string | The bot presents this as `Authorization: Bearer`. Leave it unset and the bot endpoints refuse with 503 rather than sitting open. |
+| `DISCORD_CLIENT_ID` | from the Discord app | OAuth2 → General. |
+| `DISCORD_CLIENT_SECRET` | from the Discord app | OAuth2 → General. A secret — set it here, never in the repo. |
+| `DISCORD_BOT_TOKEN` | a bot token for that app | Reads guild membership and roles. The bot must be in the guild with the **Server Members Intent** on. |
+| `DISCORD_GUILD_ID` | the community's server ID | Only members of this guild can sign in. |
+| `DISCORD_REDIRECT_URI` | `https://flrp.us/api/auth/callback` | Must match a redirect added in the Discord portal **verbatim**. |
 | `DB_CONNECTION_LIMIT` | `5` | Times the number of running instances, this has to stay under the plan's connection cap. |
 
 `PORT` is injected by Railway; do not set it.
@@ -93,7 +98,33 @@ Department hostnames work with no code change whenever you want them —
 `fhp.flrp.us`, `hcso.flrp.us` — because `server/src/lib/tenant.js` reads the
 first DNS label. Add the CNAME and the custom domain; that is all.
 
-## 5. First deploy
+## 5. Discord sign-in
+
+Sign-in is Discord OAuth (see **Authentication** in the README for the flow).
+Set it up once in the [Discord Developer Portal](https://discord.com/developers/applications):
+
+1. **Create an application** (or reuse the bot's). Copy the **Client ID** and,
+   under **OAuth2 → General**, the **Client Secret**.
+2. **OAuth2 → Redirects** → add `https://flrp.us/api/auth/callback` exactly. For
+   local development also add `http://localhost:5173/api/auth/callback`. Discord
+   rejects any redirect that is not on this list, character for character.
+3. **Bot** → make sure the application has a bot, copy its token, turn on the
+   **Server Members Intent**, and invite the bot to the community guild. The
+   callback reads roles through this bot, so it has to be a member.
+4. Copy the community **server (guild) ID** (right-click the server icon → Copy
+   Server ID, with Developer Mode on).
+5. Put all five values into the site service's variables (table above).
+
+Then map your real Discord roles to this site's role keys on the **Discord role
+mapping** page, so a signed-in member resolves to the ranks and permissions they
+should hold. Until a role is mapped, every guild member still signs in as a plain
+`member`.
+
+If any of the five variables is missing the site stays up, `GET
+/api/auth/config` returns `configured: false`, and the sign-in button says so
+rather than dead-ending.
+
+## 6. First deploy
 
 ```
 Deploy → watch the build log → check /healthz
@@ -110,7 +141,7 @@ Then, in order:
 3. Point the bot at `POST /api/roster/sync` with the `BOT_TOKEN` and let it fill
    the roster. That is the first real write.
 
-## 6. Schema changes
+## 7. Schema changes
 
 `db:init` creates what is missing. It does not alter what exists — an added
 column, a widened type or a dropped index needs a real migration.
@@ -124,7 +155,7 @@ If this outlives being a two-person job, the thing to add is a `migrations/`
 directory with numbered files and a table recording which have run. Do not
 reach for an ORM's migration tool just to get that.
 
-## 7. Backups
+## 8. Backups
 
 Railway takes daily snapshots on paid plans. That is a floor, not a plan — it
 does not protect you from a bad `DELETE` noticed a week later.

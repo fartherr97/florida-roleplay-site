@@ -6,6 +6,7 @@
  * only when the copy the user should read genuinely differs.
  */
 import { query } from "../db.js";
+import { readCookie, readSession, SESSION_COOKIE } from "../lib/session.js";
 import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
 
 const DEV_MODE = process.env.NODE_ENV !== "production";
@@ -28,12 +29,47 @@ export function rankFor(roleKeys = []) {
 }
 
 /**
- * Resolves the calling user and their Discord roles. Until OAuth is wired, a
- * development caller is read from DEV_USER_ID — a path that is hard-disabled in
- * production so it can never become a live authentication bypass.
+ * Loads a user and their role keys from the database, deriving the rank label
+ * from the roles. Returns null when there is no such row (or no database).
+ */
+async function loadDbUser(id) {
+  const users = await query(
+    `SELECT id, username, display_name AS "displayName", avatar FROM users WHERE id = $1 LIMIT 1`,
+    [id],
+  );
+  if (users.length === 0) return null;
+  const roles = await query("SELECT role FROM user_roles WHERE user_id = $1", [id]);
+  const held = roles.map((row) => row.role);
+  return { ...users[0], roles: held, rank: rankFor(held) };
+}
+
+/**
+ * Resolves the calling user and their Discord roles.
+ *
+ * In production this is a Discord OAuth session and nothing else. In development
+ * the dev-only paths below (a preview rank, an x-discord-id header, DEV_USER_ID)
+ * stand in for a real sign-in, and every one of them is hard-disabled when
+ * NODE_ENV=production so none can become a live authentication bypass.
  */
 export async function resolveUser(req) {
-  // TODO: replace with the Discord OAuth session lookup once the flow is live.
+  // The real path: a session cookie minted by the Discord OAuth callback. This
+  // is the only path that runs in production; the roles come straight out of the
+  // database, so a role revoked in Discord and synced here is gone on the next
+  // request rather than frozen in a token.
+  const sessionToken = readCookie(req, SESSION_COOKIE);
+  if (sessionToken) {
+    try {
+      const userId = await readSession(sessionToken);
+      if (userId) {
+        const user = await loadDbUser(userId);
+        // `authenticated` marks a real Discord session, so the client ends
+        // preview mode and never treats this for a dev/seed caller.
+        if (user) return { ...user, authenticated: true };
+      }
+    } catch {
+      // Database unavailable — fall through to the dev paths (dev only).
+    }
+  }
 
   // The Staff Hub's preview switcher browses as any rank while OAuth is stubbed.
   // Honouring it here is what makes the previewed rank's data load rather than
@@ -56,17 +92,8 @@ export async function resolveUser(req) {
   if (!devId) return null;
 
   try {
-    const users = await query(`SELECT id, username, display_name AS "displayName", avatar FROM users WHERE id = $1 LIMIT 1`,
-      [devId],
-    );
-    if (users.length > 0) {
-      const roles = await query("SELECT role FROM user_roles WHERE user_id = $1", [devId]);
-      const held = roles.map((row) => row.role);
-      // The seed caller and the preview path both carry a `rank`; a row out of
-      // the database does not, so derive it from the roles rather than leaving
-      // every caller to work out which of eleven role keys is the top one.
-      return { ...users[0], roles: held, rank: rankFor(held) };
-    }
+    const user = await loadDbUser(devId);
+    if (user) return user;
   } catch {
     // Database unavailable — fall through to the seed caller below.
   }

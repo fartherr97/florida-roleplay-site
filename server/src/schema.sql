@@ -38,6 +38,22 @@ CREATE TABLE IF NOT EXISTS user_roles (
   CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
+-- Browser sessions minted by the Discord OAuth callback. The cookie carries only
+-- this random id; everything about the user is read back through the join, so a
+-- stolen cookie can be revoked by deleting the row and a role change takes effect
+-- on the next request rather than living frozen inside a token.
+CREATE TABLE IF NOT EXISTS sessions (
+  id           VARCHAR(64)  NOT NULL,
+  user_id      VARCHAR(20)  NOT NULL,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at   TIMESTAMPTZ  NOT NULL,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions (expires_at);
+
 CREATE TABLE IF NOT EXISTS departments (
   id                VARCHAR(64)  NOT NULL,
   name              VARCHAR(128) NOT NULL,

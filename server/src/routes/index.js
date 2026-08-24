@@ -18,6 +18,7 @@ import promotionsRouter from "./promotions.js";
 import transfersRouter from "./transfers.js";
 import disciplineRouter from "./discipline.js";
 import supportRouter from "./support.js";
+import authRouter from "./auth.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -57,6 +58,10 @@ router.use("/transfers", transfersRouter);
 router.use("/discipline", disciplineRouter);
 // The support portal. Members open tickets here; the support team works them.
 router.use("/support", supportRouter);
+// Discord OAuth. Mounted here with the rest so it shares the /api prefix and the
+// same-origin cookie; the handshake itself needs no session, and attachUser
+// above never blocks, so a signed-out visitor reaches /auth/login fine.
+router.use("/auth", authRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

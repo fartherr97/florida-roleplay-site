@@ -1,13 +1,14 @@
 /**
- * Current-user provider backed by GET /api/me. Discord OAuth is not wired yet, so
- * the API resolves a development user and this provider simply mirrors it.
+ * Current-user provider backed by GET /api/me. A signed-in user is a real
+ * Discord OAuth session; in development the API can also resolve a stand-in
+ * caller, which this provider mirrors the same way.
  *
- * While OAuth is stubbed the provider also supports a **preview rank**: the Staff
- * Hub lets you browse as any rank so the portal can be reviewed before Discord
- * roles exist. A preview only ever replaces the role list client-side — the
- * server middleware still decides what the API will return — and the whole
- * mechanism disables itself the moment the API reports a real session
- * (`user.authenticated`), so it cannot outlive the stub.
+ * The provider also supports a **preview rank**: the Staff Hub lets you browse as
+ * any rank so the portal can be reviewed without switching Discord accounts. A
+ * preview only ever replaces the role list client-side — the server middleware
+ * still decides what the API will return — and it disables itself the moment the
+ * API reports a real session (`user.authenticated`), so it can never sit on top
+ * of a genuine sign-in.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthContext from "./authContext";
@@ -106,9 +107,11 @@ export function AuthProvider({ children }) {
       },
       grants,
       setGrants,
-      // Signing out is local-only until OAuth lands.
-      signOut: () => {
+      // End the Discord session server-side, then clear it locally. The
+      // network call is best-effort: whatever it returns, the UI signs out.
+      signOut: async () => {
         setPreviewRank(null);
+        await api.logout().catch(() => {});
         setUser(null);
       },
       refresh,
