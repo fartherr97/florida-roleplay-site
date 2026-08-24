@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, RotateCcw, Save, Search, TriangleAlert } from "lucide-react";
+import { Check, Crown, RotateCcw, Save, Search, TriangleAlert } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -18,11 +18,18 @@ import { cn } from "../../lib/cn";
 
 /**
  * Builds the role columns the matrix offers, grouped so the header stays
- * readable: base roles, then the staff ladder, then each department.
+ * readable: base roles, the staff ladder, command, then each department.
+ *
+ * Command is its own group rather than the tail of the staff ladder because
+ * Directorship sits in the `management` department on the role map, and this
+ * page used to filter that department out entirely — so the tier that holds
+ * every sensitive permission had no column at all, and the page silently
+ * understated what it was granting.
  */
 function buildRoleGroups(roles, departments) {
   const staff = roles.filter((r) => r.department === "staff");
   const civilian = roles.filter((r) => r.department === "civilian");
+  const command = roles.filter((r) => r.department === "management");
   const byDepartment = departments
     .filter((d) => !["staff", "management", "civilian"].includes(d.id))
     .map((department) => ({
@@ -44,6 +51,9 @@ function buildRoleGroups(roles, departments) {
     },
     { id: "civilian", label: "Civilian", abbr: "CIV", tone: "green", roles: civilian },
     { id: "staff", label: "Staff", abbr: "STAFF", tone: "primary", roles: staff },
+    ...(command.length
+      ? [{ id: "command", label: "Command", abbr: "CMD", tone: "amber", roles: command }]
+      : []),
     ...byDepartment,
   ];
 }
@@ -167,11 +177,31 @@ export default function HubPermissions() {
         subtitle="Every gated page, button and endpoint in the community, and the Discord roles that satisfy it. Changes take effect immediately — no deploy."
         actions={
           <>
-            <Badge tone="rose">Head Admin only</Badge>
+            <Badge tone="rose">Directorship and Ownership only</Badge>
             {dirty && <Badge tone="amber" dot>Unsaved</Badge>}
           </>
         }
       />
+
+      {/* Ownership has no column below, and should not: the grant table does not
+          decide what it holds. Saying so here is the difference between a
+          reader concluding "Ownership has nothing" and knowing it has all of
+          it. */}
+      <Card className="mb-6 flex flex-wrap items-start gap-3 p-5 ring-1 ring-inset ring-amber-400/20">
+        <Crown className="mt-0.5 size-5 shrink-0 text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white">
+            Ownership holds every permission, always
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-slate-400">
+            It is not a column below because there would be nothing to toggle —
+            the check short-circuits before the grant table is consulted. That is
+            what stops a careless edit on this page locking the owner out of the
+            page that would fix it. Every other tier, Directorship included, is
+            exactly what the rows say.
+          </p>
+        </div>
+      </Card>
 
       {status && (
         <Card className="mb-6 p-4">
