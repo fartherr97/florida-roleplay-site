@@ -123,6 +123,27 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "transfers",
+    label: "Transfer portal",
+    description:
+      "Moving a member between emergency services departments. Each department's command signs for its own side; these are the community-wide grants.",
+    permissions: [
+      {
+        key: "transfers.view",
+        label: "Open the transfer portal",
+        detail:
+          "See the portal and raise a transfer. Which tickets somebody can read is decided per ticket — your own, or ones involving a department you command.",
+      },
+      {
+        key: "transfers.manage",
+        label: "Oversee every transfer",
+        detail:
+          "Read and act on every ticket regardless of department, and close or reopen one. Department heads already sign for their own department without this.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "promotions",
     label: "Promotion board",
     description:
@@ -279,6 +300,12 @@ export const DEFAULT_GRANTS = {
   // the community-wide versions, for the people who oversee every department.
   "applications.manage": ["head_admin", "directorship", "ownership"],
   "applications.review": ["head_admin", "directorship", "ownership"],
+
+  // Anybody in a department may raise a transfer; which tickets they can then
+  // read is decided per ticket rather than by this grant. transfers.manage is
+  // the oversight tier — department command sign for their own side without it.
+  "transfers.view": ["member", "whitelisted", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
+  "transfers.manage": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

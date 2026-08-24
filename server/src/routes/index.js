@@ -16,6 +16,7 @@ import departmentHubRouter from "./departmentHub.js";
 import formsRouter from "./forms.js";
 import promotionsRouter from "./promotions.js";
 import applyRouter from "./applications.js";
+import transfersRouter from "./transfers.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -49,6 +50,10 @@ router.use("/promotions", promotionsRouter);
 // /applications because that path already belongs to the older fixed whitelist
 // form, and the two are separate systems until that one is retired.
 router.use("/apply", applyRouter);
+// The Emergency Services transfer portal, ported from the standalone
+// es-transfer-portal app. It shares this site's session and permission model
+// rather than carrying the Discord OAuth and role-map file it used to.
+router.use("/transfers", transfersRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

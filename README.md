@@ -400,6 +400,105 @@ Each submission stores its own copy of the application. A question edited
 tomorrow never rewrites what somebody was asked today, and deleting an
 application leaves its submissions readable.
 
+## Transfer portal — `/transfers`
+
+Moving a member from one emergency services department to another. Both
+departments' command staff have to sign before anybody moves, and the receiving
+department decides the rank they start on. It sits under Emergency Services in
+the nav.
+
+Ported from [fartherr97/es-transfer-portal](https://github.com/fartherr97/es-transfer-portal),
+which was a standalone Next.js app. Three things changed on the way across, and
+they are why this is a port rather than a second app deployed beside this one.
+
+### Departments and ranks come from this community
+
+The original hard-coded four departments and invented a rank ladder for each.
+Here `TRANSFER_DEPARTMENTS` is derived from `DEPARTMENTS` and every rank from
+`ROLE_MAP` — the same tables the roster and the Discord Role Mapping page read.
+So the portal covers all five departments including DHS, the ranks are the real
+ones (Trooper → Colonel, Deputy → Sheriff, Officer → Chief of Police,
+Probationary Firefighter → Fire Chief, Special Agent → Director), and a rank
+renamed on the mapping page is renamed here with no second list to update.
+
+The processing modal offers only the **receiving** department's ladder. The
+original offered every rank in the community flattened into one list, which let
+you post a Fire Chief into the Highway Patrol.
+
+### Access is this site's permission model
+
+The original carried its own Discord OAuth and a `role-map.js` full of
+`REPLACE_WITH_ROLE_ID` placeholders to work out who was a department head. Here:
+
+| Portal role | Here |
+| --- | --- |
+| Department head | Holds that department's command rank — the same rule the application builder uses |
+| Management | Holds `transfers.manage` |
+| Transferee | Everybody else, on their own tickets |
+
+Management sees every ticket. A department head sees tickets where their
+department is on either side — both have to sign, so both have to read it.
+Everybody else sees only their own, on the public thread only.
+
+The department somebody signs for is resolved from their roles server-side, never
+read from the request body — otherwise a Fire Chief could post `{ dept: "fhp" }`
+and sign for the Highway Patrol. The Approve button says which side it signs
+for, so nobody has to guess.
+
+### It is a section of the site, not an app
+
+One router, one session, one design system. The portal's own top bar, Discord
+login, toasts, buttons and inputs did not survive the move and did not need to.
+
+### The two threads
+
+Every ticket has a public thread the member reads and a staff-only thread the two
+departments read. They are tabs rather than the original's side-by-side panels:
+side by side works on a director's monitor and nowhere else, and the thing that
+must never happen is typing into the wrong one.
+
+The internal thread is filtered out **in the query** for anybody who may not see
+it. A staff note that reaches the browser has already leaked whatever it says;
+hiding it in the UI afterwards is not a control. Asking to post to it without the
+standing is a denial rather than a quiet downgrade to the public thread — silently
+posting a staff note where the member can read it is the worse failure.
+
+### Presence
+
+One call does both halves: the heartbeat records that you are looking and answers
+with everybody else who is. The original polled two endpoints on the same timer
+to say the same thing. A viewer counts as present for 25 seconds, and reads
+filter on `last_seen` rather than relying on anything having cleaned up.
+
+### Discord notifications
+
+Each department can point new tickets at a Discord webhook, configured under
+Settings (management only) with a live preview of the embed.
+
+A webhook posts a message and nothing else, which is the right tool here: a
+transfer is decided in this portal by two department heads, so the Discord
+message is a notification rather than a control surface and needs no buttons.
+Where buttons *are* needed — applications — the bot owns them, because a webhook
+cannot carry one.
+
+**The webhook URL is write-only.** It never comes back from the API, not even to
+the management tier that just typed it in, because anybody holding it can post
+into that channel as the department forever. The page shows whether one is set,
+never what it is, and a blank field means "leave it alone" rather than "delete
+it". Only real `discord.com/api/webhooks/…` URLs are accepted.
+
+### Two things that changed because they were wrong
+
+**The schema had fallen behind the code.** The original `schema.sql` had no
+`approvals`, `history`, `rejection_reason`, `assigned_rank`, `retired_member` or
+`employment_type` columns, and its status ENUM was missing `closed` — all of
+which `lib/transfers.js` read and wrote. Anybody running that file and then the
+app would have hit errors on the first approval. The schema here is the full set.
+
+**Settings were a process global.** `lib/settings.js` kept every webhook URL in
+`globalThis` and reset it on restart. A URL a director typed in should survive a
+deploy, so it is a table.
+
 ## Promotion board
 
 `/staff-hub/promotion-board`. Someone nominates a member for a rank, a timed

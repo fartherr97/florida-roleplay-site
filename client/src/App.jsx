@@ -30,6 +30,10 @@ import ApplySubmitted from "./pages/apply/ApplySubmitted";
 import ApplyManage from "./pages/apply/ApplyManage";
 import ApplyBuilder from "./pages/apply/ApplyBuilder";
 import ApplyReview from "./pages/apply/ApplyReview";
+import TransferPortal from "./pages/transfers/TransferPortal";
+import TransferNew from "./pages/transfers/TransferNew";
+import TransferTicket from "./pages/transfers/TransferTicket";
+import TransferSettings from "./pages/transfers/TransferSettings";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -101,6 +105,13 @@ export default function App() {
             <Route path="apply/manage/:id" element={<ApplyBuilder />} />
             <Route path="apply/:slug" element={<ApplyForm />} />
             <Route path="apply/:slug/submitted" element={<ApplySubmitted />} />
+
+            {/* The Emergency Services transfer portal. /new and /settings sit
+                above /:id so a ticket id can never shadow them. */}
+            <Route path="transfers" element={<TransferPortal />} />
+            <Route path="transfers/new" element={<TransferNew />} />
+            <Route path="transfers/settings" element={<TransferSettings />} />
+            <Route path="transfers/:id" element={<TransferTicket />} />
 
             <Route path="departments" element={<Departments />} />
             <Route path="departments/:id" element={<DepartmentDetail />} />

@@ -757,3 +757,90 @@ CREATE TABLE IF NOT EXISTS application_dispatches (
   PRIMARY KEY (id),
   KEY idx_application_dispatches_pending (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------ --
+-- Emergency Services transfer portal
+-- ------------------------------------------------------------------ --
+
+-- One row per transfer ticket.
+--
+-- `approvals` and `history` are JSON rather than tables of their own: both are
+-- read only as part of a ticket, both are written by the same person in the
+-- same action, and neither is queried across tickets. That is the opposite of
+-- promotion ballots, which are concurrent and so live in their own table.
+--
+-- Ported from fartherr97/es-transfer-portal. That schema.sql had fallen behind
+-- its own code — no approvals, history, rejection_reason, assigned_rank,
+-- retired_member or employment_type columns, and a status ENUM missing
+-- 'closed', all of which lib/transfers.js read and wrote. This is the full set.
+CREATE TABLE IF NOT EXISTS transfers (
+  id                VARCHAR(32)  NOT NULL,
+  member_name       VARCHAR(128) NOT NULL,
+  member_discord_id VARCHAR(20)  NULL,
+  current_rank      VARCHAR(128) NOT NULL,
+  from_dept         VARCHAR(32)  NOT NULL,
+  to_dept           VARCHAR(32)  NOT NULL,
+  reason            TEXT         NULL,
+  status            VARCHAR(16)  NOT NULL DEFAULT 'pending',
+  -- What the outgoing department should do with their roles once it completes.
+  remove_roles        TINYINT(1) NOT NULL DEFAULT 1,
+  assign_visitor_pass TINYINT(1) NOT NULL DEFAULT 1,
+  assign_retired      TINYINT(1) NOT NULL DEFAULT 0,
+  -- The outcome, written when the receiving department processes it.
+  assigned_rank     VARCHAR(128) NULL,
+  employment_type   VARCHAR(16)  NULL,
+  retired_member    TINYINT(1)   NOT NULL DEFAULT 0,
+  rejection_reason  VARCHAR(512) NULL,
+  approvals         JSON         NOT NULL,
+  history           JSON         NOT NULL,
+  raised_by         VARCHAR(20)  NULL,
+  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_transfers_queue (status, created_at),
+  KEY idx_transfers_depts (from_dept, to_dept),
+  KEY idx_transfers_member (member_discord_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Per-ticket chat. `internal = 1` is the staff-only thread; `internal = 0` is
+-- the thread the transferee also reads. One table rather than two because they
+-- differ by a flag and nothing else — and because a query that forgets the flag
+-- is easier to spot than a join against the wrong table.
+CREATE TABLE IF NOT EXISTS transfer_messages (
+  id            VARCHAR(48)  NOT NULL,
+  transfer_id   VARCHAR(32)  NOT NULL,
+  internal      TINYINT(1)   NOT NULL DEFAULT 0,
+  author_id     VARCHAR(20)  NULL,
+  author_name   VARCHAR(128) NOT NULL,
+  body          TEXT         NOT NULL,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_transfer_messages_thread (transfer_id, created_at),
+  CONSTRAINT fk_transfer_messages FOREIGN KEY (transfer_id)
+    REFERENCES transfers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Who is looking at a ticket right now. Upserted on each heartbeat; a viewer
+-- counts as present while last_seen is inside the TTL, and reads filter on it
+-- rather than relying on anything having cleaned up.
+CREATE TABLE IF NOT EXISTS transfer_viewers (
+  transfer_id VARCHAR(32)  NOT NULL,
+  viewer_id   VARCHAR(20)  NOT NULL,
+  viewer_name VARCHAR(128) NOT NULL,
+  last_seen   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (transfer_id, viewer_id),
+  KEY idx_transfer_viewers_seen (last_seen),
+  CONSTRAINT fk_transfer_viewers FOREIGN KEY (transfer_id)
+    REFERENCES transfers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Per-department webhook configuration. The original kept this in a process
+-- global and reset it on every restart; a webhook URL that a director typed in
+-- should survive a deploy, so it goes in a table.
+CREATE TABLE IF NOT EXISTS transfer_webhooks (
+  department_id VARCHAR(32) NOT NULL,
+  config        JSON        NOT NULL,
+  updated_by    VARCHAR(20) NULL,
+  updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (department_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -11,6 +11,7 @@ import { DEPARTMENT_CONFIGS } from "../data/departmentConfigs";
 import * as formsMock from "../data/formsData";
 import * as promotionMock from "../data/promotionData";
 import * as applySeed from "../data/applicationSeed";
+import * as transferSeed from "../data/transferSeed";
 import { gradeSubmission } from "./forms";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { normalizeApplication } from "./applicationConfig";
@@ -177,6 +178,17 @@ function applyFallback(slug) {
     eligibility: { ok: false, reason: "The API is unreachable, so this cannot be opened right now." },
     history: [],
   };
+}
+
+/**
+ * One ticket, computed locally. The `can` block is all false: the server
+ * resolves it against the caller's command roles, and guessing here would offer
+ * an Approve button that 403s.
+ */
+function transferFallback(id) {
+  const ticket = transferSeed.TRANSFERS.find((entry) => entry.id === id);
+  if (!ticket) return null;
+  return { ticket, can: { manage: false, internal: false, close: false, signFor: null } };
 }
 
 /** Reference ids are generated client-side only when the API is unreachable. */
@@ -513,6 +525,70 @@ export const api = {
       { decision, reason },
       () => ({ ok: false, message: "The API is unreachable, so no decision was recorded." }),
     ),
+
+  /* --------------------------- Transfer portal --------------------------- */
+
+  /**
+   * The Emergency Services transfer portal.
+   *
+   * Reads fall back to the seeds like everything else; writes do not. A
+   * signature, a rejection or a processed transfer that only exists in one
+   * browser is worse than an error, because the department on the other side
+   * will never see it.
+   */
+  transfers: () =>
+    get("/transfers", { tickets: transferSeed.TRANSFERS, me: { departments: [], management: false } }),
+
+  transfer: (id) =>
+    get(`/transfers/${encodeURIComponent(id)}`, transferFallback(id)),
+
+  raiseTransfer: (payload) =>
+    post("/transfers", payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was raised. Try again once it is back.",
+    })),
+
+  /** approve | revoke | reject | process — one shape for every ticket action. */
+  transferAction: (id, action, payload = {}) =>
+    post(`/transfers/${encodeURIComponent(id)}/${action}`, payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was recorded.",
+    })),
+
+  transferState: (id, action) =>
+    post(`/transfers/${encodeURIComponent(id)}/state`, { action }, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was recorded.",
+    })),
+
+  transferMessages: (id) =>
+    get(`/transfers/${encodeURIComponent(id)}/messages`, {
+      messages: transferSeed.MESSAGES.filter((m) => m.transferId === id && !m.internal),
+    }),
+
+  postTransferMessage: (id, body, internal) =>
+    post(`/transfers/${encodeURIComponent(id)}/messages`, { body, internal }, () => ({
+      ok: false,
+      message: "The API is unreachable, so that message was not posted.",
+    })),
+
+  transferPresence: (id) =>
+    post(`/transfers/${encodeURIComponent(id)}/presence`, {}, () => ({ viewers: [] })),
+
+  transferWebhooks: () =>
+    get("/transfers/settings/webhooks", { webhooks: {} }),
+
+  saveTransferWebhook: (deptId, config) =>
+    put(`/transfers/settings/webhooks/${encodeURIComponent(deptId)}`, { config }, () => ({
+      ok: true,
+      message: NOT_PERSISTED,
+    })),
+
+  testTransferWebhook: (deptId) =>
+    post(`/transfers/settings/webhooks/${encodeURIComponent(deptId)}/test`, {}, () => ({
+      ok: false,
+      message: "The API is unreachable, so no test was sent.",
+    })),
 
   /* --------------------------- Promotion board --------------------------- */
 
