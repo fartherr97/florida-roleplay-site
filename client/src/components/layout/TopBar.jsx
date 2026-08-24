@@ -146,10 +146,16 @@ export default function TopBar() {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3 nav:ml-4">
-            {/* 5 — Connect CTA. Wrapped rather than given a `hidden` class of
-                its own: Button sets `inline-flex` in its base, and utility
-                order in the stylesheet — not in the attribute — would decide
-                the winner. The drawer carries a full-width Connect below sm. */}
+            {/* 5 — Apply, then Connect. Both wrapped rather than given a
+                `hidden` class of their own: Button sets `inline-flex` in its
+                base, and utility order in the stylesheet — not in the attribute
+                — would decide the winner. The drawer carries both below sm. */}
+            <span className="hidden sm:block">
+              <Button as={Link} to="/apply" variant="secondary" size="sm">
+                Apply
+              </Button>
+            </span>
+
             <span className="hidden sm:block">
               <Button as="a" href={SITE.fivemConnect} variant="primary" size="sm">
                 Connect

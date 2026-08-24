@@ -682,3 +682,78 @@ CREATE TABLE IF NOT EXISTS promotion_settings (
   updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------ --
+-- Configurable applications
+-- ------------------------------------------------------------------ --
+
+-- One row per application, built in /apply/manage. Separate from the legacy
+-- `applications` table above, which is the older fixed whitelist form.
+-- The document itself is JSON because it is edited as
+-- a whole by one person in a builder — the same reason department configs are.
+-- What is lifted out into columns is only what is queried: the address people
+-- visit, who owns it, and whether it is taking submissions.
+CREATE TABLE IF NOT EXISTS custom_applications (
+  id              VARCHAR(64)  NOT NULL,
+  slug            VARCHAR(64)  NOT NULL,
+  department_id   VARCHAR(32)  NOT NULL,
+  subdivision_id  VARCHAR(64)  NULL,
+  title           VARCHAR(200) NOT NULL,
+  status          VARCHAR(16)  NOT NULL DEFAULT 'draft',
+  config          JSON         NOT NULL,
+  updated_by      VARCHAR(20)  NULL,
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_custom_applications_slug (slug),
+  KEY idx_custom_applications_department (department_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Submissions. `answers` is JSON keyed by field id; `config_snapshot` is the
+-- application exactly as it was when submitted, so a question edited afterwards
+-- never changes what somebody was actually asked.
+CREATE TABLE IF NOT EXISTS application_submissions (
+  id                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reference             VARCHAR(32)  NOT NULL,
+  application_id        VARCHAR(64)  NOT NULL,
+  application_slug      VARCHAR(64)  NOT NULL,
+  department_id         VARCHAR(32)  NOT NULL,
+  subdivision_id        VARCHAR(64)  NULL,
+  applicant_discord_id  VARCHAR(20)  NULL,
+  applicant_name        VARCHAR(128) NULL,
+  answers               JSON         NOT NULL,
+  config_snapshot       JSON         NOT NULL,
+  status                VARCHAR(16)  NOT NULL DEFAULT 'pending',
+  decided_by            VARCHAR(20)  NULL,
+  decided_by_name       VARCHAR(128) NULL,
+  decided_via           VARCHAR(16)  NULL,
+  decision_reason       VARCHAR(512) NULL,
+  decided_at            TIMESTAMP    NULL,
+  submitted_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_application_submissions_reference (reference),
+  KEY idx_application_submissions_queue (department_id, status, submitted_at),
+  KEY idx_application_submissions_applicant (applicant_discord_id, application_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The Discord outbox.
+--
+-- A website cannot post an interactive component to Discord and cannot receive
+-- the click, so every message the bot should send is queued here rather than
+-- sent from this process. The site also pushes it straight to the bot when
+-- BOT_DISPATCH_URL is set — that is an optimisation, not the contract. This
+-- table is the contract, and it is what makes a bot outage cost nothing.
+CREATE TABLE IF NOT EXISTS application_dispatches (
+  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reference      VARCHAR(32)  NOT NULL,
+  kind           VARCHAR(24)  NOT NULL DEFAULT 'submitted',
+  payload        JSON         NOT NULL,
+  status         VARCHAR(16)  NOT NULL DEFAULT 'pending',
+  attempts       INT UNSIGNED NOT NULL DEFAULT 0,
+  last_error     VARCHAR(512) NULL,
+  discord_message_id VARCHAR(20) NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  delivered_at   TIMESTAMP    NULL,
+  PRIMARY KEY (id),
+  KEY idx_application_dispatches_pending (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

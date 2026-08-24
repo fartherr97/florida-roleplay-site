@@ -170,7 +170,10 @@ export default function MobileNav({ open, onClose, primaryLinks, groups }) {
               </div>
             </nav>
 
-            <div className="shrink-0 border-t border-white/[0.06] p-4">
+            <div className="shrink-0 space-y-2 border-t border-white/[0.06] p-4">
+              <Button as={Link} to="/apply" onClick={onClose} variant="secondary" block>
+                Apply
+              </Button>
               <Button as="a" href={SITE.fivemConnect} variant="primary" block>
                 Connect to Server
                 <ExternalLink className="size-4" />

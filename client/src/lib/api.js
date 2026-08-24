@@ -10,8 +10,10 @@ import * as rosterMock from "../data/rosterData";
 import { DEPARTMENT_CONFIGS } from "../data/departmentConfigs";
 import * as formsMock from "../data/formsData";
 import * as promotionMock from "../data/promotionData";
+import * as applySeed from "../data/applicationSeed";
 import { gradeSubmission } from "./forms";
 import { normalizeConfig, summarize } from "./departmentConfig";
+import { normalizeApplication } from "./applicationConfig";
 import { projectRoster } from "./deptRoster";
 import { BASE_ROLES, DEFAULT_GRANTS, PERMISSION_GROUPS } from "../data/permissions";
 
@@ -113,6 +115,17 @@ async function put(path, body, fallback) {
   }
 }
 
+/** DELETE with the same contract as put(). */
+async function del(path, fallback) {
+  if (!USE_API) return fallback();
+  try {
+    return await request(path, { method: "DELETE" });
+  } catch (err) {
+    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    return fallback();
+  }
+}
+
 /**
  * The shape GET /dept/:id/config returns, computed locally. Capabilities are
  * left empty in the fallback: without the API there is nothing to authorise
@@ -148,6 +161,22 @@ function submissionsFallback(formId) {
   return formsMock.submissions
     .filter((entry) => entry.formId === formId)
     .map((entry) => ({ ...entry, ...gradeSubmission(form, entry.answers) }));
+}
+
+/**
+ * One application, computed locally. `eligibility` is refused rather than
+ * guessed: the server decides it against the caller's Discord roles and their
+ * submission history, and an optimistic guess here would open a form that then
+ * refuses the submission at the end of it.
+ */
+function applyFallback(slug) {
+  const application = applySeed.APPLICATIONS.find((entry) => entry.slug === slug);
+  if (!application) return null;
+  return {
+    application: normalizeApplication(application),
+    eligibility: { ok: false, reason: "The API is unreachable, so this cannot be opened right now." },
+    history: [],
+  };
 }
 
 /** Reference ids are generated client-side only when the API is unreachable. */
@@ -432,6 +461,58 @@ export const api = {
       form,
       message: NOT_PERSISTED,
     })),
+
+  /* ------------------------------ Applications ----------------------------- */
+
+  /**
+   * The configurable application system.
+   *
+   * Note what the fallbacks refuse to do. A submission that could not reach the
+   * API is reported as *not received*, never as accepted: an application is a
+   * message to a department, and telling somebody theirs arrived when it did not
+   * is the one answer that costs them something real. Everything read-only falls
+   * back to the seeds as usual.
+   */
+  applyIndex: () =>
+    get("/apply", { applications: applySeed.APPLICATIONS, subdivisions: applySeed.SUBDIVISIONS }),
+
+  applyForm: (slug) =>
+    get(`/apply/${encodeURIComponent(slug)}`, applyFallback(slug)),
+
+  // Named apart from submitApplication above, which posts the older fixed
+  // whitelist form to /applications. Two systems, two names, until that one goes.
+  submitApply: (slug, answers) =>
+    post(`/apply/${encodeURIComponent(slug)}/submit`, { answers }, () => ({
+      ok: false,
+      message:
+        "The API is unreachable, so nothing was submitted. Nobody has seen this — please try again once it is back.",
+    })),
+
+  manageableApplications: () =>
+    get("/apply/manage/list", { applications: [], canManage: [], subdivisions: applySeed.SUBDIVISIONS }),
+
+  saveApplication: (id, application) =>
+    put(`/apply/manage/${encodeURIComponent(id)}`, { application }, () => ({
+      ok: true,
+      application,
+      message: NOT_PERSISTED,
+    })),
+
+  deleteApplication: (id) =>
+    del(`/apply/manage/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
+
+  applicationQueue: (status) =>
+    get(`/apply/manage/submissions${status ? `?status=${encodeURIComponent(status)}` : ""}`, { submissions: [] }),
+
+  applicationSubmission: (reference) =>
+    get(`/apply/manage/submissions/${encodeURIComponent(reference)}`, null),
+
+  decideApplication: (reference, decision, reason) =>
+    post(
+      `/apply/manage/submissions/${encodeURIComponent(reference)}/decision`,
+      { decision, reason },
+      () => ({ ok: false, message: "The API is unreachable, so no decision was recorded." }),
+    ),
 
   /* --------------------------- Promotion board --------------------------- */
 

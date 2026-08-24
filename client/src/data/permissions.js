@@ -107,6 +107,26 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "applications",
+    label: "Applications",
+    description:
+      "Who builds the department application forms, and who decides the submissions they bring in.",
+    permissions: [
+      {
+        key: "applications.manage",
+        label: "Build applications anywhere",
+        detail:
+          "Create and edit applications for every department, not just your own. Department command already build their own without this.",
+      },
+      {
+        key: "applications.review",
+        label: "Review every application",
+        detail:
+          "Read and decide submissions across every department. Each application also names its own reviewer roles, which the bot enforces on the Discord buttons.",
+      },
+    ],
+  },
+  {
     id: "promotions",
     label: "Promotion board",
     description:
@@ -257,6 +277,12 @@ export const DEFAULT_GRANTS = {
   "promotions.vote": staffFrom("mod"),
   "promotions.nominate": staffFrom("senior_mod"),
   "promotions.manage": ["head_admin", "directorship", "ownership"],
+
+  // Department command build their own department's applications without a
+  // grant — canManageApplications knows the command role for each. These two are
+  // the community-wide versions, for the people who oversee every department.
+  "applications.manage": ["head_admin", "directorship", "ownership"],
+  "applications.review": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

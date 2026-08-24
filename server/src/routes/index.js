@@ -15,6 +15,7 @@ import permissionsRouter from "./permissions.js";
 import departmentHubRouter from "./departmentHub.js";
 import formsRouter from "./forms.js";
 import promotionsRouter from "./promotions.js";
+import applyRouter from "./applications.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -44,6 +45,10 @@ router.use("/forms", formsRouter);
 // The promotion board spans the staff ladder rather than one hub, so it sits
 // beside them too.
 router.use("/promotions", promotionsRouter);
+// The configurable application system. Mounted at /apply rather than
+// /applications because that path already belongs to the older fixed whitelist
+// form, and the two are separate systems until that one is retired.
+router.use("/apply", applyRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

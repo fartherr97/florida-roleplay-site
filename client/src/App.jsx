@@ -24,6 +24,12 @@ import SignIn from "./pages/SignIn";
 import CreateAccount from "./pages/CreateAccount";
 import HubShell from "./components/hub/HubShell";
 import DeptShell from "./components/dept/DeptShell";
+import ApplyIndex from "./pages/apply/ApplyIndex";
+import ApplyForm from "./pages/apply/ApplyForm";
+import ApplySubmitted from "./pages/apply/ApplySubmitted";
+import ApplyManage from "./pages/apply/ApplyManage";
+import ApplyBuilder from "./pages/apply/ApplyBuilder";
+import ApplyReview from "./pages/apply/ApplyReview";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -87,6 +93,15 @@ export default function App() {
             <Route path="applications" element={<Applications />} />
             <Route path="applications/:type" element={<ApplicationForm />} />
 
+            {/* The configurable application system. /manage sits above /:slug so
+                a department cannot claim the address by naming a form "manage". */}
+            <Route path="apply" element={<ApplyIndex />} />
+            <Route path="apply/manage" element={<ApplyManage />} />
+            <Route path="apply/manage/submissions/:reference" element={<ApplyReview />} />
+            <Route path="apply/manage/:id" element={<ApplyBuilder />} />
+            <Route path="apply/:slug" element={<ApplyForm />} />
+            <Route path="apply/:slug/submitted" element={<ApplySubmitted />} />
+
             <Route path="departments" element={<Departments />} />
             <Route path="departments/:id" element={<DepartmentDetail />} />
 
@@ -130,7 +145,6 @@ export default function App() {
 
             {/* Friendly redirects for legacy paths */}
             <Route path="home" element={<Navigate to="/" replace />} />
-            <Route path="apply" element={<Navigate to="/applications" replace />} />
             <Route path="whitelist" element={<Navigate to="/applications/whitelist" replace />} />
             <Route path="donate" element={<Navigate to="/store" replace />} />
             <Route path="shop" element={<Navigate to="/store" replace />} />

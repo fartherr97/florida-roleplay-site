@@ -8,7 +8,9 @@ import { SITE } from "./mockData";
 export const primaryLinks = [
   { label: "Home", to: "/" },
   { label: "Rules", to: "/rules" },
-  { label: "Applications", to: "/applications" },
+  // Points at the configurable system, not the older fixed whitelist form at
+  // /applications — that one is still reachable, just no longer the front door.
+  { label: "Applications", to: "/apply" },
   { label: "Discord", href: SITE.discordInvite, external: true },
   { label: "Store", to: "/store" },
   { label: "Knowledge Base", to: "/knowledge-base" },
