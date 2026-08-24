@@ -18,6 +18,7 @@ import promotionsRouter from "./promotions.js";
 import applyRouter from "./applications.js";
 import transfersRouter from "./transfers.js";
 import disciplineRouter from "./discipline.js";
+import supportRouter from "./support.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -59,6 +60,8 @@ router.use("/transfers", transfersRouter);
 // because a background check that covers half the community reads as a clean
 // record rather than an incomplete one.
 router.use("/discipline", disciplineRouter);
+// The support portal. Members open tickets here; the support team works them.
+router.use("/support", supportRouter);
 
 /** Try the DB query; on any failure, return the seed fallback. */
 async function safe(res, dbFn, fallback) {

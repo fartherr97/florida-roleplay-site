@@ -16,6 +16,7 @@ export const primaryLinks = [
   { label: "Knowledge Base", to: "/knowledge-base" },
   { label: "Events", to: "/events" },
   { label: "Reports / Complaints", to: "/reports" },
+  { label: "Support", to: "/support" },
 ];
 
 export const navGroups = [

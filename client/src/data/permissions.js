@@ -127,6 +127,34 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "support",
+    label: "Support portal",
+    description:
+      "Tickets members open and the team works. Anybody signed in can open one — these decide who answers them.",
+    permissions: [
+      {
+        key: "support.work",
+        label: "Work the queue",
+        detail:
+          "See every ticket, reply, write internal notes, change status and take one. The support team's grant.",
+      },
+      {
+        key: "support.escalated",
+        label: "Handle reports about staff",
+        detail:
+          "See and work tickets reporting a staff member. Deliberately apart from support.work — a report about the staff team that the staff team triages is not a report.",
+        sensitive: true,
+      },
+      {
+        key: "support.manage",
+        label: "Run the portal",
+        detail:
+          "Hand a ticket to somebody else, and build the response flows agents walk. Without it an agent can take a ticket but not push one onto a colleague.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "discipline",
     label: "Disciplinary actions",
     description:
@@ -347,6 +375,13 @@ export const DEFAULT_GRANTS = {
   "discipline.file": ["senior_admin", "head_admin", "directorship", "ownership"],
   "discipline.view": ["senior_admin", "head_admin", "directorship", "ownership"],
   "discipline.manage": ["head_admin", "directorship", "ownership"],
+
+  // Opening a ticket needs nothing but a Discord account — support that only
+  // answers people who already hold a role is not support. These decide who
+  // works them.
+  "support.work": staffFrom("trial_mod"),
+  "support.escalated": ["directorship", "ownership"],
+  "support.manage": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

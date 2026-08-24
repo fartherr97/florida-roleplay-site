@@ -34,6 +34,11 @@ import TransferPortal from "./pages/transfers/TransferPortal";
 import TransferNew from "./pages/transfers/TransferNew";
 import TransferTicket from "./pages/transfers/TransferTicket";
 import TransferSettings from "./pages/transfers/TransferSettings";
+import SupportHome from "./pages/support/SupportHome";
+import SupportNew from "./pages/support/SupportNew";
+import SupportQueue from "./pages/support/SupportQueue";
+import SupportFlows from "./pages/support/SupportFlows";
+import SupportTicket from "./pages/support/SupportTicket";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -114,6 +119,14 @@ export default function App() {
             <Route path="transfers/settings" element={<TransferSettings />} />
             <Route path="transfers/:id" element={<TransferTicket />} />
 
+            {/* The support portal. The named routes sit above /:id so a ticket
+                reference can never shadow them. */}
+            <Route path="support" element={<SupportHome />} />
+            <Route path="support/new" element={<SupportNew />} />
+            <Route path="support/queue" element={<SupportQueue />} />
+            <Route path="support/flows" element={<SupportFlows />} />
+            <Route path="support/:id" element={<SupportTicket />} />
+
             <Route path="departments" element={<Departments />} />
             <Route path="departments/:id" element={<DepartmentDetail />} />
 
@@ -161,7 +174,6 @@ export default function App() {
             <Route path="donate" element={<Navigate to="/store" replace />} />
             <Route path="shop" element={<Navigate to="/store" replace />} />
             <Route path="faq" element={<Navigate to="/knowledge-base" replace />} />
-            <Route path="support" element={<Navigate to="/knowledge-base" replace />} />
             <Route path="changelog" element={<Navigate to="/patch-notes" replace />} />
             <Route path="updates" element={<Navigate to="/patch-notes" replace />} />
             <Route path="complaints" element={<Navigate to="/reports" replace />} />

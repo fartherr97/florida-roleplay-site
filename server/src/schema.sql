@@ -879,3 +879,69 @@ CREATE TABLE IF NOT EXISTS disciplinary_actions (
   KEY idx_discipline_issuer (issued_by_discord_id, created_at),
   KEY idx_discipline_body (body_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------ --
+-- Support portal
+-- ------------------------------------------------------------------ --
+
+-- One row per ticket. `details` holds the intake answers for whichever type it
+-- is — a ban appeal's fields are not a bug report's, and a column per field
+-- across six types would be mostly nulls.
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id                  VARCHAR(32)  NOT NULL,
+  type                VARCHAR(32)  NOT NULL,
+  subject             VARCHAR(200) NOT NULL,
+  status              VARCHAR(16)  NOT NULL DEFAULT 'open',
+  priority            VARCHAR(16)  NOT NULL DEFAULT 'normal',
+  details             JSON         NOT NULL,
+  opened_by_discord_id VARCHAR(20) NULL,
+  opened_by_name      VARCHAR(128) NOT NULL,
+  assigned_to_discord_id VARCHAR(20) NULL,
+  assigned_to_name    VARCHAR(128) NULL,
+  history             JSON         NOT NULL,
+  -- Denormalised so a queue sorted by "least recently touched" does not need a
+  -- join against every message on every ticket.
+  last_message_at     TIMESTAMP    NULL,
+  created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_support_queue (status, priority, last_message_at),
+  KEY idx_support_opener (opened_by_discord_id, created_at),
+  KEY idx_support_assignee (assigned_to_discord_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The thread. `internal = 1` is a staff note the member never sees; it lives in
+-- the same table because the two differ by a flag and nothing else, and a query
+-- that forgets the flag is easier to spot than a join against the wrong table.
+--
+-- `reply_to_id` is what draws the quoted block above a message, so an agent
+-- answering the third question in a long ticket can say which one.
+CREATE TABLE IF NOT EXISTS support_messages (
+  id           VARCHAR(48)  NOT NULL,
+  ticket_id    VARCHAR(32)  NOT NULL,
+  internal     TINYINT(1)   NOT NULL DEFAULT 0,
+  author_id    VARCHAR(20)  NULL,
+  author_name  VARCHAR(128) NOT NULL,
+  author_role  VARCHAR(64)  NULL,
+  body         TEXT         NOT NULL,
+  reply_to_id  VARCHAR(48)  NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_support_messages_thread (ticket_id, created_at),
+  CONSTRAINT fk_support_messages FOREIGN KEY (ticket_id)
+    REFERENCES support_tickets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Response flows: the branching trees agents walk to compose a reply. The whole
+-- tree is one JSON document because it is edited as a whole by one person in a
+-- builder, the same reason department configs and applications are.
+CREATE TABLE IF NOT EXISTS support_flows (
+  id          VARCHAR(64) NOT NULL,
+  name        VARCHAR(120) NOT NULL,
+  enabled     TINYINT(1)  NOT NULL DEFAULT 0,
+  document    JSON        NOT NULL,
+  updated_by  VARCHAR(20) NULL,
+  created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

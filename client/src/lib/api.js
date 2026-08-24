@@ -13,6 +13,7 @@ import * as promotionMock from "../data/promotionData";
 import * as applySeed from "../data/applicationSeed";
 import * as transferSeed from "../data/transferSeed";
 import * as disciplineSeed from "../data/disciplineSeed";
+import * as supportSeed from "../data/supportSeed";
 import { gradeSubmission } from "./forms";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { normalizeApplication } from "./applicationConfig";
@@ -117,6 +118,17 @@ async function put(path, body, fallback) {
   }
 }
 
+/** PATCH with the same contract as put(). */
+async function patchJson(path, body, fallback) {
+  if (!USE_API) return fallback();
+  try {
+    return await request(path, { method: "PATCH", body: JSON.stringify(body) });
+  } catch (err) {
+    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    return fallback();
+  }
+}
+
 /** DELETE with the same contract as put(). */
 async function del(path, fallback) {
   if (!USE_API) return fallback();
@@ -190,6 +202,16 @@ function transferFallback(id) {
   const ticket = transferSeed.TRANSFERS.find((entry) => entry.id === id);
   if (!ticket) return null;
   return { ticket, can: { manage: false, internal: false, close: false, signFor: null } };
+}
+
+/**
+ * One ticket, computed locally. `can` is all false: the server resolves it from
+ * the caller's permissions, and guessing would offer a status control that 403s.
+ */
+function supportFallback(id) {
+  const ticket = supportSeed.TICKETS.find((entry) => entry.id === id);
+  if (!ticket) return null;
+  return { ticket, can: { work: false, lead: false } };
 }
 
 /** Reference ids are generated client-side only when the API is unreachable. */
@@ -526,6 +548,60 @@ export const api = {
       { decision, reason },
       () => ({ ok: false, message: "The API is unreachable, so no decision was recorded." }),
     ),
+
+  /* ---------------------------- Support portal ---------------------------- */
+
+  /**
+   * Tickets. Reads fall back to the seeds; writes do not — a ticket that only
+   * exists in one browser is somebody waiting for an answer nobody can see.
+   */
+  supportTickets: (scope) =>
+    get(`/support${scope ? `?scope=${encodeURIComponent(scope)}` : ""}`, {
+      tickets: supportSeed.TICKETS,
+      scope: scope ?? "mine",
+      agent: false,
+      lead: false,
+    }),
+
+  supportTicket: (id) =>
+    get(`/support/${encodeURIComponent(id)}`, supportFallback(id)),
+
+  openSupportTicket: (payload) =>
+    post("/support", payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was submitted. Nobody has seen this — try again once it is back.",
+    })),
+
+  /** Status, priority and assignment are one call — they are one action. */
+  updateSupportTicket: (id, patch) =>
+    patchJson(`/support/${encodeURIComponent(id)}`, patch, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was changed.",
+    })),
+
+  supportMessages: (id) =>
+    get(`/support/${encodeURIComponent(id)}/messages`, {
+      messages: supportSeed.MESSAGES.filter((m) => m.ticketId === id && !m.internal),
+    }),
+
+  postSupportMessage: (id, payload) =>
+    post(`/support/${encodeURIComponent(id)}/messages`, payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so that message was not posted.",
+    })),
+
+  supportFlows: () =>
+    get("/support/flows/list", { flows: supportSeed.FLOWS, canEdit: false }),
+
+  saveSupportFlow: (id, flow) =>
+    put(`/support/flows/${encodeURIComponent(id)}`, { flow }, () => ({
+      ok: true,
+      flow,
+      message: NOT_PERSISTED,
+    })),
+
+  deleteSupportFlow: (id) =>
+    del(`/support/flows/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
 
   /* ------------------------- Disciplinary actions ------------------------- */
 

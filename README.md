@@ -400,6 +400,71 @@ Each submission stores its own copy of the application. A question edited
 tomorrow never rewrites what somebody was asked today, and deleting an
 application leaves its submissions readable.
 
+## Support portal — `/support`
+
+Members open tickets, the team works them. `/support` is a member's own list,
+`/support/queue` is the team's, and `/support/flows` is where the branching
+replies are built.
+
+### The type decides the form
+
+Picking what a ticket is about first is what makes the rest of it worth filling
+in — a ban appeal asks where and when, a bug asks what you were doing. One box
+labelled "describe your issue" just means every reply starts by chasing details
+the form could have asked for.
+
+**Report a staff member** is the type that shapes the access model: it is worked
+only by `support.escalated` (Directorship), so an ordinary agent cannot see it
+even though they work every other queue. A report about the staff team that the
+staff team triages is not a report.
+
+### Internal notes
+
+They sit inline in the thread, badged, rather than behind a tab — that is how
+the team's existing portal shows them, and threading a note next to the message
+it is about is most of its value. The safety is in the composer instead: the
+note toggle recolours the whole box amber while it is on.
+
+What is *not* a UI decision — an internal note never reaches a member's browser.
+The server drops them from the query. Asking to post one without the standing is
+a denial rather than a quiet downgrade to the public thread.
+
+### Status moves itself
+
+An agent replying moves a ticket to **waiting on member**; the member replying
+moves it back to **open**. An internal note moves nothing. Without that a queue
+fills with tickets nobody can act on, and "open" stops meaning anything.
+
+### The rail
+
+Status, priority and assignment are one endpoint, because they are one action:
+picking a ticket up means assigning it to yourself and moving it off `open` in
+the same breath, and two round trips leave a window where it is assigned but
+untouched. Every change writes history — who reassigned a ticket and when is the
+first thing anybody asks when one goes wrong.
+
+Taking a ticket needs `support.work`. **Handing one to somebody else** needs
+`support.manage`, so an agent cannot clear their own queue by pushing everything
+onto a colleague.
+
+### Response flows
+
+A tree of prompts whose leaves are reply text. An agent picks a flow, answers
+the follow-ups the answer actually depends on — "which server", "was it
+permanent" — and lands on the reply.
+
+**It inserts, it does not send.** That is the whole safety of the feature: a
+canned answer that posts itself is how somebody gets a reply about the wrong
+server. `{user}`, `{agent}`, `{ticket}` and `{subject}` are filled in on the way
+into the box.
+
+The builder is an indented outline rather than a canvas of boxes and arrows. A
+support tree is three or four deep and every branch ends in text — an outline
+shows the whole shape on one screen and stays editable on a laptop. A flow can
+be saved as a draft with problems, but going live is refused while any branch
+points at a step that no longer exists, because that dead-ends an agent
+mid-conversation with a member.
+
 ## Disciplinary actions — the DA Hub and `/bgcheck`
 
 Every action taken against a member, by the staff team or by a department, in
