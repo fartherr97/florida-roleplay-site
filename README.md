@@ -433,12 +433,16 @@ The original carried its own Discord OAuth and a `role-map.js` full of
 | Portal role | Here |
 | --- | --- |
 | Department head | Holds that department's command rank — the same rule the application builder uses |
-| Management | Holds `transfers.manage` |
+| Management | **Directorship**, via `transfers.manage` |
 | Transferee | Everybody else, on their own tickets |
 
-Management sees every ticket. A department head sees tickets where their
+Directorship sees every ticket, and is the only tier that closes or reopens one
+or edits the webhook settings. A department head sees tickets where their
 department is on either side — both have to sign, so both have to read it.
 Everybody else sees only their own, on the public thread only.
+
+The check is named for the permission rather than the rank, so if that oversight
+ever moves off Directorship it moves on the permissions page and nowhere else.
 
 The department somebody signs for is resolved from their roles server-side, never
 read from the request body — otherwise a Fire Chief could post `{ dept: "fhp" }`
@@ -473,7 +477,7 @@ filter on `last_seen` rather than relying on anything having cleaned up.
 ### Discord notifications
 
 Each department can point new tickets at a Discord webhook, configured under
-Settings (management only) with a live preview of the embed.
+Settings (Directorship only) with a live preview of the embed.
 
 A webhook posts a message and nothing else, which is the right tool here: a
 transfer is decided in this portal by two department heads, so the Discord
@@ -482,7 +486,7 @@ Where buttons *are* needed — applications — the bot owns them, because a web
 cannot carry one.
 
 **The webhook URL is write-only.** It never comes back from the API, not even to
-the management tier that just typed it in, because anybody holding it can post
+the Directorship that just typed it in, because anybody holding it can post
 into that channel as the department forever. The page shows whether one is set,
 never what it is, and a blank field means "leave it alone" rather than "delete
 it". Only real `discord.com/api/webhooks/…` URLs are accepted.

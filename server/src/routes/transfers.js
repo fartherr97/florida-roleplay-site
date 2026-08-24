@@ -429,12 +429,12 @@ router.post("/:id/process", async (req, res) => {
   res.json({ ok: true, ticket: next });
 });
 
-/** Close or reopen. Management only — it is the undo for everything above. */
+/** Close or reopen. Directorship only — it is the undo for everything above. */
 router.post("/:id/state", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
   if (!canCloseTicket(ctx)) {
-    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Only management closes and reopens transfers." });
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Only Directorship closes and reopens transfers." });
   }
   const ticket = await loadTicket(str(req.params.id));
   if (!ticket) return res.status(404).json({ ok: false, message: "No such transfer." });
@@ -615,14 +615,14 @@ async function loadWebhooks() {
  *
  * A webhook URL is a credential: anybody holding it can post into that channel
  * as the department, forever, with no further authentication. So the API answers
- * with whether one is set, never with what it is — even to the management tier
+ * with whether one is set, never with what it is — even to the Directorship
  * that just typed it in.
  */
 router.get("/settings/webhooks", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
   if (!isManagement(ctx)) {
-    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Webhook settings are management only." });
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Webhook settings are Directorship only." });
   }
   const configs = await loadWebhooks();
   const redacted = Object.fromEntries(
@@ -636,7 +636,7 @@ router.put("/settings/webhooks/:deptId", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
   if (!isManagement(ctx)) {
-    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Webhook settings are management only." });
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Webhook settings are Directorship only." });
   }
   const deptId = str(req.params.deptId);
   if (!TRANSFER_DEPARTMENT_IDS.includes(deptId)) {
@@ -691,7 +691,7 @@ router.post("/settings/webhooks/:deptId/test", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
   if (!isManagement(ctx)) {
-    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Webhook settings are management only." });
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Webhook settings are Directorship only." });
   }
   const deptId = str(req.params.deptId);
   const config = (await loadWebhooks())[deptId];

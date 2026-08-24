@@ -209,7 +209,7 @@ export default function TransferTicket() {
 
         {can.close && (
           <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.06] pt-5">
-            <p className="mr-auto self-center text-xs text-slate-500">Management</p>
+            <p className="mr-auto self-center text-xs text-slate-500">Directorship</p>
             {ticket.status !== "closed" ? (
               <Button variant="ghost" size="sm" onClick={() => act("close")} disabled={Boolean(busy)}>
                 Close ticket

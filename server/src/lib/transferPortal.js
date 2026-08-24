@@ -13,7 +13,8 @@
  * 2. **Access is this site's permission model.** The original resolved its own
  *    Discord roles into `isDeptHead` / `isManagement` through a role-map file
  *    of its own. Here a department head is that department's command role and
- *    management is `transfers.manage` — the same indirection every other gate
+ *    oversight of every department is `transfers.manage`, which Directorship
+ *    holds — the same indirection every other gate
  *    on this site uses.
  * 3. **It is a section of the site, not an app.** One React app, one router,
  *    one design system, one session. The original carried its own Discord OAuth,
@@ -117,9 +118,13 @@ export function isTerminal(status) {
  * ------------------------------------------------------------------ */
 
 /**
- * Management oversees every ticket. On SSRP this was a list of Discord role
- * ids; here it is a permission, so it is edited on the permissions page like
- * everything else.
+ * Whoever oversees every ticket rather than one department's side of it —
+ * Directorship, by default.
+ *
+ * On SSRP this was a list of Discord role ids in a config file. Here it is a
+ * permission, so it is edited on the permissions page like everything else, and
+ * the tier that holds it can change without touching this function. That is why
+ * the check is named for the capability and not for the rank.
  */
 export function isManagement({ permissions = new Set() } = {}) {
   const perms = permissions instanceof Set ? permissions : new Set(permissions);
@@ -153,7 +158,7 @@ export function isOwnTicket(ticket, { user } = {}) {
 /**
  * Can this caller open the ticket at all?
  *
- * Management sees everything. A department head sees tickets where their
+ * Directorship sees everything. A department head sees tickets where their
  * department is either side of the move — both of them have to sign, so both of
  * them have to read it. Everybody else sees only their own.
  */
@@ -184,7 +189,7 @@ export function signingDepartmentFor(ticket, ctx) {
   const mine = headOf(ctx);
   if (mine.includes(ticket.fromDept)) return ticket.fromDept;
   if (mine.includes(ticket.toDept)) return ticket.toDept;
-  // Management signs for whichever side has not signed yet — they oversee both.
+  // Directorship signs for whichever side has not signed yet — they oversee both.
   if (isManagement(ctx)) {
     const signed = new Set((ticket.approvals ?? []).map((a) => a.dept));
     if (!signed.has(ticket.fromDept)) return ticket.fromDept;
@@ -193,7 +198,7 @@ export function signingDepartmentFor(ticket, ctx) {
   return null;
 }
 
-/** Only management ends a ticket or puts it back. */
+/** Only Directorship ends a ticket or puts it back. */
 export function canCloseTicket(ctx) {
   return isManagement(ctx);
 }

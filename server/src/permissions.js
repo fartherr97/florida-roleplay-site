@@ -126,7 +126,7 @@ export const PERMISSION_GROUPS = [
     id: "transfers",
     label: "Transfer portal",
     description:
-      "Moving a member between emergency services departments. Each department's command signs for its own side; these are the community-wide grants.",
+      "Moving a member between emergency services departments. Each department's command signs for its own side; Directorship oversees every one of them.",
     permissions: [
       {
         key: "transfers.view",
@@ -138,7 +138,7 @@ export const PERMISSION_GROUPS = [
         key: "transfers.manage",
         label: "Oversee every transfer",
         detail:
-          "Read and act on every ticket regardless of department, and close or reopen one. Department heads already sign for their own department without this.",
+          "Read and act on every ticket regardless of department, and close or reopen one. Directorship holds this; department heads already sign for their own department without it.",
         sensitive: true,
       },
     ],
@@ -303,9 +303,10 @@ export const DEFAULT_GRANTS = {
 
   // Anybody in a department may raise a transfer; which tickets they can then
   // read is decided per ticket rather than by this grant. transfers.manage is
-  // the oversight tier — department command sign for their own side without it.
+  // the oversight tier over every department, which is Directorship — the
+  // department command sign for their own side without it.
   "transfers.view": ["member", "whitelisted", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
-  "transfers.manage": ["head_admin", "directorship", "ownership"],
+  "transfers.manage": ["directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

@@ -41,7 +41,8 @@ const SAMPLE = {
  *
  * The URL is write-only. It never comes back from the API, because anybody
  * holding it can post into that channel as the department forever — so the page
- * shows whether one is set, not what it is.
+ * shows whether one is set, not what it is, even to the Directorship that just
+ * typed it in.
  */
 export default function TransferSettings() {
   const { hasPermission } = useAuth();
