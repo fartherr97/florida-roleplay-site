@@ -11,6 +11,23 @@ import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
 const DEV_MODE = process.env.NODE_ENV !== "production";
 
 /**
+ * The highest staff rank a set of role keys carries, as a label.
+ *
+ * STAFF_RANKS is ordered lowest first and each rank lists every role beneath it,
+ * so the last entry whose own key is held is the one somebody actually is.
+ */
+const RANK_ORDER = Object.keys(STAFF_RANKS);
+
+export function rankFor(roleKeys = []) {
+  const held = new Set(roleKeys);
+  for (let i = RANK_ORDER.length - 1; i >= 0; i -= 1) {
+    const key = RANK_ORDER[i];
+    if (held.has(key)) return RANK_LABELS[key] ?? null;
+  }
+  return null;
+}
+
+/**
  * Resolves the calling user and their Discord roles. Until OAuth is wired, a
  * development caller is read from DEV_USER_ID — a path that is hard-disabled in
  * production so it can never become a live authentication bypass.
@@ -45,7 +62,11 @@ export async function resolveUser(req) {
     );
     if (users.length > 0) {
       const roles = await query("SELECT role FROM user_roles WHERE user_id = ?", [devId]);
-      return { ...users[0], roles: roles.map((row) => row.role) };
+      const held = roles.map((row) => row.role);
+      // The seed caller and the preview path both carry a `rank`; a row out of
+      // the database does not, so derive it from the roles rather than leaving
+      // every caller to work out which of eleven role keys is the top one.
+      return { ...users[0], roles: held, rank: rankFor(held) };
     }
   } catch {
     // Database unavailable — fall through to the seed caller below.

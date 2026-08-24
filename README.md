@@ -102,11 +102,75 @@ shared-package overhead.
 
 ### Staff Hub — `/staff-hub`
 
-| Group | Pages |
-| --- | --- |
-| Staff Portal | Overview (reminders, staff member of the month, quick notes), Staff Roster, Staff Dashboard, Trial Mod Checklist, Staff DA Database |
-| Rank Access | Resources, Administrators, Senior Admins+, Director panel |
-| Exam Backend | Recent Submissions (with attempt review and manual override), Members, Audit Log, Management (thresholds and question catalog) |
+The staff bar is a **flat row of tabs**, not dropdown groups. Seventeen
+destinations do not fit in one row, so the split is by how often a page is
+opened rather than by what it is about: the eleven a moderator touches in a
+shift are tabs, and everything configured once and then left alone lives behind
+the last one.
+
+| Tab | What it is | Permission |
+| --- | --- | --- |
+| Home | Reminders, staff member of the month, quick notes | `staff.view` |
+| Roster | The staff roster, projected from Discord roles | `staff.view` |
+| DA Hub | File a disciplinary action; see yours and, with the permission, everyone's | `staff.view` |
+| Reports | The moderation queue — what members filed through `/reports` | `site.moderation` |
+| Forms | Forms and exams shared with the department hubs | `staff.view` |
+| Training Dashboard | Who is in training, who has them, how long it has run | `staff.view` |
+| DA Database | Look up one member's disciplinary background | `staff.da_view` |
+| Analytics | Counted from disciplinary actions, tickets and the roster | `staff.view` |
+| Promotion Board | Nominations and the vote | `promotions.view` |
+| Applications | The review queue for `/apply` | `staff.view` |
+| Site Administration | Everything below | `staff.view` |
+
+A tab whose permission the viewer does not hold is dropped rather than rendered
+as a dead end — the route gate and the API still enforce it either way. Below
+the `hub` breakpoint (1120px) the row collapses into the same right-hand drawer
+the public site uses, fed from the same tab list.
+
+Between those two points the row **measures itself and moves what will not fit
+into a More dropdown**. Eleven tabs only fit above about 1900px; as a plain
+scrolling strip, Site Administration was simply absent on a 1440px laptop with
+nothing on screen to say so, and a menu nobody can see is a page nobody opens.
+The widths are taken on the first pass while every tab is still rendered and
+kept — re-measuring a truncated row would lose the ones already moved into the
+menu. When the current page is one of the tabs inside it, the More trigger
+carries the active underline, so the bar never looks like nothing is selected.
+
+Two pages the bar no longer carries — the Staff Dashboard (this week's claim
+volume and response times) and the Trial Mod Checklist — sit as cards on Home
+instead. They fall either side of the split the bar is built on: not what a
+moderator opens every shift, not what a director configures once a month. A
+twelfth tab would have cost the ten that matter more than those two gain.
+
+**Site Administration** is a page, not a menu: four groups — access control
+(Permissions, Discord Role Mapping), the exam backend (Recent Submissions,
+Members, Audit Log, Thresholds & Questions), rank resources (Resources,
+Administrators, Senior Admins+, Head Admin) and the support portal (Ticket
+queue, Response flows, Transfer portal). Each entry carries its own permission
+and a group with nothing left in it disappears, so a moderator opening the page
+sees three links rather than fourteen refusals.
+
+Three of the tabs are worth a note:
+
+- **Reports** reads `GET /reports` and moves rows with `POST
+  /reports/:reference/status`. Reports had a write path and no read path — they
+  went into the table and nobody could see them; this is the other half. A
+  status change that the API refuses says so on the page rather than letting the
+  dropdown snap back and look broken.
+- **Training Dashboard** flags any pairing running past thirty days. That number
+  is the point of the page: a trial who has been shadowing for six weeks is
+  either being neglected or is not going to make it, and both want somebody to
+  notice. The clock is stamped once per render, so a row does not tick over from
+  29 to 30 days while it is being read.
+- **Analytics** counts rows that already exist — disciplinary actions, support
+  tickets, the roster — over a 30/90/180-day window. Nothing on it is a metric
+  invented for a dashboard, because a number nobody can trace back to a row is a
+  number nobody trusts the moment it looks wrong.
+
+The user chip in a hub carries the rank and the band it sits in (Ownership,
+Leadership, Administration, Moderation). The rank is derived server-side from
+the caller's role keys in `requireRole.js` (`rankFor`), so it is the same value
+the gates are using rather than something the client guessed.
 
 Ranks run Trial Mod → Mod → Sr. Mod → Jr. Admin → Admin → Sr. Admin → Head
 Admin → Directorship → Ownership, each granting the roles below it, over a

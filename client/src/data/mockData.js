@@ -166,6 +166,45 @@ export const mockUser = {
  * Live-ish server state
  * ------------------------------------------------------------------ */
 
+/** Mirrors reportQueue in server/src/seed.js — the staff-side moderation list. */
+export const reportQueue = [
+  {
+    reference: "RPT-48120",
+    type: "Player report",
+    discordId: "402118844500000921",
+    involved: "Toby Marsh",
+    occurredAt: "Last night, around 11pm",
+    evidence: "https://medal.tv/example-clip",
+    description:
+      "Rammed three vehicles on the interstate then logged off when a trooper caught up. Clip attached from the trooper's side.",
+    status: "Pending Review",
+    createdAt: new Date(Date.now() - 4 * 3_600_000).toISOString(),
+  },
+  {
+    reference: "RPT-48097",
+    type: "Staff complaint",
+    discordId: "402118844500000922",
+    involved: "A moderator",
+    occurredAt: "Two days ago",
+    evidence: "",
+    description:
+      "Felt the warning I got was not explained. Would like somebody to look at the interaction.",
+    status: "Investigating",
+    createdAt: new Date(Date.now() - 40 * 3_600_000).toISOString(),
+  },
+  {
+    reference: "RPT-48044",
+    type: "Player report",
+    discordId: "402118844500000923",
+    involved: "Unknown civilian",
+    occurredAt: "Sunday evening",
+    evidence: "https://example.com/clip",
+    description: "VDM outside the bank. No interaction beforehand.",
+    status: "Actioned",
+    createdAt: new Date(Date.now() - 96 * 3_600_000).toISOString(),
+  },
+];
+
 export const serverStatus = {
   online: true,
   players: 118,

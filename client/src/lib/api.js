@@ -549,6 +549,16 @@ export const api = {
       () => ({ ok: false, message: "The API is unreachable, so no decision was recorded." }),
     ),
 
+  /* -------------------------- Moderation queue --------------------------- */
+
+  moderationQueue: () => get("/reports", { reports: mock.reportQueue ?? [] }),
+
+  setReportStatus: (reference, status) =>
+    post(`/reports/${encodeURIComponent(reference)}/status`, { status }, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was changed.",
+    })),
+
   /* ---------------------------- Support portal ---------------------------- */
 
   /**

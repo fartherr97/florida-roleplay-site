@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { ExternalLink, Menu } from "lucide-react";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
@@ -11,6 +11,14 @@ import { useAuth } from "../../context/useAuth";
 import { hubIcon } from "../../lib/hubIcons";
 import { PREVIEW_RANKS } from "../../data/mockData";
 import { cn } from "../../lib/cn";
+
+/** The More menu borrows the bar's own palette rather than a group colour. */
+const TAB_MENU_TONE = {
+  text: "text-slate-300",
+  tile: "bg-white/[0.06] text-slate-300 ring-white/10",
+};
+
+const TAB_MENU_TONE_ACTIVE = { ...TAB_MENU_TONE, text: "text-white" };
 
 /** Vertical hairline separating the bar's regions, as on the public site. */
 function Divider() {
@@ -46,7 +54,64 @@ export default function HubTopBar({ hub }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const groups = hub.groups
+  // A hub either carries a flat row of tabs or colour-coded group dropdowns.
+  // The staff team has enough destinations that a row of tabs reads faster than
+  // three menus you have to open to find out what is in them.
+  const tabs = (hub.tabs ?? []).filter((tab) => loading || hasPermission(tab.permission));
+
+  // Priority-plus overflow for the flat row.
+  //
+  // Eleven tabs only fit above about 1900px. Left as a plain scrolling strip,
+  // Site Administration was simply absent on a 1440px laptop with nothing to
+  // say so — a menu you cannot see is a page nobody opens. So the row measures
+  // itself and moves whatever will not fit into a More dropdown.
+  const navRef = useRef(null);
+  const [layout, setLayout] = useState(null);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    // Widths are taken from the first pass, when every tab is still rendered;
+    // after that only the available width changes, and re-measuring a truncated
+    // row would lose the ones already moved into the menu.
+    const measure = () => {
+      setLayout((prev) => ({
+        avail: el.clientWidth,
+        count: tabs.length,
+        widths:
+          prev?.count === tabs.length
+            ? prev.widths
+            : [...el.querySelectorAll("[data-tab]")].map((node) => node.getBoundingClientRect().width),
+      }));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [tabs.length]);
+
+  // How many tabs fit, leaving room for the More trigger when one is needed.
+  const visibleCount = useMemo(() => {
+    if (!layout || layout.widths.length !== tabs.length) return tabs.length;
+    const GAP = 4;
+    const MORE = 76;
+    const total = layout.widths.reduce((sum, w) => sum + w + GAP, 0);
+    if (total <= layout.avail) return tabs.length;
+    let used = MORE;
+    let count = 0;
+    for (const width of layout.widths) {
+      used += width + GAP;
+      if (used > layout.avail) break;
+      count += 1;
+    }
+    // One lonely tab beside a More button reads worse than the menu alone.
+    return count < 2 ? 0 : count;
+  }, [layout, tabs.length]);
+
+  const shownTabs = tabs.slice(0, visibleCount);
+  const overflowTabs = tabs.slice(visibleCount);
+  const overflowActive = overflowTabs.some((tab) => location.pathname.startsWith(tab.to));
+
+  const groups = (hub.groups ?? [])
     .map((group) => ({
       ...group,
       items: group.items.filter(
@@ -87,20 +152,74 @@ export default function HubTopBar({ hub }) {
               few left them stranded mid-bar with the brand far off to one side.
               The trailing divider goes with the centring: left-aligned, it would
               have hung off the last group with nothing after it. */}
-          <nav className="hidden min-w-0 flex-1 items-center justify-start gap-3 hub:flex">
-            <Divider />
-            {groups.map((group, index) => (
-              <div key={group.id} className="flex items-center gap-3">
-                {index > 0 && <Divider />}
-                <NavDropdown
-                  label={group.label}
-                  tone={group.tone}
-                  items={group.items}
-                  resolveIcon={hubIcon}
-                />
-              </div>
-            ))}
-          </nav>
+          {hub.flat ? (
+            /* A flat tab row. It never wraps — the bar is a fixed height and a
+               second line of tabs would push the page down every time the
+               window narrowed a little — so what will not fit goes into More. */
+            <nav
+              ref={navRef}
+              className="hidden min-w-0 flex-1 items-center gap-1 hub:flex"
+            >
+              {shownTabs.map((tab) => (
+                <NavLink
+                  key={tab.to}
+                  to={tab.to}
+                  data-tab
+                  className={({ isActive }) =>
+                    cn(
+                      "relative whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition",
+                      isActive
+                        ? "text-white"
+                        : tab.accent
+                          ? "text-primary-400 hover:text-primary-300"
+                          : "text-slate-300 hover:text-white",
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {tab.label}
+                      {isActive && (
+                        <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary-500" />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+
+              {overflowTabs.length > 0 && (
+                <span className="relative ml-1 shrink-0 px-2">
+                  <NavDropdown
+                    label="More"
+                    // The trigger carries the active state when the current page
+                    // is one of the tabs inside it, so the bar never looks like
+                    // nothing at all is selected.
+                    tone={overflowActive ? TAB_MENU_TONE_ACTIVE : TAB_MENU_TONE}
+                    items={overflowTabs}
+                    resolveIcon={hubIcon}
+                  />
+                  {overflowActive && (
+                    <span className="absolute inset-x-2 -bottom-1.5 h-0.5 rounded-full bg-primary-500" />
+                  )}
+                </span>
+              )}
+            </nav>
+          ) : (
+            <nav className="hidden min-w-0 flex-1 items-center justify-start gap-3 hub:flex">
+              <Divider />
+              {groups.map((group, index) => (
+                <div key={group.id} className="flex items-center gap-3">
+                  {index > 0 && <Divider />}
+                  <NavDropdown
+                    label={group.label}
+                    tone={group.tone}
+                    items={group.items}
+                    resolveIcon={hubIcon}
+                  />
+                </div>
+              ))}
+            </nav>
+          )}
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3 hub:ml-3">
             {/* Wrapped rather than given `hidden` classes of their own: Badge
@@ -126,7 +245,7 @@ export default function HubTopBar({ hub }) {
               </Button>
             </span>
 
-            <UserChip />
+            <UserChip showRank />
 
             <button
               type="button"
@@ -141,11 +260,17 @@ export default function HubTopBar({ hub }) {
         </div>
       </header>
 
+      {/* The drawer only knows about groups, so a flat hub hands it one made
+          from its tabs — otherwise the mobile menu would be empty. */}
       <HubDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         hub={hub}
-        groups={groups}
+        groups={
+          hub.flat
+            ? [{ id: "tabs", label: hub.name, tone: hub.tone ?? {}, items: tabs }]
+            : groups
+        }
       />
     </>
   );

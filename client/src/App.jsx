@@ -49,6 +49,10 @@ import HubDashboard from "./pages/hub/HubDashboard";
 import HubChecklist from "./pages/hub/HubChecklist";
 import HubDaDatabase from "./pages/hub/HubDaDatabase";
 import HubDaHub from "./pages/hub/HubDaHub";
+import HubReports from "./pages/hub/HubReports";
+import HubTraining from "./pages/hub/HubTraining";
+import HubAnalytics from "./pages/hub/HubAnalytics";
+import HubAdministration from "./pages/hub/HubAdministration";
 import HubLinks from "./pages/hub/HubLinks";
 import HubHeadAdmin from "./pages/hub/HubHeadAdmin";
 import HubSubmissions from "./pages/hub/HubSubmissions";
@@ -209,6 +213,10 @@ export default function App() {
             <Route path="/staff-hub/dashboard" element={<HubDashboard />} />
             <Route path="/staff-hub/trial-checklist" element={<HubChecklist />} />
             <Route path="/staff-hub/da-hub" element={<HubDaHub />} />
+            <Route path="/staff-hub/reports" element={<HubReports />} />
+            <Route path="/staff-hub/training" element={<HubTraining />} />
+            <Route path="/staff-hub/analytics" element={<HubAnalytics />} />
+            <Route path="/staff-hub/administration" element={<HubAdministration />} />
             <Route path="/staff-hub/da-database" element={<HubDaDatabase />} />
 
             <Route

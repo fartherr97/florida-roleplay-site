@@ -95,23 +95,48 @@ export default function HubHome() {
         </p>
       </Card>
 
-      <Card
-        as={Link}
-        to="/staff-hub/resources"
-        hover
-        className="group mt-6 flex items-center gap-4 p-5"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-white">Staff Resources</p>
-          <p className="mt-1 text-sm text-slate-400">
-            Handbook, response templates, sanction guidelines and the shift sheet.
-          </p>
-        </div>
-        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-400 transition-all group-hover:gap-2.5">
-          Open
-          <ArrowRight className="size-3.5" />
-        </span>
-      </Card>
+      {/* The two pages that are not tabs. The bar carries what a moderator opens
+          in a shift and Site Administration carries what a director configures;
+          these sit either side of that line, so they live here rather than
+          becoming a twelfth tab nobody has room for. */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {SHORTCUTS.map((shortcut) => (
+          <Card
+            key={shortcut.to}
+            as={Link}
+            to={shortcut.to}
+            hover
+            className="group flex items-center gap-4 p-5"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-white">{shortcut.label}</p>
+              <p className="mt-1 text-sm text-slate-400">{shortcut.detail}</p>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-400 transition-all group-hover:gap-2.5">
+              Open
+              <ArrowRight className="size-3.5" />
+            </span>
+          </Card>
+        ))}
+      </div>
     </>
   );
 }
+
+const SHORTCUTS = [
+  {
+    to: "/staff-hub/resources",
+    label: "Staff Resources",
+    detail: "Handbook, response templates, sanction guidelines and the shift sheet.",
+  },
+  {
+    to: "/staff-hub/dashboard",
+    label: "Staff Dashboard",
+    detail: "This week's claim volume, response time and who is carrying the load.",
+  },
+  {
+    to: "/staff-hub/trial-checklist",
+    label: "Trial Mod Checklist",
+    detail: "What a trial has to clear before anybody signs them off.",
+  },
+]

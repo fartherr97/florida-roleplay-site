@@ -38,6 +38,12 @@ export const GUARDS = [
   // file for. Reading everybody else's record is the separate, stricter grant
   // the database below carries.
   { path: "/staff-hub/da-hub", permission: "staff.view" },
+  { path: "/staff-hub/reports", permission: "site.moderation" },
+  { path: "/staff-hub/training", permission: "staff.view" },
+  { path: "/staff-hub/analytics", permission: "staff.view" },
+  // The launcher itself only lists what you can already open, so it needs no
+  // gate beyond the hub's own.
+  { path: "/staff-hub/administration", permission: "staff.view" },
   { path: "/staff-hub/da-database", permission: "staff.da_view" },
   { path: "/staff-hub/administrators", permission: "staff.links.admin" },
   { path: "/staff-hub/senior-admins", permission: "staff.links.senior" },

@@ -492,6 +492,46 @@ router.post("/reports", async (req, res) => {
   return res.status(201).json({ ok: true, id });
 });
 
+/**
+ * The moderation queue.
+ *
+ * Reports had a write path and no read path — they went into the table and
+ * nobody could see them. This is the staff side, gated on `site.moderation`.
+ */
+router.get("/reports", requirePermission("site.moderation"), async (_req, res) => {
+  try {
+    const rows = await query(
+      `SELECT reference, type, discord_id AS discordId, involved, occurred_at AS occurredAt,
+              evidence, description, status, created_at AS createdAt
+         FROM reports ORDER BY created_at DESC LIMIT 500`,
+    );
+    return res.json({ reports: rows });
+  } catch {
+    return res.json({ reports: seed.reportQueue ?? [] });
+  }
+});
+
+/** Move one through the queue. */
+router.post("/reports/:reference/status", requirePermission("site.moderation"), async (req, res) => {
+  const status = String(req.body?.status ?? "");
+  const allowed = ["Pending Review", "Investigating", "Actioned", "Dismissed"];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ ok: false, message: "No such status." });
+  }
+  try {
+    const result = await query("UPDATE reports SET status = ? WHERE reference = ?", [
+      status,
+      String(req.params.reference),
+    ]);
+    if (!result?.affectedRows) {
+      return res.status(404).json({ ok: false, message: "No such report." });
+    }
+  } catch {
+    return res.status(503).json({ ok: false, message: "Reports need a database. Nothing was changed." });
+  }
+  res.json({ ok: true, status });
+});
+
 /* ------------------------------------------------------------- assistant */
 
 router.post("/assistant", (req, res) => {
