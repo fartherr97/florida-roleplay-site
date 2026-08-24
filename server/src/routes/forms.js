@@ -55,8 +55,7 @@ async function loadForms() {
 
 async function loadSubmissions() {
   try {
-    const rows = await query(
-      "SELECT id, form_id, subject_name, subject_discord_id, answers, submitted_at FROM form_submissions ORDER BY submitted_at DESC",
+    const rows = await query("SELECT id, form_id, subject_name, subject_discord_id, answers, submitted_at FROM form_submissions ORDER BY submitted_at DESC",
     );
     if (rows.length) {
       return rows.map((row) => ({
@@ -84,8 +83,7 @@ async function loadSubmissions() {
  */
 async function loadOverrides() {
   try {
-    const rows = await query(
-      "SELECT submission_id, question_id, awarded, reviewer, reviewed_at FROM form_reviews",
+    const rows = await query("SELECT submission_id, question_id, awarded, reviewer, reviewed_at FROM form_reviews",
     );
     const map = new Map();
     rows.forEach((row) => {
@@ -314,10 +312,9 @@ router.post("/:formId/submit", requirePermission("forms.submit"), withCaller, as
       };
 
   try {
-    await query(
-      `INSERT INTO form_submissions
+    await query(`INSERT INTO form_submissions
         (id, form_id, subject_name, subject_discord_id, answers)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5)`,
       [
         id,
         form.id,
@@ -389,10 +386,9 @@ router.post(
 
     try {
       for (const [questionId, value] of Object.entries(points)) {
-        await query(
-          `INSERT INTO form_reviews (submission_id, question_id, awarded, reviewer)
-                VALUES (?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE awarded = VALUES(awarded), reviewer = VALUES(reviewer),
+        await query(`INSERT INTO form_reviews (submission_id, question_id, awarded, reviewer)
+                VALUES ($1, $2, $3, $4)
+           ON CONFLICT (submission_id, question_id) DO UPDATE SET awarded = EXCLUDED.awarded, reviewer = EXCLUDED.reviewer,
                                    reviewed_at = CURRENT_TIMESTAMP`,
           [req.params.submissionId, questionId, Number(value), req.user?.id ?? null],
         );
@@ -429,11 +425,10 @@ router.put("/:formId", requirePermission("forms.manage"), withCaller, async (req
   if (errors.length > 0) return res.status(400).json({ ok: false, errors });
 
   try {
-    await query(
-      `INSERT INTO forms (id, audience, document, updated_by)
-            VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE audience = VALUES(audience), document = VALUES(document),
-                               updated_by = VALUES(updated_by)`,
+    await query(`INSERT INTO forms (id, audience, document, updated_by)
+            VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET audience = EXCLUDED.audience, document = EXCLUDED.document,
+                               updated_by = EXCLUDED.updated_by`,
       [form.id, form.audience, JSON.stringify(form), req.user?.id ?? null],
     );
   } catch {

@@ -1,6 +1,9 @@
 /**
- * One-shot schema initialiser. Opens a connection with no database selected —
- * schema.sql creates it — runs the DDL, then closes.
+ * One-shot schema initialiser.
+ *
+ * Every statement in schema.sql is IF NOT EXISTS (or CREATE OR REPLACE), so
+ * running this against a live database is a no-op rather than a migration. It
+ * is safe to run on every deploy, which is what the Railway start command does.
  *
  * Usage: npm run db:init
  */
@@ -8,29 +11,32 @@ import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import mariadb from "mariadb";
+import pool, { close } from "../db.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const sql = await readFile(resolve(here, "../schema.sql"), "utf8");
 
-  const conn = await mariadb.createConnection({
-    host: process.env.DB_HOST || "localhost",
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || "",
-    multipleStatements: true,
-  });
+  // One statement to node-postgres, which sends it as a simple query — that is
+  // what allows several statements separated by semicolons, and it runs them in
+  // an implicit transaction, so a failure half way leaves nothing behind.
+  const client = await pool.connect();
+  try {
+    await client.query(sql);
+  } finally {
+    client.release();
+  }
 
-  await conn.query(sql);
-  console.log(
-    `Schema initialised on ${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || 3306}`,
-  );
-  await conn.end();
+  const where = process.env.DATABASE_URL
+    ? new URL(process.env.DATABASE_URL).host
+    : `${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || 5432}`;
+  console.log(`Schema initialised on ${where}`);
+  await close();
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err.message);
+  await close();
   process.exit(1);
 });

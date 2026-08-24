@@ -1,6 +1,6 @@
 /**
  * Seed data for the Civilian Hub, mirroring client/src/data/civilianHubData.js so
- * the API serves realistic responses before MariaDB is populated. Every civilian
+ * the API serves realistic responses before Postgres is populated. Every civilian
  * route falls back to these shapes.
  *
  * NOTE: this file is intentionally a copy of the client's civilian mock data. If

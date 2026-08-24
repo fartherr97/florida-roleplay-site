@@ -56,12 +56,11 @@ export async function resolveUser(req) {
   if (!devId) return null;
 
   try {
-    const users = await query(
-      "SELECT id, username, display_name AS displayName, avatar FROM users WHERE id = ? LIMIT 1",
+    const users = await query(`SELECT id, username, display_name AS "displayName", avatar FROM users WHERE id = $1 LIMIT 1`,
       [devId],
     );
     if (users.length > 0) {
-      const roles = await query("SELECT role FROM user_roles WHERE user_id = ?", [devId]);
+      const roles = await query("SELECT role FROM user_roles WHERE user_id = $1", [devId]);
       const held = roles.map((row) => row.role);
       // The seed caller and the preview path both carry a `rank`; a row out of
       // the database does not, so derive it from the roles rather than leaving

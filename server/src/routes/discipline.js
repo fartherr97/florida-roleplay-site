@@ -11,7 +11,7 @@
  * a background check that silently omits it reads as a clean sheet.
  */
 import { Router } from "express";
-import { query, changedRows } from "../db.js";
+import { execute, query, changedRows } from "../db.js";
 import * as seed from "../disciplineSeed.js";
 import { loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser } from "../middleware/requireRole.js";
@@ -45,16 +45,25 @@ async function contextFor(req) {
 }
 
 const COLUMNS = `
-  id, type, body_id AS bodyId, target_name AS targetName,
-  target_discord_id AS targetDiscordId, issued_by_name AS issuedByName,
-  issued_by_discord_id AS issuedByDiscordId, reason, expires_at AS expiresAt,
-  voided, void_reason AS voidReason, created_at AS createdAt, updated_at AS updatedAt`;
+  id, type, body_id AS "bodyId", target_name AS "targetName",
+  target_discord_id AS "targetDiscordId", issued_by_name AS "issuedByName",
+  issued_by_discord_id AS "issuedByDiscordId", reason, expires_at AS "expiresAt",
+  voided, void_reason AS "voidReason", created_at AS "createdAt", updated_at AS "updatedAt"`;
 
 async function loadActions({ targetDiscordId, since } = {}) {
+  // Postgres numbers its placeholders, so a clause is written after its value is
+  // pushed and reads its own position off the array. Building the two lists
+  // independently is how a filter ends up bound to the wrong value.
   const where = [];
   const params = [];
-  if (targetDiscordId) { where.push("target_discord_id = ?"); params.push(targetDiscordId); }
-  if (since) { where.push("created_at >= ?"); params.push(since); }
+  if (targetDiscordId) {
+    params.push(targetDiscordId);
+    where.push(`target_discord_id = $${params.length}`);
+  }
+  if (since) {
+    params.push(since);
+    where.push(`created_at >= $${params.length}`);
+  }
   try {
     const rows = await query(
       `SELECT ${COLUMNS} FROM disciplinary_actions${where.length ? ` WHERE ${where.join(" AND ")}` : ""}
@@ -171,17 +180,20 @@ router.post("/", async (req, res) => {
 
   let insertId = null;
   try {
-    const result = await query(
-      `INSERT INTO disciplinary_actions
+    const result = await query(`INSERT INTO disciplinary_actions
          (type, body_id, target_name, target_discord_id, issued_by_name, issued_by_discord_id, reason, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         draft.type, draft.bodyId, draft.targetName, draft.targetDiscordId,
         ctx.user.displayName ?? ctx.user.username ?? "Unknown", ctx.user.id,
         draft.reason, draft.expiresAt ? new Date(draft.expiresAt) : null,
       ],
     );
-    insertId = Number(result?.insertId ?? 0) || null;
+    // Postgres has no "last insert id" to ask for afterwards — the INSERT says
+    // what it made, which is also the only version that is safe under
+    // concurrency.
+    insertId = result[0]?.id ?? null;
   } catch {
     return noStore(res);
   }
@@ -227,10 +239,9 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
-    const result = await query(
-      `UPDATE disciplinary_actions
-          SET type = ?, body_id = ?, target_name = ?, reason = ?, expires_at = ?
-        WHERE id = ?`,
+    const result = await execute(`UPDATE disciplinary_actions
+          SET type = $1, body_id = $2, target_name = $3, reason = $4, expires_at = $5
+        WHERE id = $6`,
       [next.type, next.bodyId, next.targetName, next.reason, next.expiresAt ? new Date(next.expiresAt) : null, id],
     );
     if (!changedRows(result)) return res.status(404).json({ ok: false, message: "Nothing was updated." });
@@ -268,8 +279,7 @@ router.post("/:id/void", async (req, res) => {
   }
 
   try {
-    const result = await query(
-      "UPDATE disciplinary_actions SET voided = 1, void_reason = ? WHERE id = ? AND voided = 0",
+    const result = await execute("UPDATE disciplinary_actions SET voided = TRUE, void_reason = $1 WHERE id = $2 AND voided = FALSE",
       [reason, id],
     );
     if (!changedRows(result)) {

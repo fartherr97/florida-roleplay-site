@@ -108,7 +108,7 @@ function rowToTransfer(row) {
   };
 }
 
-/** The mariadb driver hands JSON columns back already parsed on some versions. */
+/** JSONB comes back parsed; a TEXT column holding JSON does not. */
 function parseJson(value, fallback) {
   if (value == null) return fallback;
   if (typeof value !== "string") return value;
@@ -138,7 +138,7 @@ async function listTransfers() {
 }
 
 async function getTransfer(id) {
-  const rows = await query("SELECT * FROM transfers WHERE id = ? LIMIT 1", [id]);
+  const rows = await query("SELECT * FROM transfers WHERE id = $1 LIMIT 1", [id]);
   return rows[0] ? rowToTransfer(rows[0]) : null;
 }
 
@@ -170,13 +170,12 @@ function nowIso() {
 
 async function saveApprovals(id, approvals, history, status) {
   if (status) {
-    await query(
-      "UPDATE transfers SET approvals = ?, history = ?, status = ? WHERE id = ?",
+    await query("UPDATE transfers SET approvals = $1, history = $2, status = $3 WHERE id = $4",
       [JSON.stringify(approvals), JSON.stringify(history), status, id],
     );
     return;
   }
-  await query("UPDATE transfers SET approvals = ?, history = ? WHERE id = ?", [
+  await query("UPDATE transfers SET approvals = $1, history = $2 WHERE id = $3", [
     JSON.stringify(approvals),
     JSON.stringify(history),
     id,
@@ -201,11 +200,10 @@ async function addMessage({
   message,
 }) {
   const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await query(
-    `INSERT INTO transfer_messages
+  await query(`INSERT INTO transfer_messages
        (id, transfer_id, internal, author_id, author_name, author_avatar, body)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, transferId, internal ? 1 : 0, authorId, author, authorAvatar, message],
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, transferId, Boolean(internal), authorId, author, authorAvatar, message],
   );
   return {
     id,
@@ -308,12 +306,11 @@ router.post("/", async (req, res) => {
     }
 
     const id = `TR-${Date.now()}`;
-    await query(
-      `INSERT INTO transfers
+    await query(`INSERT INTO transfers
          (id, member_name, discord_username, created_by_id, current_rank, from_dept, to_dept,
           reason, status, remove_roles, assign_visitor_pass, assign_retired,
           require_bot_confirm, approvals, history)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, '[]', '[]')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, '[]', '[]')`,
       [
         id,
         member,
@@ -323,10 +320,10 @@ router.post("/", async (req, res) => {
         fromDept,
         toDept,
         reason,
-        body.removeRoles ? 1 : 0,
-        body.assignVisitorPass ? 1 : 0,
-        body.assignRetired ? 1 : 0,
-        body.requireBotConfirm ? 1 : 0,
+        Boolean(body.removeRoles),
+        Boolean(body.assignVisitorPass),
+        Boolean(body.assignRetired),
+        Boolean(body.requireBotConfirm),
       ],
     );
 
@@ -382,10 +379,9 @@ router.post("/settings", async (req, res) => {
         url,
       };
       delete cfg.hasUrl;
-      await query(
-        `INSERT INTO transfer_webhooks (department_id, config, updated_by)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE config = VALUES(config), updated_by = VALUES(updated_by)`,
+      await query(`INSERT INTO transfer_webhooks (department_id, config, updated_by)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (department_id) DO UPDATE SET config = EXCLUDED.config, updated_by = EXCLUDED.updated_by`,
         [dept, JSON.stringify(cfg), session.id],
       );
     }
@@ -456,7 +452,7 @@ router.get("/chat", async (req, res) => {
   const rows = await query(
     includeInternal
       ? "SELECT * FROM transfer_messages WHERE transfer_id = ? ORDER BY created_at ASC"
-      : "SELECT * FROM transfer_messages WHERE transfer_id = ? AND internal = 0 ORDER BY created_at ASC",
+      : "SELECT * FROM transfer_messages WHERE transfer_id = $1 AND internal = false ORDER BY created_at ASC",
     [transferId],
   );
   const messages = rows.map(rowToMessage);
@@ -529,10 +525,10 @@ router.post("/chat/read", async (req, res) => {
   try {
     // GREATEST so an out-of-order request from a stale tab cannot un-read a
     // thread and make the badge reappear.
-    await query(
-      `INSERT INTO transfer_reads (transfer_id, viewer_id, ${column})
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE ${column} = GREATEST(${column}, VALUES(${column}))`,
+    await query(`INSERT INTO transfer_reads (transfer_id, viewer_id, ${column})
+       VALUES ($1, $2, $3)
+       ON CONFLICT (transfer_id, viewer_id)
+         DO UPDATE SET ${column} = GREATEST(transfer_reads.${column}, EXCLUDED.${column})`,
       [transferId, session.id, value],
     );
   } catch (err) {
@@ -545,8 +541,7 @@ router.post("/chat/read", async (req, res) => {
 async function readMarks(transferId, viewerId) {
   if (!viewerId) return { public: 0, internal: 0 };
   try {
-    const rows = await query(
-      "SELECT public_seen, internal_seen FROM transfer_reads WHERE transfer_id = ? AND viewer_id = ? LIMIT 1",
+    const rows = await query("SELECT public_seen, internal_seen FROM transfer_reads WHERE transfer_id = $1 AND viewer_id = $2 LIMIT 1",
       [transferId, viewerId],
     );
     return {
@@ -697,8 +692,7 @@ router.patch("/:id", async (req, res) => {
       details: `${deptName} rejected: ${reason}`,
       timestamp: nowIso(),
     });
-    await query(
-      "UPDATE transfers SET status = 'rejected', rejection_reason = ?, history = ? WHERE id = ?",
+    await query("UPDATE transfers SET status = 'rejected', rejection_reason = $1, history = $2 WHERE id = $3",
       [reason, JSON.stringify(history), id],
     );
     await tryAddMessage({
@@ -724,7 +718,7 @@ router.patch("/:id", async (req, res) => {
       details: closing ? "Ticket closed" : "Ticket reopened",
       timestamp: nowIso(),
     });
-    await query("UPDATE transfers SET status = ?, history = ? WHERE id = ?", [
+    await query("UPDATE transfers SET status = $1, history = $2 WHERE id = $3", [
       closing ? "closed" : "pending",
       JSON.stringify(history),
       id,
@@ -754,11 +748,10 @@ router.patch("/:id", async (req, res) => {
       details: `Processed by ${actorName} · assigned rank: ${assignedRank || "N/A"}, ${empLabel}`,
       timestamp: nowIso(),
     });
-    await query(
-      `UPDATE transfers
-          SET status = 'completed', assigned_rank = ?, retired_member = 0,
-              employment_type = ?, history = ?
-        WHERE id = ?`,
+    await query(`UPDATE transfers
+          SET status = 'completed', assigned_rank = $1, retired_member = FALSE,
+              employment_type = $2, history = $3
+        WHERE id = $4`,
       [assignedRank, employmentType, JSON.stringify(history), id],
     );
     await tryAddMessage({
@@ -776,7 +769,7 @@ router.patch("/:id", async (req, res) => {
   const status = str(body.status);
   if (status) {
     if (!STATUSES.includes(status)) return res.status(400).json({ error: "unknown status" });
-    await query("UPDATE transfers SET status = ? WHERE id = ?", [status, id]);
+    await query("UPDATE transfers SET status = $1 WHERE id = $2", [status, id]);
     return res.json(await getTransfer(id));
   }
 
@@ -786,9 +779,8 @@ router.patch("/:id", async (req, res) => {
 /* ─── Presence ─────────────────────────────────────────────────────────────── */
 
 async function viewersFor(transferId) {
-  const rows = await query(
-    `SELECT viewer_id, viewer_name, viewer_avatar FROM transfer_viewers
-      WHERE transfer_id = ? AND last_seen >= (NOW() - INTERVAL ? SECOND)
+  const rows = await query(`SELECT viewer_id, viewer_name, viewer_avatar FROM transfer_viewers
+      WHERE transfer_id = $1 AND last_seen >= (now() - make_interval(secs => $2))
       ORDER BY last_seen DESC`,
     [transferId, PRESENCE_TTL_SECONDS],
   );
@@ -811,12 +803,11 @@ router.post("/:id/presence", async (req, res) => {
 
   if (session.id) {
     try {
-      await query(
-        `INSERT INTO transfer_viewers (transfer_id, viewer_id, viewer_name, viewer_avatar, last_seen)
-         VALUES (?, ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE viewer_name = VALUES(viewer_name),
-                                 viewer_avatar = VALUES(viewer_avatar),
-                                 last_seen = NOW()`,
+      await query(`INSERT INTO transfer_viewers (transfer_id, viewer_id, viewer_name, viewer_avatar, last_seen)
+         VALUES ($1, $2, $3, $4, now())
+         ON CONFLICT (transfer_id, viewer_id) DO UPDATE SET viewer_name = EXCLUDED.viewer_name,
+                                 viewer_avatar = EXCLUDED.viewer_avatar,
+                                 last_seen = now()`,
         [req.params.id, session.id, session.displayName || session.username, session.avatar ?? null],
       );
     } catch {

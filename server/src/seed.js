@@ -1,6 +1,6 @@
 /**
  * Seed data mirroring client/src/data/mockData.js so the API serves realistic
- * responses before MariaDB is populated. Every route falls back to these shapes
+ * responses before Postgres is populated. Every route falls back to these shapes
  * when a query fails, which keeps the whole site working end-to-end with no
  * database running.
  *

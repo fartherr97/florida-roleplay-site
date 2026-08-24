@@ -1,6 +1,6 @@
 /**
  * Seed data for the Staff Hub, mirroring client/src/data/staffHubData.js so the
- * API serves realistic responses before MariaDB is populated. Every hub route
+ * API serves realistic responses before Postgres is populated. Every hub route
  * falls back to these shapes, which is what lets the whole hub work end-to-end
  * with no database running.
  *

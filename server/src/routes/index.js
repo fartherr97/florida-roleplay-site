@@ -4,7 +4,7 @@
  * any failure (or an empty result) serve the seed shape instead.
  */
 import { Router } from "express";
-import { query } from "../db.js";
+import { changedRows, execute, query } from "../db.js";
 import * as seed from "../seed.js";
 import { attachUser } from "../middleware/requireRole.js";
 import { requirePermission } from "../middleware/requirePermission.js";
@@ -83,7 +83,7 @@ async function safeOne(res, dbFn, fallback) {
   }
 }
 
-/** MariaDB returns JSON columns as strings on some driver versions. */
+/** JSONB comes back parsed; a TEXT column holding JSON does not. */
 function parseJson(value, fallback = []) {
   if (Array.isArray(value) || (value && typeof value === "object")) return value;
   if (typeof value !== "string") return fallback;
@@ -146,7 +146,7 @@ router.get("/departments/:id", (req, res) =>
   safeOne(
     res,
     async () => {
-      const rows = await query("SELECT * FROM departments WHERE id = ? LIMIT 1", [
+      const rows = await query("SELECT * FROM departments WHERE id = $1 LIMIT 1", [
         req.params.id,
       ]);
       return rows.length ? mapDepartment(rows[0]) : null;
@@ -208,9 +208,8 @@ router.get("/rules", (req, res) => {
         return groupRules(rows);
       }
       const like = `%${q}%`;
-      const rows = await query(
-        `SELECT * FROM rules
-          WHERE title LIKE ? OR body LIKE ? OR number LIKE ? OR category LIKE ?
+      const rows = await query(`SELECT * FROM rules
+          WHERE title LIKE $1 OR body LIKE $2 OR number LIKE $3 OR category LIKE $4
           ORDER BY category_id, sort_order, number`,
         [like, like, like, like],
       );
@@ -279,8 +278,7 @@ router.get("/patch-notes/latest", (_req, res) =>
   safeOne(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM patch_notes ORDER BY released_at DESC LIMIT 1",
+      const rows = await query("SELECT * FROM patch_notes ORDER BY released_at DESC LIMIT 1",
       );
       return rows.length ? mapPatchNote(rows[0]) : null;
     },
@@ -298,11 +296,10 @@ router.post("/applications", async (req, res) => {
 
   const id = reference("APP");
   try {
-    await query(
-      `INSERT INTO applications
+    await query(`INSERT INTO applications
         (reference, type, discord_id, discord_name, age_range, experience,
          character_name, backstory, scenario)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         id,
         value.type,
@@ -325,8 +322,7 @@ router.get("/applications/:id", (req, res) =>
   safeOne(
     res,
     async () => {
-      const rows = await query(
-        "SELECT reference AS id, type, status, created_at AS createdAt FROM applications WHERE reference = ? LIMIT 1",
+      const rows = await query(`SELECT reference AS id, type, status, created_at AS "createdAt" FROM applications WHERE reference = $1 LIMIT 1`,
         [req.params.id],
       );
       return rows.length ? rows[0] : null;
@@ -365,8 +361,7 @@ router.get("/supporters", (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT id, name, tier, since FROM supporters ORDER BY tier, since",
+      const rows = await query("SELECT id, name, tier, since FROM supporters ORDER BY tier, since",
       );
       return rows.map((row) => ({
         ...row,
@@ -439,9 +434,8 @@ router.get("/knowledge-base", (req, res) => {
         return rows.map(mapArticle);
       }
       const like = `%${q}%`;
-      const rows = await query(
-        `SELECT * FROM articles
-          WHERE title LIKE ? OR summary LIKE ? OR category LIKE ?
+      const rows = await query(`SELECT * FROM articles
+          WHERE title LIKE $1 OR summary LIKE $2 OR category LIKE $3
           ORDER BY category, title`,
         [like, like, like],
       );
@@ -455,7 +449,7 @@ router.get("/knowledge-base/:slug", (req, res) =>
   safeOne(
     res,
     async () => {
-      const rows = await query("SELECT * FROM articles WHERE slug = ? LIMIT 1", [
+      const rows = await query("SELECT * FROM articles WHERE slug = $1 LIMIT 1", [
         req.params.slug,
       ]);
       return rows.length ? mapArticle(rows[0]) : null;
@@ -472,10 +466,9 @@ router.post("/reports", async (req, res) => {
 
   const id = reference("RPT");
   try {
-    await query(
-      `INSERT INTO reports
+    await query(`INSERT INTO reports
         (reference, type, discord_id, involved, occurred_at, evidence, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         id,
         value.type,
@@ -500,9 +493,8 @@ router.post("/reports", async (req, res) => {
  */
 router.get("/reports", requirePermission("site.moderation"), async (_req, res) => {
   try {
-    const rows = await query(
-      `SELECT reference, type, discord_id AS discordId, involved, occurred_at AS occurredAt,
-              evidence, description, status, created_at AS createdAt
+    const rows = await query(`SELECT reference, type, discord_id AS "discordId", involved, occurred_at AS "occurredAt",
+              evidence, description, status, created_at AS "createdAt"
          FROM reports ORDER BY created_at DESC LIMIT 500`,
     );
     return res.json({ reports: rows });
@@ -519,11 +511,11 @@ router.post("/reports/:reference/status", requirePermission("site.moderation"), 
     return res.status(400).json({ ok: false, message: "No such status." });
   }
   try {
-    const result = await query("UPDATE reports SET status = ? WHERE reference = ?", [
+    const result = await execute("UPDATE reports SET status = $1 WHERE reference = $2", [
       status,
       String(req.params.reference),
     ]);
-    if (!result?.affectedRows) {
+    if (!changedRows(result)) {
       return res.status(404).json({ ok: false, message: "No such report." });
     }
   } catch {

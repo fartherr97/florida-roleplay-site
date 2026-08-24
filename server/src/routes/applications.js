@@ -25,7 +25,7 @@
  * that queue, never instead of it.
  */
 import { Router } from "express";
-import { query, changedRows } from "../db.js";
+import { execute, query, changedRows } from "../db.js";
 import * as seed from "../applicationSeed.js";
 import { ROLE_MAP } from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
@@ -80,12 +80,12 @@ async function loadApplication(slug) {
 }
 
 const SUBMISSION_COLUMNS = `
-  reference, application_id AS applicationId, application_slug AS applicationSlug,
-  department_id AS departmentId, subdivision_id AS subdivisionId,
-  applicant_discord_id AS applicantDiscordId, applicant_name AS applicantName,
-  answers, config_snapshot AS configSnapshot, status,
-  decided_by AS decidedBy, decided_by_name AS decidedByName, decided_via AS decidedVia,
-  decision_reason AS decisionReason, decided_at AS decidedAt, submitted_at AS submittedAt`;
+  reference, application_id AS "applicationId", application_slug AS "applicationSlug",
+  department_id AS "departmentId", subdivision_id AS "subdivisionId",
+  applicant_discord_id AS "applicantDiscordId", applicant_name AS "applicantName",
+  answers, config_snapshot AS "configSnapshot", status,
+  decided_by AS "decidedBy", decided_by_name AS "decidedByName", decided_via AS "decidedVia",
+  decision_reason AS "decisionReason", decided_at AS "decidedAt", submitted_at AS "submittedAt"`;
 
 function shapeSubmission(row) {
   return {
@@ -98,10 +98,16 @@ function shapeSubmission(row) {
 async function loadSubmissions({ departmentId, status, applicantDiscordId, reference } = {}) {
   const where = [];
   const params = [];
-  if (departmentId) { where.push("department_id = ?"); params.push(departmentId); }
-  if (status) { where.push("status = ?"); params.push(status); }
-  if (applicantDiscordId) { where.push("applicant_discord_id = ?"); params.push(applicantDiscordId); }
-  if (reference) { where.push("reference = ?"); params.push(reference); }
+  // Each clause is written after its value is pushed, so it reads its own
+  // placeholder number off the array — see the same note in discipline.js.
+  const bind = (column, value) => {
+    params.push(value);
+    where.push(`${column} = $${params.length}`);
+  };
+  if (departmentId) bind("department_id", departmentId);
+  if (status) bind("status", status);
+  if (applicantDiscordId) bind("applicant_discord_id", applicantDiscordId);
+  if (reference) bind("reference", reference);
   try {
     const rows = await query(
       `SELECT ${SUBMISSION_COLUMNS} FROM application_submissions${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY submitted_at DESC LIMIT 500`,
@@ -228,11 +234,10 @@ router.post("/:slug/submit", async (req, res) => {
   };
 
   try {
-    await query(
-      `INSERT INTO application_submissions
+    await query(`INSERT INTO application_submissions
          (reference, application_id, application_slug, department_id, subdivision_id,
           applicant_discord_id, applicant_name, answers, config_snapshot, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')`,
       [
         reference, app.id, app.slug, app.departmentId, app.subdivisionId || null,
         submission.applicantDiscordId, submission.applicantName,
@@ -276,10 +281,10 @@ async function enqueueDispatch(app, submission, kind) {
   let id = null;
   try {
     const result = await query(
-      "INSERT INTO application_dispatches (reference, kind, payload) VALUES (?, ?, ?)",
+      "INSERT INTO application_dispatches (reference, kind, payload) VALUES ($1, $2, $3) RETURNING id",
       [submission.reference, kind, JSON.stringify(payload)],
     );
-    id = Number(result?.insertId ?? 0) || null;
+    id = result[0]?.id ?? null;
   } catch {
     return; // No database: the submit path already refused, so nothing is lost.
   }
@@ -304,19 +309,16 @@ async function pushDispatch(id, kind, payload) {
     clearTimeout(timer);
     if (res.ok) {
       const body = await res.json().catch(() => ({}));
-      await query(
-        "UPDATE application_dispatches SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP, attempts = attempts + 1, discord_message_id = ? WHERE id = ?",
+      await query("UPDATE application_dispatches SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP, attempts = attempts + 1, discord_message_id = $1 WHERE id = $2",
         [str(body?.messageId) || null, id],
       );
       return;
     }
-    await query(
-      "UPDATE application_dispatches SET attempts = attempts + 1, last_error = ? WHERE id = ?",
+    await query("UPDATE application_dispatches SET attempts = attempts + 1, last_error = $1 WHERE id = $2",
       [`Bot answered ${res.status}`, id],
     );
   } catch (err) {
-    await query(
-      "UPDATE application_dispatches SET attempts = attempts + 1, last_error = ? WHERE id = ?",
+    await query("UPDATE application_dispatches SET attempts = attempts + 1, last_error = $1 WHERE id = $2",
       [String(err?.message ?? "push failed").slice(0, 512), id],
     ).catch(() => {});
   }
@@ -373,13 +375,12 @@ router.put("/manage/:id", async (req, res) => {
   }
 
   try {
-    await query(
-      `INSERT INTO custom_applications (id, slug, department_id, subdivision_id, title, status, config, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         slug = VALUES(slug), department_id = VALUES(department_id),
-         subdivision_id = VALUES(subdivision_id), title = VALUES(title),
-         status = VALUES(status), config = VALUES(config), updated_by = VALUES(updated_by)`,
+    await query(`INSERT INTO custom_applications (id, slug, department_id, subdivision_id, title, status, config, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (id) DO UPDATE SET
+         slug = EXCLUDED.slug, department_id = EXCLUDED.department_id,
+         subdivision_id = EXCLUDED.subdivision_id, title = EXCLUDED.title,
+         status = EXCLUDED.status, config = EXCLUDED.config, updated_by = EXCLUDED.updated_by`,
       [
         incoming.id, incoming.slug, incoming.departmentId, incoming.subdivisionId || null,
         incoming.title, incoming.status, JSON.stringify(incoming), ctx.user?.id ?? null,
@@ -404,7 +405,7 @@ router.delete("/manage/:id", async (req, res) => {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That application belongs to another department." });
   }
   try {
-    const result = await query("DELETE FROM custom_applications WHERE id = ?", [existing.id]);
+    const result = await execute("DELETE FROM custom_applications WHERE id = $1", [existing.id]);
     if (!changedRows(result)) return res.status(404).json({ ok: false, message: "Nothing was deleted." });
   } catch {
     return res.status(503).json({ ok: false, code: "APPLY_NO_STORE", message: "Applications need a database. Nothing was deleted." });
@@ -492,11 +493,10 @@ async function recordDecision({ reference, decision, reason, deciderId, deciderN
 
   let result;
   try {
-    result = await query(
-      `UPDATE application_submissions
-          SET status = ?, decided_by = ?, decided_by_name = ?, decided_via = ?,
-              decision_reason = ?, decided_at = CURRENT_TIMESTAMP
-        WHERE reference = ? AND status = 'pending'`,
+    result = await execute(`UPDATE application_submissions
+          SET status = $1, decided_by = $2, decided_by_name = $3, decided_via = $4,
+              decision_reason = $5, decided_at = CURRENT_TIMESTAMP
+        WHERE reference = $6 AND status = 'pending'`,
       [status, deciderId, deciderName, via, note, reference],
     );
   } catch {
@@ -540,8 +540,7 @@ async function recordDecision({ reference, decision, reason, deciderId, deciderN
 router.get("/bot/outbox", requireBot, async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
   try {
-    const rows = await query(
-      `SELECT id, reference, kind, payload, attempts, last_error AS lastError, created_at AS createdAt
+    const rows = await query(`SELECT id, reference, kind, payload, attempts, last_error AS "lastError", created_at AS "createdAt"
          FROM application_dispatches
         WHERE status = 'pending'
         ORDER BY created_at ASC
@@ -559,11 +558,10 @@ router.post("/bot/outbox/:id/delivered", requireBot, async (req, res) => {
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ ok: false, message: "Invalid dispatch id." });
   const messageId = str(req.body?.messageId);
   try {
-    const result = await query(
-      `UPDATE application_dispatches
+    const result = await execute(`UPDATE application_dispatches
           SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP,
-              attempts = attempts + 1, discord_message_id = ?
-        WHERE id = ? AND status = 'pending'`,
+              attempts = attempts + 1, discord_message_id = $1
+        WHERE id = $2 AND status = 'pending'`,
       [/^\d{17,20}$/.test(messageId) ? messageId : null, id],
     );
     if (!changedRows(result)) {
@@ -580,8 +578,7 @@ router.post("/bot/outbox/:id/failed", requireBot, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ ok: false, message: "Invalid dispatch id." });
   try {
-    await query(
-      "UPDATE application_dispatches SET attempts = attempts + 1, last_error = ? WHERE id = ?",
+    await query("UPDATE application_dispatches SET attempts = attempts + 1, last_error = $1 WHERE id = $2",
       [str(req.body?.error).slice(0, 512) || "The bot reported a failure.", id],
     );
   } catch {

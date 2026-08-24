@@ -11,7 +11,7 @@
  * keeps the site, the roster and Discord from ever disagreeing.
  */
 import { Router } from "express";
-import { query, changedRows } from "../db.js";
+import { execute, query, changedRows } from "../db.js";
 import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
@@ -53,8 +53,7 @@ function mapRow(row) {
 /** Loads the roster from the database, falling back to the seeded list. */
 async function loadRoster() {
   try {
-    const rows = await query(
-      "SELECT * FROM roster_members ORDER BY department, rank_label, character_name",
+    const rows = await query("SELECT * FROM roster_members ORDER BY department, rank_label, character_name",
     );
     if (rows.length) return rows.map(mapRow);
   } catch {
@@ -220,18 +219,16 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
   try {
     await query("DELETE FROM roster_role_map");
     for (const role of cleanRoles) {
-      await query(
-        `INSERT INTO roster_role_map
+      await query(`INSERT INTO roster_role_map
            (role_id, role_key, kind, department, rank_label, rank_full, sort_order, display_template)
-         VALUES (?, ?, 'rank', ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, 'rank', $3, $4, $5, $6, $7)`,
         [role.roleId, role.key, role.department, role.rank, role.rankFull, role.order, role.displayTemplate],
       );
     }
     for (const role of cleanSpecial) {
-      await query(
-        `INSERT INTO roster_role_map
+      await query(`INSERT INTO roster_role_map
            (role_id, role_key, kind, rank_label, rank_full, sort_order, display_template)
-         VALUES (?, ?, ?, ?, ?, 0, '')`,
+         VALUES ($1, $2, $3, $4, $5, 0, '')`,
         [role.roleId, role.key, role.kind, role.label, role.detail],
       );
     }
@@ -250,8 +247,7 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
 router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>
   (async () => {
     try {
-      const rows = await query(
-        "SELECT * FROM roster_sync_log ORDER BY created_at DESC LIMIT 100",
+      const rows = await query("SELECT * FROM roster_sync_log ORDER BY created_at DESC LIMIT 100",
       );
       if (rows.length) {
         return res.json(
@@ -312,16 +308,15 @@ function validateStatus(body) {
  * Three outcomes, not two. "no-record" is the one that is easy to miss: the
  * roster falls back to seed data when `roster_members` is empty, so a member
  * plainly visible on the page may have no row to update until the bot has
- * synced them. MariaDB reports that as a successful UPDATE affecting zero rows,
+ * synced them. Postgres reports that as a successful UPDATE affecting zero rows,
  * and calling it saved would show the new status until the next reload and then
  * quietly revert it.
  */
 async function writeStatus(id, value) {
   try {
-    const result = await query(
-      `UPDATE roster_members
-          SET status = ?, loa_until = ?, loa_reason = ?, synced_at = CURRENT_TIMESTAMP
-        WHERE id = ? OR discord_id = ?`,
+    const result = await execute(`UPDATE roster_members
+          SET status = $1, loa_until = $2, loa_reason = $3, synced_at = CURRENT_TIMESTAMP
+        WHERE id = $4 OR discord_id = $5`,
       [value.status, value.loaUntil, value.loaReason, id, id],
     );
     return changedRows(result) ? "saved" : "no-record";
@@ -391,8 +386,7 @@ router.post("/:id/status", requirePermission("roster.edit_status"), async (req, 
 router.get("/loa/expired", requireBot, async (_req, res) => {
   const today = todayIso();
   try {
-    const rows = await query(
-      "SELECT * FROM roster_members WHERE status = 'LOA' AND loa_until IS NOT NULL AND loa_until <= ?",
+    const rows = await query("SELECT * FROM roster_members WHERE status = 'LOA' AND loa_until IS NOT NULL AND loa_until <= $1",
       [today],
     );
     return res.json({
@@ -541,10 +535,9 @@ function validateSyncMember(body) {
 /** Records what the bot did, so the roster page can show a sync history. */
 async function logSync(entry) {
   try {
-    await query(
-      `INSERT INTO roster_sync_log
+    await query(`INSERT INTO roster_sync_log
          (discord_id, character_name, action, detail, actor)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5)`,
       [entry.discordId, entry.characterName, entry.action, entry.detail, "roster-bot"],
     );
   } catch {
@@ -555,18 +548,17 @@ async function logSync(entry) {
 
 async function applyUpsert(resolved, joinedAt) {
   const e = resolved.entry;
-  await query(
-    `INSERT INTO roster_members
+  await query(`INSERT INTO roster_members
        (id, discord_id, character_name, display_name, department, rank_label,
         callsign, status, joined_at, synced_at, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync')
-     ON DUPLICATE KEY UPDATE
-       character_name = VALUES(character_name),
-       display_name   = VALUES(display_name),
-       department     = VALUES(department),
-       rank_label     = VALUES(rank_label),
-       callsign       = VALUES(callsign),
-       status         = VALUES(status),
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync')
+     ON CONFLICT (discord_id) DO UPDATE SET
+       character_name = EXCLUDED.character_name,
+       display_name   = EXCLUDED.display_name,
+       department     = EXCLUDED.department,
+       rank_label     = EXCLUDED.rank_label,
+       callsign       = EXCLUDED.callsign,
+       status         = EXCLUDED.status,
        synced_at      = CURRENT_TIMESTAMP,
        source         = 'discord-sync'`,
     [
@@ -604,7 +596,7 @@ router.post("/sync", requireBot, async (req, res) => {
   if (resolved.action === "remove") {
     if (!dryRun) {
       try {
-        await query("DELETE FROM roster_members WHERE discord_id = ?", [
+        await query("DELETE FROM roster_members WHERE discord_id = $1", [
           value.discordId,
         ]);
       } catch {
@@ -693,7 +685,7 @@ router.post("/sync/bulk", requireBot, async (req, res) => {
     if (resolved.action === "remove") {
       if (!dryRun) {
         try {
-          await query("DELETE FROM roster_members WHERE discord_id = ?", [
+          await query("DELETE FROM roster_members WHERE discord_id = $1", [
             value.discordId,
           ]);
         } catch {
@@ -726,8 +718,7 @@ router.post("/sync/bulk", requireBot, async (req, res) => {
     const rows = await query("SELECT discord_id FROM roster_members");
     dropped = rows.map((r) => r.discord_id).filter((id) => !seen.has(id));
     if (!dryRun && dropped.length) {
-      await query(
-        `DELETE FROM roster_members WHERE discord_id IN (${dropped.map(() => "?").join(",")})`,
+      await query(`DELETE FROM roster_members WHERE discord_id IN (${dropped.map(() => "$1").join(",")})`,
         dropped,
       );
     }

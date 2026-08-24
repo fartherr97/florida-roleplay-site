@@ -46,7 +46,7 @@ const router = Router();
  * Loading
  * ------------------------------------------------------------------ */
 
-/** MariaDB hands JSON columns back as strings on some driver versions. */
+/** JSONB comes back parsed; a TEXT column holding JSON does not. */
 function parseConfig(value) {
   if (value && typeof value === "object") return value;
   try {
@@ -59,8 +59,7 @@ function parseConfig(value) {
 /** The stored config for a department, or its seed, or null. */
 async function loadConfig(id) {
   try {
-    const rows = await query(
-      "SELECT config FROM department_configs WHERE id = ? LIMIT 1",
+    const rows = await query("SELECT config FROM department_configs WHERE id = $1 LIMIT 1",
       [id],
     );
     const stored = rows.length ? parseConfig(rows[0].config) : null;
@@ -134,19 +133,17 @@ function requireCapability(capability) {
  * ------------------------------------------------------------------ */
 
 async function recordVersion(id, config, actor, label) {
-  await query(
-    "INSERT INTO department_config_versions (department_id, config, label, actor) VALUES (?, ?, ?, ?)",
+  await query("INSERT INTO department_config_versions (department_id, config, label, actor) VALUES ($1, $2, $3, $4)",
     [id, JSON.stringify(config), label ?? null, actor ?? null],
   );
   // Keep the history bounded: a Builder session auto-saves often, and an
   // unbounded table would grow faster than anyone would ever read it.
-  await query(
-    `DELETE FROM department_config_versions
-      WHERE department_id = ?
+  await query(`DELETE FROM department_config_versions
+      WHERE department_id = $1
         AND id NOT IN (
           SELECT id FROM (
             SELECT id FROM department_config_versions
-             WHERE department_id = ? ORDER BY id DESC LIMIT 50
+             WHERE department_id = $2 ORDER BY id DESC LIMIT 50
           ) AS keep
         )`,
     [id, id],
@@ -155,9 +152,8 @@ async function recordVersion(id, config, actor, label) {
 
 async function audit(id, req, action, summary) {
   try {
-    await query(
-      `INSERT INTO department_audit_log (department_id, actor, actor_name, action, summary)
-       VALUES (?, ?, ?, ?, ?)`,
+    await query(`INSERT INTO department_audit_log (department_id, actor, actor_name, action, summary)
+       VALUES ($1, $2, $3, $4, $5)`,
       [id, req.user?.id ?? null, req.user?.displayName ?? null, action, summary.slice(0, 480)],
     );
   } catch {
@@ -209,8 +205,7 @@ router.get(
     let roster = rosterSeed;
     let roleMap = ROLE_MAP;
     try {
-      const rows = await query(
-        "SELECT * FROM roster_members WHERE department = ? ORDER BY sort_order, callsign",
+      const rows = await query("SELECT * FROM roster_members WHERE department = $1 ORDER BY sort_order, callsign",
         [req.departmentId],
       );
       if (rows.length) {
@@ -234,7 +229,7 @@ router.get(
               : row.joined_at,
         }));
       }
-      const roleRows = await query("SELECT * FROM roster_role_map WHERE department = ?", [
+      const roleRows = await query("SELECT * FROM roster_role_map WHERE department = $1", [
         req.departmentId,
       ]);
       if (roleRows.length) {
@@ -261,9 +256,8 @@ router.get(
   requireCapability("viewAudit"),
   async (req, res) => {
     try {
-      const rows = await query(
-        `SELECT id, label, actor, created_at FROM department_config_versions
-          WHERE department_id = ? ORDER BY id DESC LIMIT 50`,
+      const rows = await query(`SELECT id, label, actor, created_at FROM department_config_versions
+          WHERE department_id = $1 ORDER BY id DESC LIMIT 50`,
         [req.departmentId],
       );
       res.json(
@@ -287,9 +281,8 @@ router.get(
   requireCapability("viewAudit"),
   async (req, res) => {
     try {
-      const rows = await query(
-        `SELECT id, actor, actor_name, action, summary, at FROM department_audit_log
-          WHERE department_id = ? ORDER BY id DESC LIMIT 200`,
+      const rows = await query(`SELECT id, actor, actor_name, action, summary, at FROM department_audit_log
+          WHERE department_id = $1 ORDER BY id DESC LIMIT 200`,
         [req.departmentId],
       );
       res.json(
@@ -322,10 +315,9 @@ async function saveConfig(req, res, config, action, summary) {
 
   try {
     await recordVersion(req.departmentId, req.deptConfig, req.user?.id, action);
-    await query(
-      `INSERT INTO department_configs (id, config, updated_by)
-            VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE config = VALUES(config), updated_by = VALUES(updated_by)`,
+    await query(`INSERT INTO department_configs (id, config, updated_by)
+            VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config, updated_by = EXCLUDED.updated_by`,
       [req.departmentId, JSON.stringify(config), req.user?.id ?? null],
     );
   } catch {
@@ -420,8 +412,7 @@ router.post(
   async (req, res) => {
     let restored = null;
     try {
-      const rows = await query(
-        "SELECT config FROM department_config_versions WHERE id = ? AND department_id = ? LIMIT 1",
+      const rows = await query("SELECT config FROM department_config_versions WHERE id = $1 AND department_id = $2 LIMIT 1",
         [Number(req.params.versionId), req.departmentId],
       );
       restored = rows.length ? parseConfig(rows[0].config) : null;
@@ -456,9 +447,9 @@ router.post("/", requirePermission("departments.manage"), async (req, res) => {
   if (errors.length > 0) return res.status(400).json({ ok: false, errors });
 
   try {
-    const rows = await query("SELECT id FROM department_configs WHERE id = ? LIMIT 1", [id]);
+    const rows = await query("SELECT id FROM department_configs WHERE id = $1 LIMIT 1", [id]);
     if (rows.length) return res.status(400).json({ ok: false, errors: [`"${id}" already exists.`] });
-    await query("INSERT INTO department_configs (id, config, updated_by) VALUES (?, ?, ?)", [
+    await query("INSERT INTO department_configs (id, config, updated_by) VALUES ($1, $2, $3)", [
       id,
       JSON.stringify(config),
       req.user?.id ?? null,

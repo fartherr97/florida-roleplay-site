@@ -42,8 +42,7 @@ router.get("/characters", requireWhitelist(), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM civ_characters ORDER BY is_primary DESC, name",
+      const rows = await query("SELECT * FROM civ_characters ORDER BY is_primary DESC, name",
       );
       return rows.map((row) => ({
         id: row.id,
@@ -111,8 +110,7 @@ router.get("/licences", requireWhitelist(), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM civ_licences ORDER BY holder_name, licence_type",
+      const rows = await query("SELECT * FROM civ_licences ORDER BY holder_name, licence_type",
       );
       return rows.map((row) => ({
         id: row.id,
@@ -175,8 +173,7 @@ router.get("/classifieds", requirePermission("civilian.view"), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM civ_classifieds ORDER BY posted_at DESC",
+      const rows = await query("SELECT * FROM civ_classifieds ORDER BY posted_at DESC",
       );
       return rows.map((row) => ({
         id: row.id,
@@ -219,9 +216,8 @@ router.get("/penal-code", requirePermission("civilian.view"), (req, res) => {
         return rows.map(mapPenalRow);
       }
       const like = `%${q}%`;
-      const rows = await query(
-        `SELECT * FROM civ_penal_code
-          WHERE title LIKE ? OR code LIKE ? OR degree LIKE ? OR notes LIKE ?
+      const rows = await query(`SELECT * FROM civ_penal_code
+          WHERE title LIKE $1 OR code LIKE $2 OR degree LIKE $3 OR notes LIKE $4
           ORDER BY code`,
         [like, like, like, like],
       );

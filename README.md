@@ -10,7 +10,7 @@ florida-roleplay/
   package.json        # orchestration only — no dependencies of its own
   railway.json
   client/             # Vite 8 + React 19 + Tailwind v4 (JSX, no TypeScript)
-  server/             # Express + MariaDB
+  server/             # Express + PostgreSQL
 ```
 
 ## Quick start
@@ -23,12 +23,18 @@ npm run dev:server    # API on http://localhost:4000
 
 The site is fully usable **with no database running**: every API read falls back
 to seed data, and every client read falls back to `client/src/data/mockData.js`.
-Bring MariaDB up when you want persistence.
+Bring Postgres up when you want persistence.
 
 ```bash
-cp server/.env.example server/.env   # then fill in your DB credentials
-npm run db:init                      # creates the schema
+docker run -d --name flrp-db -e POSTGRES_PASSWORD=devonly \
+  -e POSTGRES_DB=florida_rp -p 5432:5432 postgres:16
+
+cp server/.env.example server/.env   # set DATABASE_URL and DB_SSL=disable
+npm run db:init                      # applies the schema
 ```
+
+Writes refuse rather than pretending when there is no database, so test anything
+that saves against a real Postgres.
 
 ## Production
 
@@ -38,8 +44,11 @@ npm start       # one process serves the API and the built client
 ```
 
 `server/src/index.js` serves `client/dist` with SPA history fallback, so deep
-links such as `/patch-notes` survive a hard refresh. Deployment config for
-Railway lives in `railway.json`.
+links such as `/patch-notes` survive a hard refresh.
+
+**[DEPLOY.md](DEPLOY.md) is the walkthrough** — Railway with its own Postgres,
+the Cloudflare records for `flrp.us`, and what actually changes when it moves to
+Northflank. `railway.json` holds the build, start and health-check config.
 
 ## Stack
 
@@ -49,8 +58,16 @@ Railway lives in `railway.json`.
 `react-router-dom` v7 with `BrowserRouter`, `framer-motion` for page and modal
 transitions, `lucide-react` for UI icons and `react-icons/fa6` for brand icons.
 
-**Server** — Express 4 and the `mariadb` driver, ESM throughout. No ORM: queries
-are hand-written and always parameterised.
+**Server** — Express 4 and `pg` (node-postgres), ESM throughout. No ORM: queries
+are hand-written and always parameterised with `$1, $2, …`.
+
+`server/src/db.js` is the only place a connection is made. It reads
+`DATABASE_URL` when there is one — which Railway and Northflank both provide, so
+the deployment configures itself — and the discrete `DB_*` vars otherwise. It
+exports `query` (rows), `execute` (the full result, for anything that measures
+`rowCount`) and `transaction`. A short circuit breaker keeps a down database
+from making every request pay the connection timeout, since serving seeds
+without one is a supported mode rather than an outage.
 
 ## How things are wired
 

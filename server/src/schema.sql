@@ -1,31 +1,42 @@
--- Florida Roleplay — MariaDB schema.
--- Run with `npm run db:init`, which executes this file with multipleStatements.
+-- Florida Roleplay — PostgreSQL schema.
+--
+-- Run with `npm run db:init`, which executes this file as one statement batch.
+-- Every statement is IF NOT EXISTS, so running it against a live database is a
+-- no-op rather than a migration — see server/src/scripts/initDb.js.
+--
+-- There is no CREATE DATABASE here. Railway, Northflank and every other managed
+-- Postgres hand you a database that already exists and a role that cannot make
+-- another one; the connection string names it.
 
-CREATE DATABASE IF NOT EXISTS florida_rp
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+-- Bumps updated_at on every UPDATE. MySQL had ON UPDATE CURRENT_TIMESTAMP as a
+-- column attribute; Postgres does not, so it is one shared trigger function
+-- attached to each table that carries the column.
+CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-USE florida_rp;
-
--- Discord-authenticated members. `id` is the Discord snowflake.
+-- Discord-authenticated members. id is the Discord snowflake.
 CREATE TABLE IF NOT EXISTS users (
   id            VARCHAR(20)  NOT NULL,
   username      VARCHAR(64)  NOT NULL,
   display_name  VARCHAR(128) NULL,
   avatar        TEXT         NULL,
-  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Roles are rows rather than a column so a user can hold several at once.
 CREATE TABLE IF NOT EXISTS user_roles (
   user_id     VARCHAR(20) NOT NULL,
   role        VARCHAR(32) NOT NULL,
-  granted_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  granted_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, role),
   CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE IF NOT EXISTS departments (
   id                VARCHAR(64)  NOT NULL,
@@ -36,15 +47,15 @@ CREATE TABLE IF NOT EXISTS departments (
   tagline           TEXT         NULL,
   mission           TEXT         NULL,
   roster            INT          NOT NULL DEFAULT 0,
-  hiring            TINYINT(1)   NOT NULL DEFAULT 1,
-  ranks             JSON         NULL,
-  fleet             JSON         NULL,
+  hiring            BOOLEAN      NOT NULL DEFAULT TRUE,
+  ranks             JSONB         NULL,
+  fleet             JSONB         NULL,
   application_type  VARCHAR(64)  NULL,
   sort_order        INT          NOT NULL DEFAULT 0,
-  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE IF NOT EXISTS staff (
   id          VARCHAR(64)  NOT NULL,
@@ -54,12 +65,12 @@ CREATE TABLE IF NOT EXISTS staff (
   team        VARCHAR(64)  NOT NULL,
   department  VARCHAR(64)  NULL,
   tone        VARCHAR(16)  NOT NULL DEFAULT 'primary',
-  online      TINYINT(1)   NOT NULL DEFAULT 0,
+  online      BOOLEAN      NOT NULL DEFAULT FALSE,
   sort_order  INT          NOT NULL DEFAULT 0,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE IF NOT EXISTS rules (
   id                    VARCHAR(64)  NOT NULL,
@@ -70,11 +81,10 @@ CREATE TABLE IF NOT EXISTS rules (
   title                 VARCHAR(255) NOT NULL,
   body                  TEXT         NOT NULL,
   sort_order            INT          NOT NULL DEFAULT 0,
-  created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_rules_category (category_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at            TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS patch_notes (
   id           VARCHAR(64)  NOT NULL,
@@ -83,15 +93,14 @@ CREATE TABLE IF NOT EXISTS patch_notes (
   tag          VARCHAR(32)  NOT NULL DEFAULT 'Feature',
   tone         VARCHAR(16)  NOT NULL DEFAULT 'primary',
   released_at  DATE         NOT NULL,
-  changes      JSON         NOT NULL,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_patch_notes_released (released_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  changes      JSONB         NOT NULL,
+  created_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS applications (
-  id              INT          NOT NULL AUTO_INCREMENT,
+  id              INT GENERATED BY DEFAULT AS IDENTITY,
   reference       VARCHAR(32)  NOT NULL,
   type            VARCHAR(64)  NOT NULL,
   discord_id      VARCHAR(20)  NOT NULL,
@@ -103,15 +112,13 @@ CREATE TABLE IF NOT EXISTS applications (
   scenario        TEXT         NOT NULL,
   status          VARCHAR(32)  NOT NULL DEFAULT 'Pending Review',
   reviewer_id     VARCHAR(20)  NULL,
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_applications_reference (reference),
-  KEY idx_applications_discord_id (discord_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS reports (
-  id           INT         NOT NULL AUTO_INCREMENT,
+  id           INT GENERATED BY DEFAULT AS IDENTITY,
   reference    VARCHAR(32) NOT NULL,
   type         VARCHAR(32) NOT NULL,
   discord_id   VARCHAR(20) NOT NULL,
@@ -120,12 +127,10 @@ CREATE TABLE IF NOT EXISTS reports (
   evidence     TEXT        NULL,
   description  TEXT        NOT NULL,
   status       VARCHAR(32) NOT NULL DEFAULT 'Pending Review',
-  created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_reports_reference (reference),
-  KEY idx_reports_discord_id (discord_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at   TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS events (
   id           VARCHAR(64)  NOT NULL,
@@ -136,11 +141,10 @@ CREATE TABLE IF NOT EXISTS events (
   status       VARCHAR(32)  NOT NULL DEFAULT 'Upcoming',
   attendance   INT          NOT NULL DEFAULT 0,
   description  TEXT         NULL,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_events_date (event_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS articles (
   slug          VARCHAR(64)  NOT NULL,
@@ -148,12 +152,11 @@ CREATE TABLE IF NOT EXISTS articles (
   category      VARCHAR(64)  NOT NULL,
   summary       TEXT         NULL,
   reading_time  VARCHAR(16)  NULL,
-  body          JSON         NOT NULL,
-  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (slug),
-  KEY idx_articles_category (category)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  body          JSONB         NOT NULL,
+  created_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (slug)
+);
 
 CREATE TABLE IF NOT EXISTS supporters (
   id          VARCHAR(64)  NOT NULL,
@@ -161,11 +164,10 @@ CREATE TABLE IF NOT EXISTS supporters (
   tier        VARCHAR(32)  NOT NULL,
   since       DATE         NULL,
   discord_id  VARCHAR(20)  NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_supporters_tier (tier)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS store_tiers (
   id          VARCHAR(64)  NOT NULL,
@@ -173,29 +175,29 @@ CREATE TABLE IF NOT EXISTS store_tiers (
   price       VARCHAR(16)  NOT NULL,
   period      VARCHAR(16)  NOT NULL DEFAULT '/month',
   tone        VARCHAR(16)  NOT NULL DEFAULT 'primary',
-  popular     TINYINT(1)   NOT NULL DEFAULT 0,
+  popular     BOOLEAN      NOT NULL DEFAULT FALSE,
   blurb       TEXT         NULL,
-  features    JSON         NOT NULL,
+  features    JSONB         NOT NULL,
   sort_order  INT          NOT NULL DEFAULT 0,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- ---------------------------------------------------------------------------
 -- Staff Hub
 -- ---------------------------------------------------------------------------
 
 -- Portal content, one row per editable section (featured, reminders,
--- quickNotes, links). JSON keeps the shapes flexible without a migration each
+-- quickNotes, links). JSONB keeps the shapes flexible without a migration each
 -- time the Director panel gains a field.
 CREATE TABLE IF NOT EXISTS hub_portal (
   section     VARCHAR(32) NOT NULL,
-  payload     JSON        NOT NULL,
+  payload     JSONB        NOT NULL,
   updated_by  VARCHAR(20) NULL,
-  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (section)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE IF NOT EXISTS hub_roster (
   id          VARCHAR(64)  NOT NULL,
@@ -210,12 +212,10 @@ CREATE TABLE IF NOT EXISTS hub_roster (
   vest_hours  INT          NOT NULL DEFAULT 0,
   status      VARCHAR(32)  NOT NULL DEFAULT 'Active',
   discord_id  VARCHAR(20)  NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_hub_roster_rank (rank_id),
-  KEY idx_hub_roster_discord (discord_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS hub_disciplinary (
   id           VARCHAR(32)  NOT NULL,
@@ -228,38 +228,33 @@ CREATE TABLE IF NOT EXISTS hub_disciplinary (
   status       VARCHAR(32)  NOT NULL DEFAULT 'Active',
   summary      TEXT         NULL,
   discord_id   VARCHAR(20)  NULL,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_hub_da_discord (discord_id),
-  KEY idx_hub_da_issued (issued_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
--- One row per staff exam attempt. `override_payload` caches the latest override
+-- One row per staff exam attempt. override_payload caches the latest override
 -- so listing attempts never needs to join the full history.
 CREATE TABLE IF NOT EXISTS hub_attempts (
   attempt_id       VARCHAR(64)  NOT NULL,
   staff_name       VARCHAR(128) NOT NULL,
   discord_id       VARCHAR(20)  NULL,
   exam_type        VARCHAR(16)  NOT NULL,
-  submitted_at     DATETIME     NOT NULL,
+  submitted_at     TIMESTAMPTZ     NOT NULL,
   score            VARCHAR(32)  NULL,
   status           VARCHAR(32)  NOT NULL DEFAULT 'Needs Review',
   original_score   VARCHAR(32)  NULL,
   original_status  VARCHAR(32)  NULL,
-  override_payload JSON         NULL,
-  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (attempt_id),
-  KEY idx_hub_attempts_discord (discord_id),
-  KEY idx_hub_attempts_exam (exam_type),
-  KEY idx_hub_attempts_submitted (submitted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  override_payload JSONB         NULL,
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id)
+);
 
 -- Append-only: every override ever applied. Rows are never updated or deleted,
 -- which is what makes the audit log trustworthy.
 CREATE TABLE IF NOT EXISTS hub_overrides (
-  id               INT          NOT NULL AUTO_INCREMENT,
+  id               INT GENERATED BY DEFAULT AS IDENTITY,
   attempt_id       VARCHAR(64)  NOT NULL,
   discord_id       VARCHAR(20)  NULL,
   staff_name       VARCHAR(128) NULL,
@@ -270,11 +265,9 @@ CREATE TABLE IF NOT EXISTS hub_overrides (
   override_status  VARCHAR(32)  NOT NULL,
   reviewer         VARCHAR(128) NOT NULL,
   reason           TEXT         NOT NULL,
-  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_hub_overrides_attempt (attempt_id),
-  KEY idx_hub_overrides_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS hub_exam_settings (
   exam_type   VARCHAR(16) NOT NULL,
@@ -282,12 +275,12 @@ CREATE TABLE IF NOT EXISTS hub_exam_settings (
   review_min  INT         NOT NULL,
   review_max  INT         NOT NULL,
   max_score   INT         NOT NULL,
-  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (exam_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE IF NOT EXISTS hub_questions (
-  id               INT          NOT NULL AUTO_INCREMENT,
+  id               INT GENERATED BY DEFAULT AS IDENTITY,
   exam_type        VARCHAR(16)  NOT NULL,
   question_id      VARCHAR(32)  NOT NULL,
   question_number  VARCHAR(16)  NOT NULL,
@@ -295,12 +288,10 @@ CREATE TABLE IF NOT EXISTS hub_questions (
   question_type    VARCHAR(32)  NULL,
   points           INT          NOT NULL DEFAULT 1,
   correct_answer   TEXT         NULL,
-  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_hub_questions_qid (question_id),
-  KEY idx_hub_questions_exam (exam_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- ---------------------------------------------------------------------------
 -- Civilian Hub
@@ -317,13 +308,12 @@ CREATE TABLE IF NOT EXISTS civ_characters (
   bank_balance  INT          NOT NULL DEFAULT 0,
   cash_balance  INT          NOT NULL DEFAULT 0,
   status        VARCHAR(32)  NOT NULL DEFAULT 'Active',
-  is_primary    TINYINT(1)   NOT NULL DEFAULT 0,
+  is_primary    BOOLEAN      NOT NULL DEFAULT FALSE,
   joined_at     DATE         NULL,
-  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_civ_characters_discord (discord_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_vehicles (
   id                VARCHAR(64)  NOT NULL,
@@ -336,14 +326,12 @@ CREATE TABLE IF NOT EXISTS civ_vehicles (
   owner_name        VARCHAR(128) NULL,
   garage            VARCHAR(128) NULL,
   status            VARCHAR(32)  NOT NULL DEFAULT 'Stored',
-  insured           TINYINT(1)   NOT NULL DEFAULT 0,
+  insured           BOOLEAN      NOT NULL DEFAULT FALSE,
   registered_until  DATE         NULL,
-  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_civ_vehicles_plate (plate),
-  KEY idx_civ_vehicles_owner (owner_character)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_properties (
   id               VARCHAR(64)  NOT NULL,
@@ -356,11 +344,10 @@ CREATE TABLE IF NOT EXISTS civ_properties (
   value_usd        INT          NOT NULL DEFAULT 0,
   garage_slots     INT          NOT NULL DEFAULT 0,
   status           VARCHAR(32)  NOT NULL DEFAULT 'Owned',
-  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_civ_properties_owner (owner_character)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_licences (
   id              VARCHAR(64)  NOT NULL,
@@ -372,12 +359,10 @@ CREATE TABLE IF NOT EXISTS civ_licences (
   expires_at      DATE         NULL,
   status          VARCHAR(32)  NOT NULL DEFAULT 'Valid',
   points          INT          NOT NULL DEFAULT 0,
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_civ_licences_number (licence_number),
-  KEY idx_civ_licences_holder (holder_character)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_businesses (
   id          VARCHAR(64)  NOT NULL,
@@ -386,13 +371,12 @@ CREATE TABLE IF NOT EXISTS civ_businesses (
   owner_name  VARCHAR(128) NULL,
   district    VARCHAR(64)  NULL,
   phone       VARCHAR(32)  NULL,
-  hiring      TINYINT(1)   NOT NULL DEFAULT 0,
+  hiring      BOOLEAN      NOT NULL DEFAULT FALSE,
   blurb       TEXT         NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_civ_businesses_category (category)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_jobs (
   id             VARCHAR(64)  NOT NULL,
@@ -404,11 +388,10 @@ CREATE TABLE IF NOT EXISTS civ_jobs (
   job_type       VARCHAR(32)  NULL,
   posted_at      DATE         NULL,
   blurb          TEXT         NULL,
-  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_civ_jobs_posted (posted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at     TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_classifieds (
   id           VARCHAR(64)  NOT NULL,
@@ -419,11 +402,10 @@ CREATE TABLE IF NOT EXISTS civ_classifieds (
   phone        VARCHAR(32)  NULL,
   posted_at    DATE         NULL,
   blurb        TEXT         NULL,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_civ_classifieds_posted (posted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 CREATE TABLE IF NOT EXISTS civ_penal_code (
   code        VARCHAR(16)  NOT NULL,
@@ -433,17 +415,16 @@ CREATE TABLE IF NOT EXISTS civ_penal_code (
   jail_time   VARCHAR(32)  NULL,
   points      INT          NOT NULL DEFAULT 0,
   notes       TEXT         NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (code),
-  KEY idx_civ_penal_degree (degree)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (code)
+);
 
 -- ---------------------------------------------------------------------------
 -- Community roster (written by the Discord bot)
 -- ---------------------------------------------------------------------------
 
--- One row per member holding a mapped Discord role. `discord_id` is unique
+-- One row per member holding a mapped Discord role. discord_id is unique
 -- because the sync API upserts on it, and losing a member's roles deletes the
 -- row rather than flagging it.
 CREATE TABLE IF NOT EXISTS roster_members (
@@ -456,13 +437,10 @@ CREATE TABLE IF NOT EXISTS roster_members (
   callsign        VARCHAR(32)  NULL,
   status          VARCHAR(32)  NOT NULL DEFAULT 'Active',
   joined_at       DATE         NULL,
-  synced_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  synced_at       TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   source          VARCHAR(32)  NOT NULL DEFAULT 'discord-sync',
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_roster_discord (discord_id),
-  KEY idx_roster_department (department),
-  KEY idx_roster_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (id)
+);
 
 -- The Discord role → department/rank mapping the bot reads. Editing a row here
 -- changes what a role means everywhere at once; the bot holds no copy.
@@ -477,27 +455,22 @@ CREATE TABLE IF NOT EXISTS roster_role_map (
   rank_full         VARCHAR(128) NULL,
   sort_order        INT          NOT NULL DEFAULT 0,
   display_template  VARCHAR(128) NOT NULL DEFAULT '{callsign} | {rank} | {surname}',
-  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (role_id),
-  UNIQUE KEY uq_roster_role_key (role_key),
-  KEY idx_roster_role_department (department),
-  KEY idx_roster_role_kind (kind)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (role_id)
+);
 
 -- Append-only record of what the bot changed, so a wrong rank can be traced.
 CREATE TABLE IF NOT EXISTS roster_sync_log (
-  id              INT          NOT NULL AUTO_INCREMENT,
+  id              INT GENERATED BY DEFAULT AS IDENTITY,
   discord_id      VARCHAR(20)  NULL,
   character_name  VARCHAR(128) NULL,
   action          VARCHAR(32)  NOT NULL,
   detail          TEXT         NULL,
   actor           VARCHAR(64)  NOT NULL DEFAULT 'roster-bot',
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_roster_log_discord (discord_id),
-  KEY idx_roster_log_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- ---------------------------------------------------------------------------
 -- Permission grants (edited from the Permissions page)
@@ -509,10 +482,9 @@ CREATE TABLE IF NOT EXISTS permission_grants (
   permission_key  VARCHAR(64) NOT NULL,
   role_key        VARCHAR(64) NOT NULL,
   granted_by      VARCHAR(20) NULL,
-  granted_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (permission_key, role_key),
-  KEY idx_permission_grants_role (role_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  granted_at      TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (permission_key, role_key)
+);
 
 -- LOA is stored on the roster row: the return date lives here rather than in the
 -- bot, so a restart or redeploy cannot lose a pending return.
@@ -531,40 +503,38 @@ ALTER TABLE roster_members
 -- has ever been saved.
 CREATE TABLE IF NOT EXISTS department_configs (
   id          VARCHAR(64) NOT NULL,
-  config      JSON        NOT NULL,
+  config      JSONB        NOT NULL,
   updated_by  VARCHAR(20) NULL,
-  created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- The config each save replaced, so a department that breaks its own site can
 -- restore the previous version from the Builder Portal instead of filing a
 -- ticket. Trimmed to the newest 50 per department on every write — Builder
 -- sessions auto-save far more often than anyone reads back.
 CREATE TABLE IF NOT EXISTS department_config_versions (
-  id             INT          NOT NULL AUTO_INCREMENT,
+  id             INT GENERATED BY DEFAULT AS IDENTITY,
   department_id  VARCHAR(64)  NOT NULL,
-  config         JSON         NOT NULL,
+  config         JSONB         NOT NULL,
   label          VARCHAR(160) NULL,
   actor          VARCHAR(20)  NULL,
-  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_dept_versions_dept (department_id, id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at     TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- Append-only record of who changed what on a department site.
 CREATE TABLE IF NOT EXISTS department_audit_log (
-  id             INT          NOT NULL AUTO_INCREMENT,
+  id             INT GENERATED BY DEFAULT AS IDENTITY,
   department_id  VARCHAR(64)  NOT NULL,
   actor          VARCHAR(20)  NULL,
   actor_name     VARCHAR(128) NULL,
   action         VARCHAR(64)  NOT NULL,
   summary        VARCHAR(512) NULL,
-  at             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_dept_audit_dept (department_id, id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  at             TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- The staff roster grew an operational view: a callsign, the position someone
 -- holds (which is not the same as their rank), when they were hired and last
@@ -576,9 +546,9 @@ ALTER TABLE hub_roster
   ADD COLUMN IF NOT EXISTS hired         DATE         NULL,
   ADD COLUMN IF NOT EXISTS last_move     DATE         NULL,
   ADD COLUMN IF NOT EXISTS loa_until     DATE         NULL,
-  ADD COLUMN IF NOT EXISTS online        TINYINT(1)   NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS online        BOOLEAN      NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS notes         TEXT         NULL,
-  ADD COLUMN IF NOT EXISTS vacant        TINYINT(1)   NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS vacant        BOOLEAN      NOT NULL DEFAULT FALSE;
 
 -- Who is on probation and which administrator is signing off on them. Read
 -- beside the staff roster but kept apart from it: it is a different list, and a
@@ -588,27 +558,26 @@ CREATE TABLE IF NOT EXISTS hub_training (
   trainee     VARCHAR(128) NOT NULL,
   admin_name  VARCHAR(128) NOT NULL,
   since       DATE         NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- ---------------------------------------------------------------------------
 -- Forms and exams
 -- ---------------------------------------------------------------------------
 
 -- One row per form. The whole document — questions, answer key, thresholds and
--- who may take or review it — is JSON, so adding a question type needs no
+-- who may take or review it — is JSONB, so adding a question type needs no
 -- migration. An empty table means the seeds in server/src/formsSeed.js apply.
 CREATE TABLE IF NOT EXISTS forms (
   id          VARCHAR(64) NOT NULL,
   audience    VARCHAR(16) NOT NULL DEFAULT 'staff',
-  document    JSON        NOT NULL,
+  document    JSONB        NOT NULL,
   updated_by  VARCHAR(20) NULL,
-  created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_forms_audience (audience)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- Answers only. The score is never stored: it is computed from the form on
 -- every read, so correcting an answer key re-grades the whole history instead
@@ -619,12 +588,10 @@ CREATE TABLE IF NOT EXISTS form_submissions (
   form_id             VARCHAR(64)  NOT NULL,
   subject_name        VARCHAR(128) NULL,
   subject_discord_id  VARCHAR(20)  NULL,
-  answers             JSON         NOT NULL,
-  submitted_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_form_submissions_form (form_id, submitted_at),
-  KEY idx_form_submissions_discord (subject_discord_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  answers             JSONB         NOT NULL,
+  submitted_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- A reviewer's score for one written answer, kept apart from the submission so
 -- the original auto-grade is never overwritten — the machine's result and the
@@ -634,9 +601,9 @@ CREATE TABLE IF NOT EXISTS form_reviews (
   question_id    VARCHAR(64) NOT NULL,
   awarded        INT         NOT NULL DEFAULT 0,
   reviewer       VARCHAR(20) NULL,
-  reviewed_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at    TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (submission_id, question_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- ---------------------------------------------------------------------------
 -- Promotion board
@@ -651,19 +618,18 @@ CREATE TABLE IF NOT EXISTS promotion_votes (
   reason              TEXT         NOT NULL,
   created_by          VARCHAR(20)  NULL,
   created_by_name     VARCHAR(128) NULL,
-  opens_at            DATETIME     NOT NULL,
-  closes_at           DATETIME     NOT NULL,
-  published           TINYINT(1)   NOT NULL DEFAULT 0,
-  published_at        TIMESTAMP    NULL,
-  cancelled           TINYINT(1)   NOT NULL DEFAULT 0,
-  created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_promotion_votes_closes (closes_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  opens_at            TIMESTAMPTZ     NOT NULL,
+  closes_at           TIMESTAMPTZ     NOT NULL,
+  published           BOOLEAN      NOT NULL DEFAULT FALSE,
+  published_at        TIMESTAMPTZ    NULL,
+  cancelled           BOOLEAN      NOT NULL DEFAULT FALSE,
+  created_at          TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- One ballot per voter per vote, so changing your mind updates rather than
 -- appends. Ballots are their own table because voting is the concurrent
--- operation here — two people voting at once on a single JSON document would
+-- operation here — two people voting at once on a single JSONB document would
 -- lose one of them.
 CREATE TABLE IF NOT EXISTS promotion_ballots (
   vote_id           VARCHAR(64)  NOT NULL,
@@ -671,25 +637,25 @@ CREATE TABLE IF NOT EXISTS promotion_ballots (
   voter_name        VARCHAR(128) NULL,
   choice            VARCHAR(16)  NOT NULL,
   reason            VARCHAR(512) NULL,
-  cast_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  cast_at           TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (vote_id, voter_discord_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Board settings, currently just the live-result visibility rules.
 CREATE TABLE IF NOT EXISTS promotion_settings (
   name        VARCHAR(64) NOT NULL,
-  value       JSON        NOT NULL,
-  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  value       JSONB        NOT NULL,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- ------------------------------------------------------------------ --
 -- Configurable applications
 -- ------------------------------------------------------------------ --
 
 -- One row per application, built in /apply/manage. Separate from the legacy
--- `applications` table above, which is the older fixed whitelist form.
--- The document itself is JSON because it is edited as
+-- applications table above, which is the older fixed whitelist form.
+-- The document itself is JSONB because it is edited as
 -- a whole by one person in a builder — the same reason department configs are.
 -- What is lifted out into columns is only what is queried: the address people
 -- visit, who owns it, and whether it is taking submissions.
@@ -700,20 +666,18 @@ CREATE TABLE IF NOT EXISTS custom_applications (
   subdivision_id  VARCHAR(64)  NULL,
   title           VARCHAR(200) NOT NULL,
   status          VARCHAR(16)  NOT NULL DEFAULT 'draft',
-  config          JSON         NOT NULL,
+  config          JSONB         NOT NULL,
   updated_by      VARCHAR(20)  NULL,
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_custom_applications_slug (slug),
-  KEY idx_custom_applications_department (department_id, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
--- Submissions. `answers` is JSON keyed by field id; `config_snapshot` is the
+-- Submissions. answers is JSONB keyed by field id; config_snapshot is the
 -- application exactly as it was when submitted, so a question edited afterwards
 -- never changes what somebody was actually asked.
 CREATE TABLE IF NOT EXISTS application_submissions (
-  id                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  id                    BIGINT GENERATED BY DEFAULT AS IDENTITY,
   reference             VARCHAR(32)  NOT NULL,
   application_id        VARCHAR(64)  NOT NULL,
   application_slug      VARCHAR(64)  NOT NULL,
@@ -721,20 +685,17 @@ CREATE TABLE IF NOT EXISTS application_submissions (
   subdivision_id        VARCHAR(64)  NULL,
   applicant_discord_id  VARCHAR(20)  NULL,
   applicant_name        VARCHAR(128) NULL,
-  answers               JSON         NOT NULL,
-  config_snapshot       JSON         NOT NULL,
+  answers               JSONB         NOT NULL,
+  config_snapshot       JSONB         NOT NULL,
   status                VARCHAR(16)  NOT NULL DEFAULT 'pending',
   decided_by            VARCHAR(20)  NULL,
   decided_by_name       VARCHAR(128) NULL,
   decided_via           VARCHAR(16)  NULL,
   decision_reason       VARCHAR(512) NULL,
-  decided_at            TIMESTAMP    NULL,
-  submitted_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_application_submissions_reference (reference),
-  KEY idx_application_submissions_queue (department_id, status, submitted_at),
-  KEY idx_application_submissions_applicant (applicant_discord_id, application_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  decided_at            TIMESTAMPTZ    NULL,
+  submitted_at          TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
 -- The Discord outbox.
 --
@@ -744,19 +705,18 @@ CREATE TABLE IF NOT EXISTS application_submissions (
 -- BOT_DISPATCH_URL is set — that is an optimisation, not the contract. This
 -- table is the contract, and it is what makes a bot outage cost nothing.
 CREATE TABLE IF NOT EXISTS application_dispatches (
-  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  id             BIGINT GENERATED BY DEFAULT AS IDENTITY,
   reference      VARCHAR(32)  NOT NULL,
   kind           VARCHAR(24)  NOT NULL DEFAULT 'submitted',
-  payload        JSON         NOT NULL,
+  payload        JSONB         NOT NULL,
   status         VARCHAR(16)  NOT NULL DEFAULT 'pending',
-  attempts       INT UNSIGNED NOT NULL DEFAULT 0,
+  attempts       INT NOT NULL DEFAULT 0,
   last_error     VARCHAR(512) NULL,
   discord_message_id VARCHAR(20) NULL,
-  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  delivered_at   TIMESTAMP    NULL,
-  PRIMARY KEY (id),
-  KEY idx_application_dispatches_pending (status, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at     TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  delivered_at   TIMESTAMPTZ    NULL,
+  PRIMARY KEY (id)
+);
 
 -- ------------------------------------------------------------------ --
 -- Emergency Services transfer portal
@@ -764,7 +724,7 @@ CREATE TABLE IF NOT EXISTS application_dispatches (
 
 -- One row per transfer ticket.
 --
--- `approvals` and `history` are JSON rather than tables of their own: both are
+-- approvals and history are JSONB rather than tables of their own: both are
 -- read only as part of a ticket, both are written by the same person in the
 -- same action, and neither is queried across tickets. That is the opposite of
 -- promotion ballots, which are concurrent and so live in their own table.
@@ -774,7 +734,7 @@ CREATE TABLE IF NOT EXISTS application_dispatches (
 -- retired_member or employment_type columns, and a status ENUM missing
 -- 'closed', all of which lib/transfers.js read and wrote. This is the full set.
 --
--- `created_by_id` is the one column upstream does not have, and it fixes a real
+-- created_by_id is the one column upstream does not have, and it fixes a real
 -- bug. Upstream decides whether you are looking at your own ticket by comparing
 -- your Discord username and display name against the strings stored on the row
 -- (lib/access.js, isOwnTicket). Change your Discord name — or have a department
@@ -793,43 +753,39 @@ CREATE TABLE IF NOT EXISTS transfers (
   reason            TEXT         NULL,
   status            VARCHAR(16)  NOT NULL DEFAULT 'pending',
   -- What the outgoing department should do with their roles once it completes.
-  remove_roles        TINYINT(1) NOT NULL DEFAULT 1,
-  assign_visitor_pass TINYINT(1) NOT NULL DEFAULT 1,
-  assign_retired      TINYINT(1) NOT NULL DEFAULT 0,
-  require_bot_confirm TINYINT(1) NOT NULL DEFAULT 1,
+  remove_roles        BOOLEAN    NOT NULL DEFAULT TRUE,
+  assign_visitor_pass BOOLEAN    NOT NULL DEFAULT TRUE,
+  assign_retired      BOOLEAN    NOT NULL DEFAULT FALSE,
+  require_bot_confirm BOOLEAN    NOT NULL DEFAULT TRUE,
   -- The outcome, written when the receiving department processes it.
   assigned_rank     VARCHAR(128) NULL,
   employment_type   VARCHAR(16)  NULL,
-  retired_member    TINYINT(1)   NOT NULL DEFAULT 0,
+  retired_member    BOOLEAN      NOT NULL DEFAULT FALSE,
   rejection_reason  VARCHAR(512) NULL,
-  approvals         JSON         NOT NULL,
-  history           JSON         NOT NULL,
-  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_transfers_queue (status, created_at),
-  KEY idx_transfers_depts (from_dept, to_dept),
-  KEY idx_transfers_creator (created_by_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  approvals         JSONB         NOT NULL,
+  history           JSONB         NOT NULL,
+  created_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
--- Per-ticket chat. `internal = 1` is the staff-only thread; `internal = 0` is
+-- Per-ticket chat. internal = 1 is the staff-only thread; internal = 0 is
 -- the thread the transferee also reads. One table rather than two because they
 -- differ by a flag and nothing else — and because a query that forgets the flag
 -- is easier to spot than a join against the wrong table.
 CREATE TABLE IF NOT EXISTS transfer_messages (
   id            VARCHAR(48)  NOT NULL,
   transfer_id   VARCHAR(32)  NOT NULL,
-  internal      TINYINT(1)   NOT NULL DEFAULT 0,
+  internal      BOOLEAN      NOT NULL DEFAULT FALSE,
   author_id     VARCHAR(20)  NULL,
   author_name   VARCHAR(128) NOT NULL,
   author_avatar VARCHAR(512) NULL,
   body          TEXT         NOT NULL,
-  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_transfer_messages_thread (transfer_id, created_at),
   CONSTRAINT fk_transfer_messages FOREIGN KEY (transfer_id)
     REFERENCES transfers(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Who is looking at a ticket right now. Upserted on each heartbeat; a viewer
 -- counts as present while last_seen is inside the TTL, and reads filter on it
@@ -839,12 +795,11 @@ CREATE TABLE IF NOT EXISTS transfer_viewers (
   viewer_id    VARCHAR(20)  NOT NULL,
   viewer_name  VARCHAR(128) NOT NULL,
   viewer_avatar VARCHAR(512) NULL,
-  last_seen    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  last_seen    TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (transfer_id, viewer_id),
-  KEY idx_transfer_viewers_seen (last_seen),
   CONSTRAINT fk_transfer_viewers FOREIGN KEY (transfer_id)
     REFERENCES transfers(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- How much of each thread a viewer has read.
 --
@@ -862,22 +817,22 @@ CREATE TABLE IF NOT EXISTS transfer_reads (
   viewer_id     VARCHAR(20) NOT NULL,
   public_seen   INT         NOT NULL DEFAULT 0,
   internal_seen INT         NOT NULL DEFAULT 0,
-  updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (transfer_id, viewer_id),
   CONSTRAINT fk_transfer_reads FOREIGN KEY (transfer_id)
     REFERENCES transfers(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Per-department webhook configuration. The original kept this in a process
 -- global and reset it on every restart; a webhook URL that a director typed in
 -- should survive a deploy, so it goes in a table.
 CREATE TABLE IF NOT EXISTS transfer_webhooks (
   department_id VARCHAR(32) NOT NULL,
-  config        JSON        NOT NULL,
+  config        JSONB        NOT NULL,
   updated_by    VARCHAR(20) NULL,
-  updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (department_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- ------------------------------------------------------------------ --
 -- Disciplinary actions
@@ -890,11 +845,11 @@ CREATE TABLE IF NOT EXISTS transfer_webhooks (
 -- check that only covers half the community is worse than none — it reads as a
 -- clean record.
 --
--- `voided` rather than DELETE: an action that was later withdrawn is still part
+-- voided rather than DELETE: an action that was later withdrawn is still part
 -- of the record, and dropping the row would let a reviewer conclude nothing
 -- ever happened. The row stays, marked, with the reason it was withdrawn.
 CREATE TABLE IF NOT EXISTS disciplinary_actions (
-  id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  id                   BIGINT GENERATED BY DEFAULT AS IDENTITY,
   type                 VARCHAR(32)  NOT NULL,
   body_id              VARCHAR(32)  NOT NULL,
   target_name          VARCHAR(128) NOT NULL,
@@ -902,23 +857,18 @@ CREATE TABLE IF NOT EXISTS disciplinary_actions (
   issued_by_name       VARCHAR(128) NOT NULL,
   issued_by_discord_id VARCHAR(20)  NULL,
   reason               VARCHAR(1000) NOT NULL,
-  expires_at           TIMESTAMP    NULL,
-  voided               TINYINT(1)   NOT NULL DEFAULT 0,
+  expires_at           TIMESTAMPTZ    NULL,
+  voided               BOOLEAN      NOT NULL DEFAULT FALSE,
   void_reason          VARCHAR(500) NULL,
-  created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  -- The index /bgcheck reads: one member, newest first, inside a date window.
-  KEY idx_discipline_target (target_discord_id, created_at),
-  KEY idx_discipline_issuer (issued_by_discord_id, created_at),
-  KEY idx_discipline_body (body_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at           TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id));
 
 -- ------------------------------------------------------------------ --
 -- Support portal
 -- ------------------------------------------------------------------ --
 
--- One row per ticket. `details` holds the intake answers for whichever type it
+-- One row per ticket. details holds the intake answers for whichever type it
 -- is — a ban appeal's fields are not a bug report's, and a column per field
 -- across six types would be mostly nulls.
 CREATE TABLE IF NOT EXISTS support_tickets (
@@ -927,55 +877,240 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   subject             VARCHAR(200) NOT NULL,
   status              VARCHAR(16)  NOT NULL DEFAULT 'open',
   priority            VARCHAR(16)  NOT NULL DEFAULT 'normal',
-  details             JSON         NOT NULL,
+  details             JSONB         NOT NULL,
   opened_by_discord_id VARCHAR(20) NULL,
   opened_by_name      VARCHAR(128) NOT NULL,
   assigned_to_discord_id VARCHAR(20) NULL,
   assigned_to_name    VARCHAR(128) NULL,
-  history             JSON         NOT NULL,
+  history             JSONB         NOT NULL,
   -- Denormalised so a queue sorted by "least recently touched" does not need a
   -- join against every message on every ticket.
-  last_message_at     TIMESTAMP    NULL,
-  created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_support_queue (status, priority, last_message_at),
-  KEY idx_support_opener (opened_by_discord_id, created_at),
-  KEY idx_support_assignee (assigned_to_discord_id, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  last_message_at     TIMESTAMPTZ    NULL,
+  created_at          TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
 
--- The thread. `internal = 1` is a staff note the member never sees; it lives in
+-- The thread. internal = 1 is a staff note the member never sees; it lives in
 -- the same table because the two differ by a flag and nothing else, and a query
 -- that forgets the flag is easier to spot than a join against the wrong table.
 --
--- `reply_to_id` is what draws the quoted block above a message, so an agent
+-- reply_to_id is what draws the quoted block above a message, so an agent
 -- answering the third question in a long ticket can say which one.
 CREATE TABLE IF NOT EXISTS support_messages (
   id           VARCHAR(48)  NOT NULL,
   ticket_id    VARCHAR(32)  NOT NULL,
-  internal     TINYINT(1)   NOT NULL DEFAULT 0,
+  internal     BOOLEAN      NOT NULL DEFAULT FALSE,
   author_id    VARCHAR(20)  NULL,
   author_name  VARCHAR(128) NOT NULL,
   author_role  VARCHAR(64)  NULL,
   body         TEXT         NOT NULL,
   reply_to_id  VARCHAR(48)  NULL,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_support_messages_thread (ticket_id, created_at),
   CONSTRAINT fk_support_messages FOREIGN KEY (ticket_id)
     REFERENCES support_tickets(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Response flows: the branching trees agents walk to compose a reply. The whole
--- tree is one JSON document because it is edited as a whole by one person in a
+-- tree is one JSONB document because it is edited as a whole by one person in a
 -- builder, the same reason department configs and applications are.
 CREATE TABLE IF NOT EXISTS support_flows (
   id          VARCHAR(64) NOT NULL,
   name        VARCHAR(120) NOT NULL,
-  enabled     TINYINT(1)  NOT NULL DEFAULT 0,
-  document    JSON        NOT NULL,
+  enabled     BOOLEAN     NOT NULL DEFAULT FALSE,
+  document    JSONB        NOT NULL,
   updated_by  VARCHAR(20) NULL,
-  created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
+
+-- ------------------------------------------------------------------ --
+-- Indexes
+--
+-- Separate statements rather than inline KEY clauses: that is MySQL syntax,
+-- and Postgres index names are unique per database rather than per table —
+-- which is why each one already carries its table's name.
+-- ------------------------------------------------------------------ --
+
+CREATE INDEX IF NOT EXISTS idx_rules_category ON rules (category_id);
+CREATE INDEX IF NOT EXISTS idx_patch_notes_released ON patch_notes (released_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_applications_reference ON applications (reference);
+CREATE INDEX IF NOT EXISTS idx_applications_discord_id ON applications (discord_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_reports_reference ON reports (reference);
+CREATE INDEX IF NOT EXISTS idx_reports_discord_id ON reports (discord_id);
+CREATE INDEX IF NOT EXISTS idx_events_date ON events (event_date);
+CREATE INDEX IF NOT EXISTS idx_articles_category ON articles (category);
+CREATE INDEX IF NOT EXISTS idx_supporters_tier ON supporters (tier);
+CREATE INDEX IF NOT EXISTS idx_hub_roster_rank ON hub_roster (rank_id);
+CREATE INDEX IF NOT EXISTS idx_hub_roster_discord ON hub_roster (discord_id);
+CREATE INDEX IF NOT EXISTS idx_hub_da_discord ON hub_disciplinary (discord_id);
+CREATE INDEX IF NOT EXISTS idx_hub_da_issued ON hub_disciplinary (issued_at);
+CREATE INDEX IF NOT EXISTS idx_hub_attempts_discord ON hub_attempts (discord_id);
+CREATE INDEX IF NOT EXISTS idx_hub_attempts_exam ON hub_attempts (exam_type);
+CREATE INDEX IF NOT EXISTS idx_hub_attempts_submitted ON hub_attempts (submitted_at);
+CREATE INDEX IF NOT EXISTS idx_hub_overrides_attempt ON hub_overrides (attempt_id);
+CREATE INDEX IF NOT EXISTS idx_hub_overrides_created ON hub_overrides (created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_hub_questions_qid ON hub_questions (question_id);
+CREATE INDEX IF NOT EXISTS idx_hub_questions_exam ON hub_questions (exam_type);
+CREATE INDEX IF NOT EXISTS idx_civ_characters_discord ON civ_characters (discord_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_civ_vehicles_plate ON civ_vehicles (plate);
+CREATE INDEX IF NOT EXISTS idx_civ_vehicles_owner ON civ_vehicles (owner_character);
+CREATE INDEX IF NOT EXISTS idx_civ_properties_owner ON civ_properties (owner_character);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_civ_licences_number ON civ_licences (licence_number);
+CREATE INDEX IF NOT EXISTS idx_civ_licences_holder ON civ_licences (holder_character);
+CREATE INDEX IF NOT EXISTS idx_civ_businesses_category ON civ_businesses (category);
+CREATE INDEX IF NOT EXISTS idx_civ_jobs_posted ON civ_jobs (posted_at);
+CREATE INDEX IF NOT EXISTS idx_civ_classifieds_posted ON civ_classifieds (posted_at);
+CREATE INDEX IF NOT EXISTS idx_civ_penal_degree ON civ_penal_code (degree);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_roster_discord ON roster_members (discord_id);
+CREATE INDEX IF NOT EXISTS idx_roster_department ON roster_members (department);
+CREATE INDEX IF NOT EXISTS idx_roster_status ON roster_members (status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_roster_role_key ON roster_role_map (role_key);
+CREATE INDEX IF NOT EXISTS idx_roster_role_department ON roster_role_map (department);
+CREATE INDEX IF NOT EXISTS idx_roster_role_kind ON roster_role_map (kind);
+CREATE INDEX IF NOT EXISTS idx_roster_log_discord ON roster_sync_log (discord_id);
+CREATE INDEX IF NOT EXISTS idx_roster_log_created ON roster_sync_log (created_at);
+CREATE INDEX IF NOT EXISTS idx_permission_grants_role ON permission_grants (role_key);
+CREATE INDEX IF NOT EXISTS idx_dept_versions_dept ON department_config_versions (department_id, id);
+CREATE INDEX IF NOT EXISTS idx_dept_audit_dept ON department_audit_log (department_id, id);
+CREATE INDEX IF NOT EXISTS idx_forms_audience ON forms (audience);
+CREATE INDEX IF NOT EXISTS idx_form_submissions_form ON form_submissions (form_id, submitted_at);
+CREATE INDEX IF NOT EXISTS idx_form_submissions_discord ON form_submissions (subject_discord_id);
+CREATE INDEX IF NOT EXISTS idx_promotion_votes_closes ON promotion_votes (closes_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_custom_applications_slug ON custom_applications (slug);
+CREATE INDEX IF NOT EXISTS idx_custom_applications_department ON custom_applications (department_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_application_submissions_reference ON application_submissions (reference);
+CREATE INDEX IF NOT EXISTS idx_application_submissions_queue ON application_submissions (department_id, status, submitted_at);
+CREATE INDEX IF NOT EXISTS idx_application_submissions_applicant ON application_submissions (applicant_discord_id, application_id);
+CREATE INDEX IF NOT EXISTS idx_application_dispatches_pending ON application_dispatches (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_transfers_queue ON transfers (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_transfers_depts ON transfers (from_dept, to_dept);
+CREATE INDEX IF NOT EXISTS idx_transfers_creator ON transfers (created_by_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_messages_thread ON transfer_messages (transfer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_transfer_viewers_seen ON transfer_viewers (last_seen);
+-- The index /bgcheck reads: one member, newest first, inside a date window.
+CREATE INDEX IF NOT EXISTS idx_discipline_target ON disciplinary_actions (target_discord_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_discipline_issuer ON disciplinary_actions (issued_by_discord_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_discipline_body ON disciplinary_actions (body_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_support_queue ON support_tickets (status, priority, last_message_at);
+CREATE INDEX IF NOT EXISTS idx_support_opener ON support_tickets (opened_by_discord_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_support_assignee ON support_tickets (assigned_to_discord_id, status);
+CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages (ticket_id, created_at);
+
+-- ------------------------------------------------------------------ --
+-- updated_at triggers
+-- ------------------------------------------------------------------ --
+
+DROP TRIGGER IF EXISTS touch_users ON users;
+CREATE TRIGGER touch_users BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_departments ON departments;
+CREATE TRIGGER touch_departments BEFORE UPDATE ON departments
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_staff ON staff;
+CREATE TRIGGER touch_staff BEFORE UPDATE ON staff
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_rules ON rules;
+CREATE TRIGGER touch_rules BEFORE UPDATE ON rules
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_patch_notes ON patch_notes;
+CREATE TRIGGER touch_patch_notes BEFORE UPDATE ON patch_notes
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_applications ON applications;
+CREATE TRIGGER touch_applications BEFORE UPDATE ON applications
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_reports ON reports;
+CREATE TRIGGER touch_reports BEFORE UPDATE ON reports
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_events ON events;
+CREATE TRIGGER touch_events BEFORE UPDATE ON events
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_articles ON articles;
+CREATE TRIGGER touch_articles BEFORE UPDATE ON articles
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_supporters ON supporters;
+CREATE TRIGGER touch_supporters BEFORE UPDATE ON supporters
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_store_tiers ON store_tiers;
+CREATE TRIGGER touch_store_tiers BEFORE UPDATE ON store_tiers
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_hub_portal ON hub_portal;
+CREATE TRIGGER touch_hub_portal BEFORE UPDATE ON hub_portal
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_hub_roster ON hub_roster;
+CREATE TRIGGER touch_hub_roster BEFORE UPDATE ON hub_roster
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_hub_disciplinary ON hub_disciplinary;
+CREATE TRIGGER touch_hub_disciplinary BEFORE UPDATE ON hub_disciplinary
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_hub_attempts ON hub_attempts;
+CREATE TRIGGER touch_hub_attempts BEFORE UPDATE ON hub_attempts
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_hub_exam_settings ON hub_exam_settings;
+CREATE TRIGGER touch_hub_exam_settings BEFORE UPDATE ON hub_exam_settings
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_hub_questions ON hub_questions;
+CREATE TRIGGER touch_hub_questions BEFORE UPDATE ON hub_questions
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_characters ON civ_characters;
+CREATE TRIGGER touch_civ_characters BEFORE UPDATE ON civ_characters
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_vehicles ON civ_vehicles;
+CREATE TRIGGER touch_civ_vehicles BEFORE UPDATE ON civ_vehicles
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_properties ON civ_properties;
+CREATE TRIGGER touch_civ_properties BEFORE UPDATE ON civ_properties
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_licences ON civ_licences;
+CREATE TRIGGER touch_civ_licences BEFORE UPDATE ON civ_licences
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_businesses ON civ_businesses;
+CREATE TRIGGER touch_civ_businesses BEFORE UPDATE ON civ_businesses
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_jobs ON civ_jobs;
+CREATE TRIGGER touch_civ_jobs BEFORE UPDATE ON civ_jobs
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_classifieds ON civ_classifieds;
+CREATE TRIGGER touch_civ_classifieds BEFORE UPDATE ON civ_classifieds
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_civ_penal_code ON civ_penal_code;
+CREATE TRIGGER touch_civ_penal_code BEFORE UPDATE ON civ_penal_code
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_roster_role_map ON roster_role_map;
+CREATE TRIGGER touch_roster_role_map BEFORE UPDATE ON roster_role_map
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_department_configs ON department_configs;
+CREATE TRIGGER touch_department_configs BEFORE UPDATE ON department_configs
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_forms ON forms;
+CREATE TRIGGER touch_forms BEFORE UPDATE ON forms
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_promotion_settings ON promotion_settings;
+CREATE TRIGGER touch_promotion_settings BEFORE UPDATE ON promotion_settings
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_custom_applications ON custom_applications;
+CREATE TRIGGER touch_custom_applications BEFORE UPDATE ON custom_applications
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_transfers ON transfers;
+CREATE TRIGGER touch_transfers BEFORE UPDATE ON transfers
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_transfer_viewers ON transfer_viewers;
+CREATE TRIGGER touch_transfer_viewers BEFORE UPDATE ON transfer_viewers
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_transfer_reads ON transfer_reads;
+CREATE TRIGGER touch_transfer_reads BEFORE UPDATE ON transfer_reads
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_transfer_webhooks ON transfer_webhooks;
+CREATE TRIGGER touch_transfer_webhooks BEFORE UPDATE ON transfer_webhooks
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_disciplinary_actions ON disciplinary_actions;
+CREATE TRIGGER touch_disciplinary_actions BEFORE UPDATE ON disciplinary_actions
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_support_tickets ON support_tickets;
+CREATE TRIGGER touch_support_tickets BEFORE UPDATE ON support_tickets
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_support_flows ON support_flows;
+CREATE TRIGGER touch_support_flows BEFORE UPDATE ON support_flows
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();

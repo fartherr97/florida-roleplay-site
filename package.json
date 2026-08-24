@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Florida Roleplay — public community site and API for a FiveM roleplay server.",
-  "engines": { "node": ">=20" },
+  "description": "Florida Roleplay \u2014 public community site and API for a FiveM roleplay server.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "npm --prefix client run dev",
     "dev:server": "npm --prefix server run dev",

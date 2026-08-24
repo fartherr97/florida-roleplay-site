@@ -105,13 +105,11 @@ router.post("/grants", requirePermission("permissions.manage"), async (req, res)
       // falling back to its shipped default — and, just as importantly, a
       // permission added by a later deploy keeps its default rather than being
       // denied to everyone. See CONFIGURED in middleware/requirePermission.js.
-      await query(
-        "INSERT INTO permission_grants (permission_key, role_key) VALUES (?, ?)",
+      await query("INSERT INTO permission_grants (permission_key, role_key) VALUES ($1, $2)",
         [permission, CONFIGURED],
       );
       for (const role of roles) {
-        await query(
-          "INSERT INTO permission_grants (permission_key, role_key) VALUES (?, ?)",
+        await query("INSERT INTO permission_grants (permission_key, role_key) VALUES ($1, $2)",
           [permission, role],
         );
       }

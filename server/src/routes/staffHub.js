@@ -1,7 +1,7 @@
 /**
  * The /api/staff-hub router. Same seed-fallback contract as the public API: try
  * the database, and on any failure serve the seed shape — so the hub works
- * end-to-end before MariaDB is provisioned.
+ * end-to-end before Postgres is provisioned.
  *
  * Every route here names a permission rather than a rank. The grants behind
  * those permissions are editable from the Permissions page, and the client gates
@@ -9,7 +9,7 @@
  * cannot disagree. Hiding a link is a convenience; this file is the boundary.
  */
 import { Router } from "express";
-import { query, changedRows } from "../db.js";
+import { execute, query, changedRows } from "../db.js";
 import * as seed from "../staffHubSeed.js";
 import { requirePermission } from "../middleware/requirePermission.js";
 import { collect, str } from "../validate.js";
@@ -44,9 +44,10 @@ function isoDate(value) {
 
 router.get("/portal", requirePermission("staff.view"), async (_req, res) => {
   try {
-    const rows = await query(
-      "SELECT section, payload FROM hub_portal WHERE id = 1 OR section IS NOT NULL",
-    );
+    // The table is keyed by section and holds one row per section — there is
+    // nothing to filter, and the `id = 1` this used to carry was left over from
+    // a single-row table it has not been for a long time.
+    const rows = await query("SELECT section, payload FROM hub_portal");
     if (rows.length) {
       const bySection = Object.fromEntries(
         rows.map((row) => [row.section, parseJson(row.payload, null)]),
@@ -84,18 +85,33 @@ router.post("/portal/:section", requirePermission("staff.portal.manage"), async 
       "Quick notes must be under 5000 characters.",
     ],
     [
-      key !== "reminders" || Array.isArray(body.reminders),
-      "Reminders must be a list.",
+      // A list of strings, checked to the element. The page renders each one
+      // directly, so an array of objects is accepted by a looser check and then
+      // crashes the page it was just saved to — the API has to refuse a shape
+      // it cannot render.
+      key !== "reminders" ||
+        (Array.isArray(body.reminders) &&
+          body.reminders.every((entry) => typeof entry === "string" && entry.length <= 500)),
+      "Reminders must be a list of strings, each under 500 characters.",
     ],
-    [key !== "links" || Array.isArray(body.links), "Links must be a list."],
+    [
+      key !== "links" ||
+        (Array.isArray(body.links) &&
+          body.links.every((entry) => entry && typeof entry === "object")),
+      "Links must be a list of link objects.",
+    ],
   ]);
   if (errors.length) return res.status(400).json({ ok: false, errors });
 
   try {
-    await query(
-      `INSERT INTO hub_portal (section, payload) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
-      [key, JSON.stringify(body)],
+    // The section's value, not the envelope it arrived in. Storing the whole
+    // body nested it one level deeper than the reader expects — `reminders`
+    // came back as `{ reminders: [...] }`, and the page crashed mapping over an
+    // object. It only ever showed up once somebody actually saved, because the
+    // seed fallback has the right shape.
+    await query(`INSERT INTO hub_portal (section, payload) VALUES ($1, $2)
+         ON CONFLICT (section) DO UPDATE SET payload = EXCLUDED.payload`,
+      [key, JSON.stringify(body[key] ?? null)],
     );
     return res.json({ ok: true });
   } catch {
@@ -115,8 +131,7 @@ router.get("/roster", requirePermission("staff.view"), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM hub_roster ORDER BY rank_order DESC, callsign, name",
+      const rows = await query("SELECT * FROM hub_roster ORDER BY rank_order DESC, callsign, name",
       );
       return rows.map((row) => ({
         id: row.id,
@@ -156,8 +171,7 @@ router.get("/training", requirePermission("staff.view"), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM hub_training ORDER BY since DESC",
+      const rows = await query("SELECT * FROM hub_training ORDER BY since DESC",
       );
       return rows.map((row) => ({
         id: row.id,
@@ -187,8 +201,7 @@ router.get("/disciplinary", requirePermission("staff.da_view"), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM hub_disciplinary ORDER BY issued_at DESC",
+      const rows = await query("SELECT * FROM hub_disciplinary ORDER BY issued_at DESC",
       );
       return rows.map((row) => ({
         id: row.id,
@@ -350,10 +363,9 @@ router.post(
     // update here is the normal case rather than an error.
     let persisted = false;
     try {
-      const result = await query(
-        `UPDATE hub_attempts
-            SET score = ?, status = ?, override_payload = ?
-          WHERE attempt_id = ?`,
+      const result = await execute(`UPDATE hub_attempts
+            SET score = $1, status = $2, override_payload = $3
+          WHERE attempt_id = $4`,
         [
           override.overrideScore,
           override.overrideStatus,
@@ -363,11 +375,10 @@ router.post(
       );
       persisted = changedRows(result);
       if (persisted) {
-        await query(
-          `INSERT INTO hub_overrides
+        await query(`INSERT INTO hub_overrides
              (attempt_id, discord_id, staff_name, exam_type, original_score,
               original_status, override_score, override_status, reviewer, reason)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             override.attemptId, override.discordId, override.staffName,
             override.examType, override.originalScore, override.originalStatus,
@@ -423,8 +434,7 @@ router.get("/exams/audit-log", requirePermission("exams.audit"), (_req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM hub_overrides ORDER BY created_at DESC",
+      const rows = await query("SELECT * FROM hub_overrides ORDER BY created_at DESC",
       );
       return rows.map((row) => ({
         id: `al-${row.id}`,
@@ -493,13 +503,12 @@ router.post("/exams/settings", requirePermission("exams.manage"), async (req, re
     for (const exam of seed.EXAMS) {
       const values = body[exam.key];
       if (!values) continue;
-      await query(
-        `INSERT INTO hub_exam_settings
+      await query(`INSERT INTO hub_exam_settings
            (exam_type, pass_score, review_min, review_max, max_score)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           pass_score = VALUES(pass_score), review_min = VALUES(review_min),
-           review_max = VALUES(review_max), max_score = VALUES(max_score)`,
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (exam_type) DO UPDATE SET
+           pass_score = EXCLUDED.pass_score, review_min = EXCLUDED.review_min,
+           review_max = EXCLUDED.review_max, max_score = EXCLUDED.max_score`,
         [
           exam.key,
           Number(values.passScore),
@@ -523,8 +532,7 @@ router.get("/exams/question-catalog", requirePermission("exams.manage"), (_req, 
   safe(
     res,
     async () => {
-      const rows = await query(
-        "SELECT * FROM hub_questions ORDER BY exam_type, question_number",
+      const rows = await query("SELECT * FROM hub_questions ORDER BY exam_type, question_number",
       );
       return rows.map((row) => ({
         rowNumber: row.id,
@@ -566,10 +574,9 @@ router.post(
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
     try {
-      const result = await query(
-        `UPDATE hub_questions
-            SET question_text = ?, points = ?, correct_answer = ?
-          WHERE id = ?`,
+      const result = await execute(`UPDATE hub_questions
+            SET question_text = $1, points = $2, correct_answer = $3
+          WHERE id = $4`,
         [questionText, points, correctAnswer, rowNumber],
       );
       if (!changedRows(result)) {

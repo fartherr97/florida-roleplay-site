@@ -16,7 +16,7 @@
  * and when is the first thing anybody asks when one goes wrong.
  */
 import { Router } from "express";
-import { query, changedRows } from "../db.js";
+import { execute, query, changedRows } from "../db.js";
 import * as seed from "../supportSeed.js";
 import { loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser } from "../middleware/requireRole.js";
@@ -67,9 +67,9 @@ function parseJson(value, fallback) {
 
 const TICKET_COLUMNS = `
   id, type, subject, status, priority, details,
-  opened_by_discord_id AS openedByDiscordId, opened_by_name AS openedByName,
-  assigned_to_discord_id AS assignedToDiscordId, assigned_to_name AS assignedToName,
-  history, last_message_at AS lastMessageAt, created_at AS createdAt, updated_at AS updatedAt`;
+  opened_by_discord_id AS "openedByDiscordId", opened_by_name AS "openedByName",
+  assigned_to_discord_id AS "assignedToDiscordId", assigned_to_name AS "assignedToName",
+  history, last_message_at AS "lastMessageAt", created_at AS "createdAt", updated_at AS "updatedAt"`;
 
 function shapeTicket(row) {
   return { ...row, details: parseJson(row.details, {}), history: parseJson(row.history, []) };
@@ -77,8 +77,7 @@ function shapeTicket(row) {
 
 async function loadTickets() {
   try {
-    const rows = await query(
-      `SELECT ${TICKET_COLUMNS} FROM support_tickets ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT 1000`,
+    const rows = await query(`SELECT ${TICKET_COLUMNS} FROM support_tickets ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT 1000`,
     );
     if (rows.length) return rows.map(shapeTicket);
   } catch {
@@ -174,17 +173,15 @@ router.post("/", async (req, res) => {
   const history = [{ action: "opened", actor: name, details: TYPE_MAP[draft.type].label, at: new Date().toISOString() }];
 
   try {
-    await query(
-      `INSERT INTO support_tickets
+    await query(`INSERT INTO support_tickets
          (id, type, subject, status, priority, details, opened_by_discord_id, opened_by_name, history, last_message_at)
-       VALUES (?, ?, ?, 'open', 'normal', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+       VALUES ($1, $2, $3, 'open', 'normal', $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
       [id, draft.type, draft.subject, JSON.stringify(details), ctx.user.id, name, JSON.stringify(history)],
     );
     // The opening message is the first post in the thread, so the conversation
     // reads as one rather than starting with a reply to something invisible.
-    await query(
-      `INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, body)
-       VALUES (?, ?, 0, ?, ?, ?)`,
+    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, body)
+       VALUES ($1, $2, false, $3, $4, $5)`,
       [`sm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, id, ctx.user.id, name, draft.body],
     );
   } catch {
@@ -251,10 +248,9 @@ router.patch("/:id", async (req, res) => {
   }
 
   try {
-    const result = await query(
-      `UPDATE support_tickets
-          SET status = ?, priority = ?, assigned_to_discord_id = ?, assigned_to_name = ?, history = ?
-        WHERE id = ?`,
+    const result = await execute(`UPDATE support_tickets
+          SET status = $1, priority = $2, assigned_to_discord_id = $3, assigned_to_name = $4, history = $5
+        WHERE id = $6`,
       [next.status, next.priority, next.assignedToDiscordId, next.assignedToName, JSON.stringify(history), ticket.id],
     );
     if (!changedRows(result)) return res.status(404).json({ ok: false, message: "Nothing was updated." });
@@ -279,11 +275,10 @@ router.get("/:id/messages", async (req, res) => {
 
   const internal = canWorkTicket(ticket, ctx);
   try {
-    const rows = await query(
-      `SELECT id, internal, author_id AS authorId, author_name AS authorName,
-              author_role AS authorRole, body, reply_to_id AS replyToId, created_at AS createdAt
+    const rows = await query(`SELECT id, internal, author_id AS "authorId", author_name AS "authorName",
+              author_role AS "authorRole", body, reply_to_id AS "replyToId", created_at AS "createdAt"
          FROM support_messages
-        WHERE ticket_id = ?${internal ? "" : " AND internal = 0"}
+        WHERE ticket_id = $1${internal ? "" : " AND internal = false"}
         ORDER BY created_at ASC
         LIMIT 500`,
       [ticket.id],
@@ -329,10 +324,9 @@ router.post("/:id/messages", async (req, res) => {
   };
 
   try {
-    await query(
-      `INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, body, reply_to_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [message.id, ticket.id, message.internal ? 1 : 0, message.authorId, message.authorName, message.authorRole, body, message.replyToId],
+    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, body, reply_to_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [message.id, ticket.id, Boolean(message.internal), message.authorId, message.authorName, message.authorRole, body, message.replyToId],
     );
     // An internal note is not the member replying, so it must not move the
     // ticket off "waiting on member" or bump it up the queue.
@@ -344,8 +338,7 @@ router.post("/:id/messages", async (req, res) => {
           : !isMember && ticket.status === "open"
             ? "pending"
             : ticket.status;
-      await query(
-        "UPDATE support_tickets SET last_message_at = CURRENT_TIMESTAMP, status = ? WHERE id = ?",
+      await query("UPDATE support_tickets SET last_message_at = CURRENT_TIMESTAMP, status = $1 WHERE id = $2",
         [nextStatus, ticket.id],
       );
     }
@@ -392,12 +385,11 @@ router.put("/flows/:id", async (req, res) => {
   }
 
   try {
-    await query(
-      `INSERT INTO support_flows (id, name, enabled, document, updated_by)
-       VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE name = VALUES(name), enabled = VALUES(enabled),
-         document = VALUES(document), updated_by = VALUES(updated_by)`,
-      [flow.id, flow.name, flow.enabled ? 1 : 0, JSON.stringify(flow), ctx.user.id],
+    await query(`INSERT INTO support_flows (id, name, enabled, document, updated_by)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, enabled = EXCLUDED.enabled,
+         document = EXCLUDED.document, updated_by = EXCLUDED.updated_by`,
+      [flow.id, flow.name, Boolean(flow.enabled), JSON.stringify(flow), ctx.user.id],
     );
   } catch {
     return noStore(res);
@@ -412,7 +404,7 @@ router.delete("/flows/:id", async (req, res) => {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Editing flows needs support.manage." });
   }
   try {
-    const result = await query("DELETE FROM support_flows WHERE id = ?", [str(req.params.id, 64)]);
+    const result = await execute("DELETE FROM support_flows WHERE id = $1", [str(req.params.id, 64)]);
     if (!changedRows(result)) return res.status(404).json({ ok: false, message: "No such flow." });
   } catch {
     return noStore(res);

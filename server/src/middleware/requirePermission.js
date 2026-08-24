@@ -45,8 +45,7 @@ export async function loadGrants() {
   // configured keeps them, then let stored rows override the ones it has.
   let grants = DEFAULT_GRANTS;
   try {
-    const rows = await query(
-      "SELECT permission_key, role_key FROM permission_grants",
+    const rows = await query("SELECT permission_key, role_key FROM permission_grants",
     );
     if (rows.length) {
       const stored = {};

@@ -11,7 +11,7 @@
  *     countdown in the UI is a courtesy; this is the deadline.
  */
 import { Router } from "express";
-import { query, changedRows } from "../db.js";
+import { execute, query, changedRows } from "../db.js";
 import * as seed from "../promotionSeed.js";
 import { ROLE_MAP } from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
@@ -97,8 +97,7 @@ function iso(value) {
 
 async function loadRules() {
   try {
-    const rows = await query(
-      "SELECT value FROM promotion_settings WHERE name = 'visibilityRules' LIMIT 1",
+    const rows = await query("SELECT value FROM promotion_settings WHERE name = 'visibilityRules' LIMIT 1",
     );
     if (rows.length) return parseJson(rows[0].value, seed.visibilityRules);
   } catch {
@@ -215,11 +214,10 @@ router.post("/", requirePermission("promotions.nominate"), withCaller, async (re
   });
 
   try {
-    await query(
-      `INSERT INTO promotion_votes
+    await query(`INSERT INTO promotion_votes
         (id, nominee_name, nominee_discord_id, current_role_key, proposed_role_key,
          reason, created_by, created_by_name, opens_at, closes_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         vote.id,
         vote.name,
@@ -259,11 +257,10 @@ router.post("/:voteId/ballot", requirePermission("promotions.vote"), withCaller,
   };
 
   try {
-    await query(
-      `INSERT INTO promotion_ballots (vote_id, voter_discord_id, voter_name, choice, reason)
-            VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE choice = VALUES(choice), reason = VALUES(reason),
-                               voter_name = VALUES(voter_name), cast_at = CURRENT_TIMESTAMP`,
+    await query(`INSERT INTO promotion_ballots (vote_id, voter_discord_id, voter_name, choice, reason)
+            VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (vote_id, voter_discord_id) DO UPDATE SET choice = EXCLUDED.choice, reason = EXCLUDED.reason,
+                               voter_name = EXCLUDED.voter_name, cast_at = CURRENT_TIMESTAMP`,
       [vote.id, voter.discordId, voter.name, choice, str(req.body?.reason)],
     );
   } catch {
@@ -296,10 +293,10 @@ function resolveAction(publish) {
     }
 
     try {
-      const result = await query(
+      const result = await execute(
         publish
-          ? "UPDATE promotion_votes SET published = 1, published_at = CURRENT_TIMESTAMP WHERE id = ?"
-          : "UPDATE promotion_votes SET cancelled = 1 WHERE id = ?",
+          ? "UPDATE promotion_votes SET published = TRUE, published_at = CURRENT_TIMESTAMP WHERE id = $1"
+          : "UPDATE promotion_votes SET cancelled = TRUE WHERE id = $1",
         [vote.id],
       );
       // A seeded nomination has no row of its own, so the update matches
@@ -339,9 +336,8 @@ router.put("/rules", requirePermission("promotions.manage"), withCaller, async (
   if (errors.length > 0) return res.status(400).json({ ok: false, errors });
 
   try {
-    await query(
-      `INSERT INTO promotion_settings (name, value) VALUES ('visibilityRules', ?)
-       ON DUPLICATE KEY UPDATE value = VALUES(value)`,
+    await query(`INSERT INTO promotion_settings (name, value) VALUES ('visibilityRules', $1)
+       ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value`,
       [JSON.stringify(rules)],
     );
   } catch {
