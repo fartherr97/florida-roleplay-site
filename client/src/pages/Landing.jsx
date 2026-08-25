@@ -1,55 +1,34 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, Bot, ChevronDown, Clock, FileText, MessageCircle, Newspaper,
-  Signal, UserPlus, Users,
+  ArrowRight, Bot, ChevronDown, FileText, MessageCircle, Newspaper,
+  UserPlus,
 } from "lucide-react";
 import Section from "../components/layout/Section";
 import SocialLinks from "../components/layout/SocialLinks";
 import AssistantModal from "../components/landing/AssistantModal";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
-import Badge from "../components/ui/Badge";
-import CopyField from "../components/ui/CopyField";
 import { api } from "../lib/api";
 import { iconFor } from "../lib/icons";
 import { toneTile } from "../lib/tones";
 import {
-  SITE, features, heroCopy, serverStatus as seedStatus,
+  SITE, features, heroCopy,
   departments as seedDepartments, patchNotes,
 } from "../data/mockData";
 import { formatDate } from "../lib/format";
 
-/** Small labelled figure used inside the server status strip. */
-function StatusStat({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-slate-400 ring-1 ring-inset ring-white/10">
-        <Icon className="size-4" />
-      </span>
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-          {label}
-        </p>
-        <p className="text-sm font-bold text-white">{value}</p>
-      </div>
-    </div>
-  );
-}
-
 /** The public landing page — full-bleed hero over stacked content sections. */
 export default function Landing() {
-  const [status, setStatus] = useState(seedStatus);
   const [departments, setDepartments] = useState(seedDepartments);
   const [latest, setLatest] = useState(patchNotes[0]);
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.serverStatus(), api.departments(), api.latestPatchNote()])
-      .then(([s, d, p]) => {
+    Promise.all([api.departments(), api.latestPatchNote()])
+      .then(([d, p]) => {
         if (!active) return;
-        if (s) setStatus(s);
         if (d?.length) setDepartments(d);
         if (p) setLatest(p);
       })
@@ -60,7 +39,7 @@ export default function Landing() {
   }, []);
 
   const scrollToContent = () => {
-    document.getElementById("server-status")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -144,27 +123,10 @@ export default function Landing() {
         </button>
       </section>
 
-      {/* 2 — Server status strip */}
-      <Section id="server-status" className="py-8 sm:py-10">
-        <Card className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-6">
-            <Badge tone={status.online ? "green" : "rose"} dot>
-              {status.online ? "Online" : "Offline"}
-            </Badge>
-            <StatusStat
-              icon={Users}
-              label="Players"
-              value={`${status.players} / ${status.maxPlayers}`}
-            />
-            <StatusStat icon={Signal} label="Queue" value={status.queue} />
-            <StatusStat icon={Clock} label="Uptime" value={status.uptime} />
-          </div>
-          <CopyField label="Connect" value={status.address ?? SITE.serverAddress} />
-        </Card>
-      </Section>
 
-      {/* 3 — Feature grid */}
+      {/* 2 — Feature grid */}
       <Section
+        id="explore"
         reveal
         eyebrow="Why Florida Roleplay"
         title="Built for people who take the scene seriously"

@@ -36,7 +36,7 @@ function Panel({ title, children }) {
  * reports that rather than pretending it persisted.
  */
 export default function HubHeadAdmin() {
-  const [featured, setFeatured] = useState(seedPortal.featuredMember);
+  const [featured, setFeatured] = useState(seedPortal.featuredMember ?? {});
   const [reminders, setReminders] = useState(seedPortal.reminders);
   const [quickNotes, setQuickNotes] = useState(seedPortal.quickNotes);
   const [links, setLinks] = useState(seedLinks);

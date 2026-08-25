@@ -243,7 +243,7 @@ export const api = {
       status: "Pending Review",
     }),
 
-  me: () => get("/me", mock.mockUser),
+  me: () => get("/me", null),
 
   /* Discord OAuth. login is a full-page redirect (see loginUrl); these two are
      the fetches the UI makes around it. */
