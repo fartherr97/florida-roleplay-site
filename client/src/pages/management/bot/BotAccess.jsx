@@ -37,7 +37,12 @@ function levelMeta(value) {
 
 export default function BotAccess() {
   const { capabilities } = useBotAuth();
-  const canManage = capabilities.includes("access.manage");
+  // `capabilities` are objects ({capability, scopeType, scopeId}) with uppercase
+  // keys, so match on the field case-insensitively rather than a string include.
+  const canManage = capabilities.some((c) => {
+    const key = typeof c === "string" ? c : c?.capability;
+    return typeof key === "string" && key.toUpperCase() === "ACCESS.MANAGE";
+  });
 
   const rules = useBotResource("/access", { skip: !canManage });
   const [adding, setAdding] = useState(false);
