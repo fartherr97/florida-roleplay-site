@@ -25,6 +25,14 @@ import { cn } from "../../../lib/cn";
  * capability. The grant form's scope options come from the catalogue too, so a
  * capability that only makes sense globally cannot be offered per-guild.
  */
+/** Renders any API field as text — an object sent where a string was expected
+ *  becomes readable JSON instead of crashing the page ("Objects are not valid
+ *  as a React child"). */
+function text(value) {
+  if (value === null || value === undefined) return "";
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
 export default function BotPermissions() {
   const [page, setPage] = useState(1);
   const catalogue = useBotResource("/permissions/capabilities");
@@ -97,7 +105,7 @@ export default function BotPermissions() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <code className="text-sm font-semibold text-white">
-                          {entry.capability}
+                          {text(entry.capability)}
                         </code>
                         {definition?.dangerous && (
                           <Badge tone="rose">
@@ -116,10 +124,12 @@ export default function BotPermissions() {
                         <p className="mt-1 text-sm text-slate-400">{definition.description}</p>
                       )}
                       <p className="mt-1 text-xs text-slate-500">
-                        {entry.subjectName ??
-                          entry.discordUserId ??
-                          entry.subjectId ??
-                          "Unknown holder"}
+                        {text(
+                          entry.subjectName ??
+                            entry.discordUserId ??
+                            entry.subjectId ??
+                            "Unknown holder",
+                        )}
                       </p>
                     </div>
                     <button
@@ -192,7 +202,7 @@ function Catalogue({ capabilities }) {
         <Card key={category} className="overflow-hidden">
           <div className="border-b border-white/[0.06] px-5 py-3">
             <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-              {category}
+              {text(category)}
             </h3>
           </div>
           <ul className="divide-y divide-white/[0.06]">
@@ -205,7 +215,7 @@ function Catalogue({ capabilities }) {
                       capability.dangerous ? "text-rose-300" : "text-white",
                     )}
                   >
-                    {capability.key}
+                    {text(capability.key)}
                   </code>
                   {capability.dangerous && (
                     <Badge tone="rose">
@@ -219,7 +229,7 @@ function Catalogue({ capabilities }) {
                 </div>
                 {capability.description && (
                   <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
-                    {capability.description}
+                    {text(capability.description)}
                   </p>
                 )}
                 {(capability.scopes ?? capability.allowedScopes ?? []).length > 0 && (

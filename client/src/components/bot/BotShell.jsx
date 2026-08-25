@@ -1,10 +1,11 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import Section from "../layout/Section";
 import PageHeader from "../layout/PageHeader";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import BotGate from "./BotGate";
+import BotErrorBoundary from "./BotErrorBoundary";
 import { useBotAuth } from "../../context/useBotAuth";
 import { cn } from "../../lib/cn";
 
@@ -27,6 +28,7 @@ const SECTIONS = [
 ];
 
 export default function BotShell() {
+  const location = useLocation();
   return (
     <BotGate>
       <Section className="max-w-6xl">
@@ -50,7 +52,9 @@ export default function BotShell() {
             </NavLink>
           ))}
         </nav>
-        <Outlet />
+        <BotErrorBoundary key={location.pathname}>
+          <Outlet />
+        </BotErrorBoundary>
       </Section>
     </BotGate>
   );

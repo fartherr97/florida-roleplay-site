@@ -94,15 +94,13 @@ export default function BotOverview() {
             <Loading rows={1} />
           ) : (
             <Card className="p-5">
-              <dl className="space-y-2.5">
+              <dl className="space-y-3">
                 {Object.entries(health.data ?? {}).map(([key, value]) => (
-                  <div key={key} className="flex items-baseline gap-3">
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      {key.replace(/([A-Z])/g, " $1").trim()}
+                  <div key={key}>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {healthLabel(key)}
                     </dt>
-                    <dd className="ml-auto text-sm text-slate-300">
-                      {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                    </dd>
+                    <dd className="mt-1 text-sm text-slate-300">{healthValue(value)}</dd>
                   </div>
                 ))}
               </dl>
@@ -146,6 +144,45 @@ export default function BotOverview() {
   );
 }
 
+
+/** "checkedInMs" -> "Checked In Ms". */
+function healthLabel(key) {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
+/** A single leaf value, compact. */
+function healthLeaf(value) {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value !== "object") return String(value);
+  return JSON.stringify(value);
+}
+
+/**
+ * Renders a health field. The bot returns nested objects (database, redis,
+ * counts, queues…); rather than dumping JSON, each object becomes a row of
+ * `key value` chips so the card reads at a glance.
+ */
+function healthValue(value) {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value !== "object") return String(value);
+  if (Array.isArray(value)) return value.length ? value.map(healthLeaf).join(", ") : "none";
+  const entries = Object.entries(value);
+  if (entries.length === 0) return "none";
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-slate-400">
+      {entries.map(([k, v]) => (
+        <span key={k}>
+          <span className="text-slate-500">{k}</span> {healthLeaf(v)}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function Tile({ to, icon, label, value, hint, tone = "slate" }) {
   const tones = {
