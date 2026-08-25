@@ -24,7 +24,7 @@ import { api } from "../../../lib/botApi";
  * anyone else, so a caller without it never sees this at all.
  */
 const LEVELS = [
-  { value: 100, label: "Admin", tone: "rose" },
+  { value: 100, label: "Global Admin", tone: "rose" },
   { value: 80, label: "Staff", tone: "amber" },
   { value: 60, label: "Manager", tone: "primary" },
   { value: 40, label: "Command", tone: "sky" },
