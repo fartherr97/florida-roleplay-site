@@ -48,7 +48,6 @@ export const SITE = {
     x: "https://x.com/floridaroleplay",
     youtube: "https://www.youtube.com/@floridaroleplay",
   },
-  supportEmail: "support@flrp.us",
 };
 
 /* ------------------------------------------------------------------ *

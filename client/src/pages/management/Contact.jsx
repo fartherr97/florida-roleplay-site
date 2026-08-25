@@ -10,7 +10,6 @@ import Select from "../../components/ui/Select";
 import Modal from "../../components/ui/Modal";
 import { TextArea, TextInput } from "../../components/ui/TextInput";
 import { api } from "../../lib/api";
-import { SITE } from "../../data/mockData";
 
 const TOPICS = [
   { value: "partnership", label: "Partnership or content creator enquiry" },
@@ -133,7 +132,11 @@ export default function Contact() {
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-xs text-slate-500">
-            Prefer email? {SITE.supportEmail}
+            Need help with the server or your account?{" "}
+            <Link to="/support" className="font-semibold text-primary-400 hover:underline">
+              Open a support ticket
+            </Link>
+            .
           </p>
           <Button type="submit" disabled={submitting}>
             <Send className="size-4" />
