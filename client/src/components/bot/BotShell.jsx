@@ -20,6 +20,7 @@ const SECTIONS = [
   { to: "/management/bot", label: "Overview", end: true },
   { to: "/management/bot/rosters", label: "Rosters" },
   { to: "/management/bot/permissions", label: "Permissions" },
+  { to: "/management/bot/access", label: "Access" },
   { to: "/management/bot/servers", label: "Servers" },
   { to: "/management/bot/sync", label: "Sync" },
   { to: "/management/bot/audit", label: "Audit" },
