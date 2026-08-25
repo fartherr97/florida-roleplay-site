@@ -13,6 +13,15 @@ WORKDIR /app
 # build output out, so this is source only.
 COPY . .
 
+# Vite inlines VITE_* into the bundle during `npm run build`, so the bot API URL
+# has to exist as a build argument. A runtime environment variable arrives too
+# late — by then the string is already compiled into client/dist and the bot
+# dashboard renders its "not configured" screen. ARG sits after COPY so changing
+# the URL doesn't invalidate the copy layer. Set it as a Build argument on the
+# platform (Northflank → Build → Build arguments), not a runtime variable.
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # Installs client dev deps, builds the client, installs server prod deps.
 RUN npm run build
 
