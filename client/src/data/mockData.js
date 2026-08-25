@@ -32,7 +32,7 @@ export const SITE = {
   fivemConnect: "fivem://connect/play.flrp.us",
   serverAddress: "play.flrp.us",
   // TODO: replace with the real Discord invite.
-  discordInvite: "https://discord.gg/your-invite-here",
+  discordInvite: "https://discord.gg/WvRYkCxxy7",
   // Applications, forms and CAD are handled by Sonoran now, not by this site.
   // TODO: replace with the community's real Sonoran apply/forms URL. Every
   // "Apply" affordance points here, so it only needs setting in one place.
@@ -43,7 +43,7 @@ export const SITE = {
   assistantName: "Sunny",
   // TODO: replace with the real social handles.
   socials: {
-    discord: "https://discord.gg/your-invite-here",
+    discord: "https://discord.gg/WvRYkCxxy7",
     tiktok: "https://www.tiktok.com/@floridaroleplay",
     x: "https://x.com/floridaroleplay",
     youtube: "https://www.youtube.com/@floridaroleplay",
