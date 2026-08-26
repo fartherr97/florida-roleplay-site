@@ -178,7 +178,7 @@ const FHP = department({
   id: "fhp",
   name: "Florida Highway Patrol",
   shortName: "FHP",
-  accent: "brand",
+  accent: "#d2b48c",
   tagline: "Troop C — South Florida",
   description:
     "State troopers covering the interstates and state routes across the South Florida region — traffic enforcement, crash investigation and pursuit.",

@@ -36,7 +36,7 @@ const TRANSFER_DEPT_IDS = ["fhp", "bcso", "mpd"];
  * place the two vocabularies meet.
  */
 const DEPT_COLORS = {
-  fhp: "#60a5fa",
+  fhp: "#d2b48c",
   bcso: "#1f8b4c",
   mpd: "#2e69f1",
 };

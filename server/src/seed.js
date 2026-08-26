@@ -153,7 +153,7 @@ export const departments = [
     id: "fhp",
     name: "Florida Highway Patrol",
     abbr: "FHP",
-    tone: "brand",
+    tone: "amber",
     icon: "Car",
     tagline: "Interstate enforcement and traffic homicide investigation.",
     mission:
