@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import { iconFor } from "../../lib/icons";
 import { cn } from "../../lib/cn";
 
 /**
@@ -10,14 +9,13 @@ import { cn } from "../../lib/cn";
  * delay so the pointer can travel to the panel) and on click; closes on outside
  * click, Escape and route change. Arrow keys move focus between rows.
  *
- * `resolveIcon` lets the hubs supply their own icon registry rather than adding
- * every hub icon to the public site's.
+ * Rows are plain labels — no per-item icon — that take the group's colour and
+ * lift slightly on hover, which reads cleaner than a column of tiles.
  */
 export default function NavDropdown({
   label,
   tone,
   items,
-  resolveIcon = iconFor,
   groupId,
   hoverGroup,
   onHover,
@@ -180,32 +178,25 @@ export default function NavDropdown({
             transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
             className="absolute left-0 top-full z-40 mt-3 w-80 rounded-2xl border border-white/10 bg-[#1a2234] p-1.5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]"
           >
-            {items.map((item, index) => {
-              const Icon = resolveIcon(item.icon);
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  role="menuitem"
-                  ref={(el) => {
-                    itemRefs.current[index] = el;
-                  }}
-                  onKeyDown={(e) => onItemKeyDown(e, index)}
-                  onClick={close}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:bg-white/[0.06]"
-                >
-                  <span
-                    className={cn(
-                      "grid size-7 shrink-0 place-items-center rounded-lg ring-1 ring-inset",
-                      tone.tile,
-                    )}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
+            {items.map((item, index) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                role="menuitem"
+                ref={(el) => {
+                  itemRefs.current[index] = el;
+                }}
+                onKeyDown={(e) => onItemKeyDown(e, index)}
+                onClick={close}
+                className={cn(
+                  "block truncate rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-all duration-150",
+                  "hover:-translate-y-px focus-visible:outline-none",
+                  tone.hover ?? "hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.06]",
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
           </motion.div>
         )}
       </AnimatePresence>

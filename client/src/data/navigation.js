@@ -27,6 +27,7 @@ export const navGroups = [
     tone: {
       text: "text-emerald-400",
       tile: "bg-emerald-500/10 text-emerald-400 ring-emerald-400/20",
+      hover: "hover:bg-emerald-500/10 hover:text-emerald-300 focus-visible:bg-emerald-500/10",
     },
     items: [
       { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
@@ -42,6 +43,7 @@ export const navGroups = [
     tone: {
       text: "text-sky-400",
       tile: "bg-sky-500/10 text-sky-400 ring-sky-400/20",
+      hover: "hover:bg-sky-500/10 hover:text-sky-300 focus-visible:bg-sky-500/10",
     },
     items: [
       { label: "All Departments", to: "/departments", icon: "LayoutGrid" },
@@ -58,6 +60,7 @@ export const navGroups = [
     tone: {
       text: "text-primary-400",
       tile: "bg-primary-500/10 text-primary-400 ring-primary-400/20",
+      hover: "hover:bg-primary-500/10 hover:text-primary-300 focus-visible:bg-primary-500/10",
     },
     items: [
       { label: "Staff Hub", to: "/staff-hub", icon: "LayoutGrid" },
@@ -80,6 +83,7 @@ export const navGroups = [
     tone: {
       text: "text-rose-500",
       tile: "bg-rose-500/10 text-rose-400 ring-rose-400/20",
+      hover: "hover:bg-rose-500/10 hover:text-rose-300 focus-visible:bg-rose-500/10",
     },
     items: [
       { label: "Leadership", to: "/management/leadership", icon: "Crown" },
