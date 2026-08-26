@@ -268,65 +268,100 @@ function headlineFor(live, worst) {
 const EMBED_COLORS = { clean: 0x10b981, light: 0xf59e0b, heavy: 0xf43f5e };
 
 /**
+ * A record's date the way the embed prints it: `M/D/YYYY, h:mm:ss AM/PM` in UTC.
+ *
+ * The embed's body is a static code block, so the timestamp cannot be a Discord
+ * `<t:…>` tag that renders in the reader's zone — it has to be a literal string.
+ * UTC keeps it deterministic across whoever runs the check.
+ */
+function embedDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  const h = d.getUTCHours();
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}, ` +
+    `${hour12}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} ${h < 12 ? "AM" : "PM"} UTC`
+  );
+}
+
+/**
  * The Discord embed `/bgcheck` posts.
  *
  * Built here, not in the bot, for the same reason the application embeds are:
  * the site owns what a record means, and a second renderer would be a second
  * opinion about somebody's history.
+ *
+ * The body is monospace on purpose: a background check is read like a form, so
+ * every entry lays out the same labelled fields — Action Type, Reason, Date,
+ * Department, Revocation — under a PLAYER INFO header, and a section with
+ * nothing in it says so rather than vanishing.
  */
 export function buildBackgroundEmbed(background, { memberName } = {}) {
-  const clamp = (value, max) => {
-    const text = String(value ?? "");
-    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  const clampBlock = (text, max = 1000) =>
+    text.length > max ? `${text.slice(0, max - 1)}…` : text;
+
+  // One record as the labelled block the reference lays out.
+  const entry = (action) => {
+    const revoked = action.voided
+      ? `Revoked${action.voidReason ? ` — ${action.voidReason}` : ""}`
+      : "Not Revoked";
+    return [
+      `Action Type: ${actionLabel(action.type)}`,
+      `Reason:      ${action.reason || "—"}`,
+      `Date:        ${embedDate(action.createdAt)}`,
+      `Department:  ${bodyLabel(action.bodyId)}`,
+      `Revocation:  ${revoked}`,
+    ].join("\n");
   };
 
-  const line = (action) =>
-    `\`${actionLabel(action.type)}\` · ${bodyLabel(action.bodyId)} · <t:${Math.floor(new Date(action.createdAt).getTime() / 1000)}:D>\n${clamp(action.reason, 180)}`;
+  // A whole section, always shown, wrapped in a code fence so it renders
+  // monospace. "No records found." when the member has nothing of that kind.
+  const section = (name, list) => {
+    const body = list.length
+      ? list.map(entry).join("\n\n")
+      : "No records found.";
+    return {
+      name,
+      value: `\`\`\`\n${clampBlock(body)}\n\`\`\``,
+      inline: false,
+    };
+  };
 
-  const section = (name, list) =>
-    list.length
-      ? { name: `${name} (${list.length})`, value: clamp(list.slice(0, 5).map(line).join("\n\n"), 1024), inline: false }
-      : null;
+  // Staff and department read as one list here — the entry names the department
+  // itself, so the reviewer sees the whole verbal (or non-verbal) history in one
+  // place rather than split across two headings.
+  const verbal = [...background.verbal.staff, ...background.verbal.department].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+  const nonVerbal = [...background.nonVerbal.staff, ...background.nonVerbal.department].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
 
   const severity = background.total === 0 ? "clean" : background.nonVerbal.total > 0 ? "heavy" : "light";
 
-  const fields = [
-    section("Verbal · Staff", background.verbal.staff),
-    section("Verbal · Department", background.verbal.department),
-    section("Non-verbal · Staff", background.nonVerbal.staff),
-    section("Non-verbal · Department", background.nonVerbal.department),
-  ].filter(Boolean);
+  const playerInfo = [
+    `Name:       ${memberName || "Unknown"}`,
+    `Discord ID: ${background.discordId}`,
+    `Window:     last ${Math.round(background.windowDays / 30)} months`,
+    `Summary:    ${background.total} active · ${background.voided.length} revoked`,
+  ].join("\n");
 
-  if (background.active.length) {
-    fields.unshift({
-      name: `⚠ Currently in effect (${background.active.length})`,
-      value: clamp(background.active.map(line).join("\n\n"), 1024),
-      inline: false,
-    });
-  }
-  if (background.voided.length) {
-    fields.push({
-      name: `Voided (${background.voided.length})`,
-      value: clamp(
-        background.voided.slice(0, 3).map((a) => `~~${actionLabel(a.type)}~~ — ${clamp(a.voidReason || "withdrawn", 120)}`).join("\n"),
-        1024,
-      ),
-      inline: false,
-    });
-  }
+  const fields = [
+    section("🚨 NON-VERBAL DISCIPLINARY LOGS (last 6 mo)", nonVerbal),
+    section("🗣️ VERBAL DISCIPLINARY LOGS (last 6 mo)", verbal),
+  ];
 
   return {
     embeds: [
       {
-        title: `Background check · ${clamp(memberName || background.discordId, 200)}`,
-        description: [
-          `<@${background.discordId}>`,
-          "",
-          `**${background.headline}**`,
-          `Last ${background.windowDays} days · ${background.verbal.total} verbal · ${background.nonVerbal.total} non-verbal`,
-        ].join("\n"),
+        title: "Background Check Results",
+        description:
+          `**PLAYER INFO**\n\`\`\`\n${clampBlock(playerInfo)}\n\`\`\`\n` +
+          `<@${background.discordId}> — ${background.headline}`,
         color: EMBED_COLORS[severity],
-        fields: fields.slice(0, 25),
+        fields,
         footer: { text: "Florida Roleplay · Disciplinary record" },
         timestamp: new Date().toISOString(),
       },
