@@ -159,20 +159,14 @@ export const CIVILIAN_HUB = {
   eyebrow: "Civilian Hub",
   tagline: "Civilian Hub",
   description:
-    "Everything your character owns and everywhere they work — vehicles, property, licences and businesses.",
+    "Community resources for civilians — the business directory, penal code, guides and assessments.",
   groups: [
     {
-      id: "records",
-      label: "My Records",
+      id: "main",
+      label: "Civilian Hub",
       tone: TONES.green,
       items: [
         { to: "/civilian-hub/home", label: "Overview", icon: "Home", permission: "civilian.view" },
-        // A member who simply is not whitelisted yet gets its own denial copy,
-        // pointing at the application rather than at a supervisor.
-        { to: "/civilian-hub/characters", label: "Characters", icon: "IdCard", permission: "civilian.records" },
-        { to: "/civilian-hub/vehicles", label: "Vehicles", icon: "Car", permission: "civilian.records" },
-        { to: "/civilian-hub/properties", label: "Properties", icon: "House", permission: "civilian.records" },
-        { to: "/civilian-hub/licences", label: "Licences", icon: "BadgeCheck", permission: "civilian.records" },
       ],
     },
     {

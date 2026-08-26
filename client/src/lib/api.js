@@ -330,10 +330,6 @@ export const api = {
 
   /* --------------------------- Civilian Hub --------------------------- */
 
-  civCharacters: () => get("/civilian-hub/characters", civ.characters),
-  civVehicles: () => get("/civilian-hub/vehicles", civ.vehicles),
-  civProperties: () => get("/civilian-hub/properties", civ.properties),
-  civLicences: () => get("/civilian-hub/licences", civ.licences),
   discordRoleMap: () =>
     get("/roster/role-map", {
       divisions: rosterMock.DIVISIONS,

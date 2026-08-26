@@ -28,10 +28,9 @@ export const PERMISSION_GROUPS = [
   {
     id: "civilian",
     label: "Civilian Hub",
-    description: "Civilian records and the community sections.",
+    description: "The civilian community pages — directory, penal code and guides.",
     permissions: [
       { key: "civilian.view", label: "Community pages", detail: "Business directory, penal code and guides." },
-      { key: "civilian.records", label: "Personal records", detail: "Characters, vehicles, properties and licences." },
     ],
   },
   {
@@ -309,7 +308,6 @@ export const DEFAULT_GRANTS = {
   "roster.remove": staffFrom("admin"),
 
   "civilian.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
-  "civilian.records": ["whitelisted", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
 
   "staff.view": STAFF_LADDER,
   "staff.da_view": staffFrom("junior_admin"),

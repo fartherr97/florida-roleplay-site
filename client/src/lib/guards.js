@@ -61,12 +61,6 @@ export const GUARDS = [
   { path: "/civilian-hub/businesses", permission: "civilian.view" },
   { path: "/civilian-hub/penal-code", permission: "civilian.view" },
   { path: "/civilian-hub/guides", permission: "civilian.view" },
-  // A member who is simply not whitelisted yet gets its own denial copy,
-  // pointing at the application rather than at a supervisor.
-  { path: "/civilian-hub/characters", permission: "civilian.records", reason: "whitelist" },
-  { path: "/civilian-hub/vehicles", permission: "civilian.records", reason: "whitelist" },
-  { path: "/civilian-hub/properties", permission: "civilian.records", reason: "whitelist" },
-  { path: "/civilian-hub/licences", permission: "civilian.records", reason: "whitelist" },
 ];
 
 /** The guard covering `pathname`, or null when the route is public. */

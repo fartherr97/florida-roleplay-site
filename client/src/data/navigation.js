@@ -30,8 +30,6 @@ export const navGroups = [
     items: [
       { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
       { label: "Forms & Assessments", to: "/civilian-hub/forms", icon: "ClipboardList" },
-      { label: "Vehicles", to: "/civilian-hub/vehicles", icon: "Car" },
-      { label: "Properties", to: "/civilian-hub/properties", icon: "House" },
       { label: "Business Directory", to: "/civilian-hub/businesses", icon: "Store" },
       { label: "Penal Code", to: "/civilian-hub/penal-code", icon: "Scale" },
     ],

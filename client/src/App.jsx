@@ -56,10 +56,6 @@ import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
 import HubForms from "./pages/hub/HubForms";
 import HubPromotionBoard from "./pages/hub/HubPromotionBoard";
 import CivHome from "./pages/civ/CivHome";
-import CivCharacters from "./pages/civ/CivCharacters";
-import CivVehicles from "./pages/civ/CivVehicles";
-import CivProperties from "./pages/civ/CivProperties";
-import CivLicences from "./pages/civ/CivLicences";
 import CivBusinesses from "./pages/civ/CivBusinesses";
 import CivPenalCode from "./pages/civ/CivPenalCode";
 import CivGuides from "./pages/civ/CivGuides";
@@ -261,13 +257,9 @@ export default function App() {
 
           {/* Civilian Hub — same shape: a public landing page, then a gated
               shell over its sections. */}
-          <Route path="/civilian-hub" element={<HubLanding hub={CIVILIAN_HUB} chips={CIVILIAN_RANKS} chipNote="Certification tiers are granted in Discord. Personal records need a whitelisted character; the community pages are open to any member." />} />
+          <Route path="/civilian-hub" element={<HubLanding hub={CIVILIAN_HUB} chips={CIVILIAN_RANKS} chipNote="Certification tiers are granted in Discord. The community pages are open to any member." />} />
           <Route element={<HubShell hub={CIVILIAN_HUB} />}>
             <Route path="/civilian-hub/home" element={<CivHome />} />
-            <Route path="/civilian-hub/characters" element={<CivCharacters />} />
-            <Route path="/civilian-hub/vehicles" element={<CivVehicles />} />
-            <Route path="/civilian-hub/properties" element={<CivProperties />} />
-            <Route path="/civilian-hub/licences" element={<CivLicences />} />
             <Route path="/civilian-hub/forms" element={<CivForms />} />
             <Route path="/civilian-hub/businesses" element={<CivBusinesses />} />
             <Route path="/civilian-hub/penal-code" element={<CivPenalCode />} />
