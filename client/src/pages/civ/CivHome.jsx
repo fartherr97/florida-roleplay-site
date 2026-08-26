@@ -18,7 +18,6 @@ import {
 const SHORTCUTS = [
   { to: "/civilian-hub/vehicles", label: "Vehicles", blurb: "Registration, insurance and where each one is parked." },
   { to: "/civilian-hub/properties", label: "Properties", blurb: "What you own or rent, and the garage slots it carries." },
-  { to: "/civilian-hub/jobs", label: "Job Board", blurb: "Who is hiring across the county right now." },
   { to: "/civilian-hub/penal-code", label: "Penal Code", blurb: "Charges, fines and licence points, searchable." },
 ];
 

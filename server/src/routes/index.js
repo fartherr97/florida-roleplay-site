@@ -357,21 +357,6 @@ router.get("/store/tiers", (_req, res) =>
   ),
 );
 
-router.get("/supporters", (_req, res) =>
-  safe(
-    res,
-    async () => {
-      const rows = await query("SELECT id, name, tier, since FROM supporters ORDER BY tier, since",
-      );
-      return rows.map((row) => ({
-        ...row,
-        since: row.since instanceof Date ? row.since.toISOString().slice(0, 10) : row.since,
-      }));
-    },
-    seed.supporters,
-  ),
-);
-
 /* ---------------------------------------------------------------- events */
 
 router.get("/events", (_req, res) =>

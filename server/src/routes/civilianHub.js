@@ -149,47 +149,6 @@ router.get("/businesses", requirePermission("civilian.view"), (_req, res) =>
   ),
 );
 
-router.get("/jobs", requirePermission("civilian.view"), (_req, res) =>
-  safe(
-    res,
-    async () => {
-      const rows = await query("SELECT * FROM civ_jobs ORDER BY posted_at DESC");
-      return rows.map((row) => ({
-        id: row.id,
-        title: row.title,
-        business: row.business_name,
-        category: row.category,
-        pay: row.pay,
-        type: row.job_type,
-        postedAt: isoDate(row.posted_at),
-        blurb: row.blurb,
-      }));
-    },
-    seed.jobs,
-  ),
-);
-
-router.get("/classifieds", requirePermission("civilian.view"), (_req, res) =>
-  safe(
-    res,
-    async () => {
-      const rows = await query("SELECT * FROM civ_classifieds ORDER BY posted_at DESC",
-      );
-      return rows.map((row) => ({
-        id: row.id,
-        title: row.title,
-        category: row.category,
-        price: row.price,
-        seller: row.seller_name,
-        phone: row.phone,
-        postedAt: isoDate(row.posted_at),
-        blurb: row.blurb,
-      }));
-    },
-    seed.classifieds,
-  ),
-);
-
 /* ------------------------------- resources ------------------------------ */
 
 /** Mirrors the client's fallback filter so both paths behave identically. */

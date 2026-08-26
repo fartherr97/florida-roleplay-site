@@ -8,7 +8,7 @@
  * table roughly 890px, which is not enough for the columns without a horizontal
  * scroll. Widening only these pages keeps every other page where it was.
  */
-const WIDE_PAGES = ["/staff-hub/roster", "/civilian-hub/roster"];
+const WIDE_PAGES = ["/staff-hub/roster"];
 
 export function isWideHubPage(pathname) {
   return WIDE_PAGES.includes(pathname);

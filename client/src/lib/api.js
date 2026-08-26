@@ -251,7 +251,6 @@ export const api = {
   logout: () => post("/auth/logout", {}, () => ({ ok: true })),
 
   storeTiers: () => get("/store/tiers", mock.storeTiers),
-  supporters: () => get("/supporters", mock.supporters),
   events: () => get("/events", mock.events),
 
   knowledgeBase: (q = "") => {
@@ -378,8 +377,6 @@ export const api = {
   rosterSyncLog: () => get("/roster/sync-log", rosterMock.syncLog),
 
   civBusinesses: () => get("/civilian-hub/businesses", civ.businesses),
-  civJobs: () => get("/civilian-hub/jobs", civ.jobs),
-  civClassifieds: () => get("/civilian-hub/classifieds", civ.classifieds),
   civPenalCode: (q = "") => {
     const trimmed = q.trim();
     const fallback = trimmed ? filterPenalCode(civ.penalCode, trimmed) : civ.penalCode;

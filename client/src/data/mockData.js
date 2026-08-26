@@ -296,7 +296,6 @@ export const patchNotes = [];
 
 export const storeTiers = [];
 
-export const supporters = [];
 
 /* ------------------------------------------------------------------ *
  * Events

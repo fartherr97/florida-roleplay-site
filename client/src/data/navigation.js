@@ -29,15 +29,11 @@ export const navGroups = [
     },
     items: [
       { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
-      { label: "Community Roster", to: "/civilian-hub/roster", icon: "Users" },
       { label: "Forms & Assessments", to: "/civilian-hub/forms", icon: "ClipboardList" },
       { label: "Vehicles", to: "/civilian-hub/vehicles", icon: "Car" },
       { label: "Properties", to: "/civilian-hub/properties", icon: "House" },
       { label: "Business Directory", to: "/civilian-hub/businesses", icon: "Store" },
-      { label: "Job Board", to: "/civilian-hub/jobs", icon: "Briefcase" },
-      { label: "Classifieds", to: "/civilian-hub/classifieds", icon: "Tag" },
       { label: "Penal Code", to: "/civilian-hub/penal-code", icon: "Scale" },
-      { label: "Supporters", to: "/supporters", icon: "Heart" },
     ],
   },
   {

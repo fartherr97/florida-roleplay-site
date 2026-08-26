@@ -12,7 +12,6 @@ import ApplicationForm from "./pages/ApplicationForm";
 import Departments from "./pages/Departments";
 import DepartmentDetail from "./pages/DepartmentDetail";
 import Store from "./pages/Store";
-import Supporters from "./pages/Supporters";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Article from "./pages/Article";
 import Events from "./pages/Events";
@@ -59,10 +58,7 @@ import CivCharacters from "./pages/civ/CivCharacters";
 import CivVehicles from "./pages/civ/CivVehicles";
 import CivProperties from "./pages/civ/CivProperties";
 import CivLicences from "./pages/civ/CivLicences";
-import CivRoster from "./pages/civ/CivRoster";
 import CivBusinesses from "./pages/civ/CivBusinesses";
-import CivJobs from "./pages/civ/CivJobs";
-import CivClassifieds from "./pages/civ/CivClassifieds";
 import CivPenalCode from "./pages/civ/CivPenalCode";
 import CivGuides from "./pages/civ/CivGuides";
 import CivForms from "./pages/civ/CivForms";
@@ -125,7 +121,6 @@ export default function App() {
             <Route path="departments/:id" element={<DepartmentDetail />} />
 
             <Route path="store" element={<Store />} />
-            <Route path="supporters" element={<Supporters />} />
             <Route path="knowledge-base" element={<KnowledgeBase />} />
             <Route path="knowledge-base/:slug" element={<Article />} />
             <Route path="events" element={<Events />} />
@@ -180,10 +175,7 @@ export default function App() {
             <Route path="staff-hub/director" element={<Navigate to="/staff-hub/head-admin" replace />} />
             <Route path="civilian-portal" element={<Navigate to="/civilian-hub" replace />} />
             <Route path="penal-code" element={<Navigate to="/civilian-hub/penal-code" replace />} />
-            <Route path="jobs" element={<Navigate to="/civilian-hub/jobs" replace />} />
             <Route path="businesses" element={<Navigate to="/civilian-hub/businesses" replace />} />
-            <Route path="roster" element={<Navigate to="/civilian-hub/roster" replace />} />
-            <Route path="community-roster" element={<Navigate to="/civilian-hub/roster" replace />} />
             <Route path="connect" element={<Navigate to="/join" replace />} />
             <Route path="login" element={<Navigate to="/sign-in" replace />} />
             <Route path="register" element={<Navigate to="/create-account" replace />} />
@@ -268,11 +260,8 @@ export default function App() {
             <Route path="/civilian-hub/vehicles" element={<CivVehicles />} />
             <Route path="/civilian-hub/properties" element={<CivProperties />} />
             <Route path="/civilian-hub/licences" element={<CivLicences />} />
-            <Route path="/civilian-hub/roster" element={<CivRoster />} />
             <Route path="/civilian-hub/forms" element={<CivForms />} />
             <Route path="/civilian-hub/businesses" element={<CivBusinesses />} />
-            <Route path="/civilian-hub/jobs" element={<CivJobs />} />
-            <Route path="/civilian-hub/classifieds" element={<CivClassifieds />} />
             <Route path="/civilian-hub/penal-code" element={<CivPenalCode />} />
             <Route path="/civilian-hub/guides" element={<CivGuides />} />
           </Route>

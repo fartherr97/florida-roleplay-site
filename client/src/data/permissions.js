@@ -34,7 +34,7 @@ export const PERMISSION_GROUPS = [
     label: "Civilian Hub",
     description: "Civilian records and the community sections.",
     permissions: [
-      { key: "civilian.view", label: "Community pages", detail: "Business directory, job board, classifieds, penal code and guides." },
+      { key: "civilian.view", label: "Community pages", detail: "Business directory, penal code and guides." },
       { key: "civilian.records", label: "Personal records", detail: "Characters, vehicles, properties and licences." },
     ],
   },

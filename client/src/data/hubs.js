@@ -159,7 +159,7 @@ export const CIVILIAN_HUB = {
   eyebrow: "Civilian Hub",
   tagline: "Civilian Hub",
   description:
-    "Everything your character owns and everywhere they work — vehicles, property, licences, businesses, jobs and the classifieds board.",
+    "Everything your character owns and everywhere they work — vehicles, property, licences and businesses.",
   groups: [
     {
       id: "records",
@@ -180,10 +180,7 @@ export const CIVILIAN_HUB = {
       label: "Community",
       tone: TONES.brand,
       items: [
-        { to: "/civilian-hub/roster", label: "Community Roster", icon: "Users", permission: "roster.view" },
         { to: "/civilian-hub/businesses", label: "Business Directory", icon: "Store", permission: "civilian.view" },
-        { to: "/civilian-hub/jobs", label: "Job Board", icon: "Briefcase", permission: "civilian.view" },
-        { to: "/civilian-hub/classifieds", label: "Classifieds", icon: "Tag", permission: "civilian.view" },
         { to: "/civilian-hub/forms", label: "Forms & Assessments", icon: "ClipboardList", permission: "forms.view" },
       ],
     },
