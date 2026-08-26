@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import router from "./routes/index.js";
+import { serve as mediaServe } from "./routes/media.js";
 import { close, ping } from "./db.js";
 
 /**
@@ -50,11 +51,16 @@ app.get("/healthz", async (_req, res) => {
 
 app.use("/api", router);
 
+// The image host's public read side. Serves hosted image bytes straight from the
+// database at /images/<id> — a clean, CDN-friendly URL, deliberately outside the
+// /api prefix and the SPA fallback below.
+app.use("/images", mediaServe);
+
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  // Everything that is not an API route falls back to index.html, so
-  // /patch-notes and friends load on a hard refresh.
-  app.get(/^\/(?!api\/).*/, (_req, res) => {
+  // Everything that is not an API route or a hosted image falls back to
+  // index.html, so /patch-notes and friends load on a hard refresh.
+  app.get(/^\/(?!api\/|images\/).*/, (_req, res) => {
     res.sendFile(resolve(clientDist, "index.html"));
   });
 } else {

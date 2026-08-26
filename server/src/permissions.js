@@ -209,6 +209,19 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "media",
+    label: "Image hosting",
+    description:
+      "The community image host: upload an image and get a shareable link. Anyone with a link can view the image; only holders can upload or remove one.",
+    permissions: [
+      {
+        key: "media.upload",
+        label: "Upload images",
+        detail: "Upload an image to the host, get its link, and remove images.",
+      },
+    ],
+  },
+  {
     id: "site",
     label: "Public site",
     description: "Gated areas of the main community site.",
@@ -371,6 +384,10 @@ export const DEFAULT_GRANTS = {
   "support.mpd": ["mpd_lieutenant", "mpd_captain", "mpd_chief"],
   "support.bcso": ["bcso_lieutenant", "bcso_major", "bcso_sheriff"],
   "support.civilian": ["senior_admin", "head_admin", "directorship", "ownership"],
+
+  // Uploading to the image host — seeded to staff and department command, widen
+  // it on this page for anyone else who should host images.
+  "media.upload": [...staffFrom("mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

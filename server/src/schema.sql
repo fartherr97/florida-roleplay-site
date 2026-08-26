@@ -1068,3 +1068,20 @@ CREATE TRIGGER touch_support_flows BEFORE UPDATE ON support_flows
 DROP TRIGGER IF EXISTS touch_support_type_config ON support_type_config;
 CREATE TRIGGER touch_support_type_config BEFORE UPDATE ON support_type_config
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- Community image host. Uploaded images live in the database (Northflank wipes
+-- local disk on redeploy), keyed by a random id that also forms the public URL
+-- at /images/<id>. Only raster types are accepted (no SVG, which can carry
+-- script), verified by magic bytes at upload.
+CREATE TABLE IF NOT EXISTS media_images (
+  id               TEXT PRIMARY KEY,
+  content_type     TEXT NOT NULL,
+  bytes            BYTEA NOT NULL,
+  size             INTEGER NOT NULL,
+  original_name    TEXT,
+  uploaded_by_id   TEXT,
+  uploaded_by_name TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS media_images_created_idx ON media_images (created_at DESC);
+CREATE INDEX IF NOT EXISTS media_images_uploader_idx ON media_images (uploaded_by_id);

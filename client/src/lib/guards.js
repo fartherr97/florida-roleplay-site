@@ -13,6 +13,7 @@ import { matchPath } from "react-router-dom";
 /** Matched with `end: true`, so each entry gates exactly its own path. */
 export const GUARDS = [
   // Public site
+  { path: "/image-host", permission: "media.upload" },
   { path: "/staff", permission: "site.staff_directory" },
   { path: "/staff/moderation", permission: "site.moderation" },
   { path: "/staff/support", permission: "site.support" },

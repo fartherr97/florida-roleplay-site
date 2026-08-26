@@ -4,14 +4,14 @@
  */
 import {
   Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
-  ClipboardList, Crown, Flame, Gavel, Heart, House, LayoutGrid, LifeBuoy,
+  ClipboardList, Crown, Flame, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy,
   ListChecks, Mail, Newspaper, Radio, Scale, ScrollText, Shield, Siren,
   Stethoscope, Store, Tag, Users, UserCog, Wrench,
 } from "lucide-react";
 
 const ICONS = {
   Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
-  ClipboardList, Crown, Flame, Gavel, Heart, House, LayoutGrid, LifeBuoy,
+  ClipboardList, Crown, Flame, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy,
   ListChecks, Mail, Newspaper, Radio, Scale, ScrollText, Shield, Siren,
   Stethoscope, Store, Tag, Users, UserCog, Wrench,
 };

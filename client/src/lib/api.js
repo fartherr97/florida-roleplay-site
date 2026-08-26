@@ -656,6 +656,36 @@ export const api = {
       reply:
         "I'm offline right now, but the rules page has the answer to most questions — or open a ticket in Discord and a staff member will help.",
     })),
+
+  // --- Image host ---------------------------------------------------------
+  listImages: () => get("/media", { images: [] }),
+
+  /**
+   * Uploads one image file. The bytes are sent raw with the file's own
+   * content-type — not JSON — so the server stores them without a base64 hop.
+   */
+  uploadImage: async (file) => {
+    const res = await fetch(`${BASE}/media`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "x-filename": encodeURIComponent(file.name || "image"),
+        ...previewHeaders(),
+      },
+      body: file,
+    });
+    const body = await res.json().catch(() => null);
+    if (res.status === 403) throw new ApiForbiddenError(body?.code, body?.message);
+    if (!res.ok) {
+      const err = new Error(body?.message || `Upload failed (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+    return body;
+  },
+
+  deleteImage: (id) =>
+    del(`/media/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
 };
 
 /**

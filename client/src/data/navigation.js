@@ -49,6 +49,7 @@ export const navGroups = [
       { label: "Broward County SO", to: "/departments/bcso", icon: "Shield" },
       { label: "Miami Police Department", to: "/departments/mpd", icon: "Building2" },
       { label: "Transfer Portal", to: "/transfers", icon: "ArrowLeftRight" },
+      { label: "Image Hosting", to: "/image-host", icon: "Image" },
     ],
   },
   {
