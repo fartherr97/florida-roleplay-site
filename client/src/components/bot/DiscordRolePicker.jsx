@@ -18,10 +18,18 @@ import { cn } from "../../lib/cn";
  * different message from "nothing is assignable".
  *
  * `guildId` is the platform guild id from GET /guilds, not the Discord
- * snowflake. `value` is the selected role's Discord id; `onChange` receives the
- * whole role object so the caller has its name to store alongside the id.
+ * snowflake. `onChange` always receives the whole role object so the caller has
+ * its name to store alongside the id. In single-select mode `value` is the
+ * selected role's Discord id; in `multiple` mode it is an array of ids and a
+ * click toggles the clicked role — the caller maintains the set.
  */
-export default function DiscordRolePicker({ guildId, value, onChange, disabled = false }) {
+export default function DiscordRolePicker({
+  guildId,
+  value,
+  onChange,
+  disabled = false,
+  multiple = false,
+}) {
   // Requesting `?refresh=true` is a distinct path, so it drives useBotResource
   // rather than a second fetch — the hook already handles keying and aborts.
   const [refresh, setRefresh] = useState(false);
@@ -72,7 +80,9 @@ export default function DiscordRolePicker({ guildId, value, onChange, disabled =
 
       <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl bg-black/20 p-1.5 ring-1 ring-inset ring-white/[0.06]">
         {roles.map((role) => {
-          const selected = value && String(value) === String(role.id);
+          const selected = multiple
+            ? Array.isArray(value) && value.some((id) => String(id) === String(role.id))
+            : value && String(value) === String(role.id);
           const usable = role.assignable && !disabled;
           return (
             <button
