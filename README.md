@@ -129,11 +129,10 @@ the last one.
 | --- | --- | --- |
 | Home | Reminders, staff member of the month, quick notes | `staff.view` |
 | Roster | The staff roster, projected from Discord roles | `staff.view` |
-| DA Hub | File a disciplinary action; see yours and, with the permission, everyone's | `staff.view` |
+| DA Hub | File a disciplinary action, and — with `discipline.view` — search the record and read anyone's background summary (the old DA Database, folded in) | `staff.view` |
 | Reports | The moderation queue — what members filed through `/reports` | `site.moderation` |
 | Forms | Forms and exams shared with the department hubs | `staff.view` |
 | Training Dashboard | Who is in training, who has them, how long it has run | `staff.view` |
-| DA Database | Look up one member's disciplinary background | `staff.da_view` |
 | Analytics | Counted from disciplinary actions, tickets and the roster | `staff.view` |
 | Promotion Board | Nominations and the vote | `promotions.view` |
 | Site Administration | Everything below | `staff.view` |

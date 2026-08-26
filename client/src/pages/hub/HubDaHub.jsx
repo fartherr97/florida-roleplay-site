@@ -1,49 +1,102 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Loader2, Search } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Search, ShieldAlert, TriangleAlert, UserRound, X } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
 import Select from "../../components/ui/Select";
-import Modal from "../../components/ui/Modal";
 import { TextArea, TextInput } from "../../components/ui/TextInput";
 import DaActionForm from "../../components/hub/DaActionForm";
-import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
+import { api } from "../../lib/api";
+import { formatDateTime, plural } from "../../lib/format";
 import { cn } from "../../lib/cn";
-import { formatDateTime } from "../../lib/format";
 import {
   ACTION_BODIES,
   ACTION_TYPES,
+  DEFAULT_WINDOW_DAYS,
   actionLabel,
   actionTone,
+  backgroundFor,
   bodyLabel,
   canEditAction,
   canFileFor,
   filingBodiesFor,
+  isVerbal,
+  sourceOf,
 } from "../../lib/discipline";
 
+const TYPE_OPTIONS = [
+  { value: "all", label: "Every action" },
+  { value: "verbal", label: "Verbal only" },
+  { value: "nonverbal", label: "Non-verbal only" },
+  ...ACTION_TYPES.map((t) => ({ value: t.id, label: t.label })),
+];
+
+const BODY_OPTIONS = [
+  { value: "all", label: "Every body" },
+  { value: "staff", label: "Staff — any" },
+  { value: "department", label: "Departments — any" },
+  ...ACTION_BODIES.map((b) => ({ value: b.id, label: b.label })),
+];
+
+const WINDOWS = [
+  { value: "180", label: "Last 6 months" },
+  { value: "90", label: "Last 90 days" },
+  { value: "365", label: "Last year" },
+  { value: "all", label: "Everything" },
+];
+
 /**
- * The DA Hub — where an action is filed, and the list of what has been.
+ * The Disciplinary Action Hub — one page for the whole record.
  *
- * The filing form sits collapsed at the top rather than on a page of its own,
- * because filing and checking what was already filed are the same visit: you
- * look up whether somebody has a history, then you add to it.
+ * File an action, look somebody up by name or Discord ID, read the folded
+ * background summary `/bgcheck` gives in Discord, and edit or void what has been
+ * filed. It used to be two pages — a filing hub and a lookup database — which
+ * only made a reviewer hop between them, since filing and checking a history are
+ * the same visit.
  *
- * Deleting voids rather than removes. The row stays, struck through with the
- * reason it was withdrawn — an action that quietly vanished is indistinguishable
- * from one that never happened, and the difference matters to whoever it was
- * filed against.
+ * The access boundary is unchanged: everyone who can open the page sees what
+ * they filed and can file where they are allowed, while searching the whole
+ * record and reading anybody's background stay behind `discipline.view`. The
+ * server decides that — a caller without it is simply never sent other people's
+ * rows — and the lookup surface here hides itself to match.
  */
 export default function HubDaHub() {
   const { user, hasPermission } = useAuth();
   const [data, setData] = useState(null);
-  const [tab, setTab] = useState("mine");
-  const [query, setQuery] = useState("");
-  const [formOpen, setFormOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [voiding, setVoiding] = useState(null);
   const [editing, setEditing] = useState(null);
+  // Stamped once. A window boundary that slides while somebody is reading would
+  // drop a row out from under them mid-scroll.
+  const [asOf] = useState(() => Date.now());
+  const [query, setQuery] = useState("");
+  const [type, setType] = useState("all");
+  const [body, setBody] = useState("all");
+  const [window, setWindow] = useState(String(DEFAULT_WINDOW_DAYS));
+  const [tab, setTab] = useState("mine");
+  // A person picked from search (or "My records"). Drives the profile view.
+  const [selectedId, setSelectedId] = useState(null);
+
+  const load = useCallback(() => {
+    let active = true;
+    api
+      .disciplinaryActions()
+      .then((result) => active && setData(result))
+      .catch(
+        () =>
+          active &&
+          setData({ actions: [], mine: [], canViewAll: false, totals: { mine: 0, all: 0 } }),
+      );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(load, [load]);
 
   const ctx = useMemo(() => {
     const held = ["discipline.file", "discipline.view", "discipline.manage"].filter((key) =>
@@ -52,33 +105,110 @@ export default function HubDaHub() {
     return { user, roleKeys: user?.roles ?? [], permissions: new Set(held) };
   }, [user, hasPermission]);
 
-  const load = useCallback(() => {
-    let active = true;
-    api
-      .disciplinaryActions()
-      .then((result) => active && setData(result))
-      .catch(() => active && setData({ actions: [], mine: [], canViewAll: false, totals: { mine: 0, all: 0 } }));
-    return () => {
-      active = false;
-    };
-  }, []);
+  const canFile = filingBodiesFor(ctx).length > 0;
+  const canViewAll = data?.canViewAll === true;
+  // Memoised to stable references so the lookup/filter memos below do not re-run
+  // on every render.
+  const allActions = useMemo(() => data?.actions ?? [], [data]);
+  const mine = useMemo(() => data?.mine ?? [], [data]);
+  const totals = data?.totals ?? { mine: 0, all: 0 };
 
-  useEffect(load, [load]);
+  const windowDays = window === "all" ? 3650 : Number(window);
 
-  const rows = useMemo(() => {
-    const list = tab === "mine" ? (data?.mine ?? []) : (data?.actions ?? []);
+  // The rows the list draws from before search/type/body narrow them. Only a
+  // viewer ever has "all"; everyone else only ever has their own.
+  const source = canViewAll && tab === "all" ? allActions : mine;
+
+  const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return list;
-    return list.filter((action) =>
-      [action.targetName, action.targetDiscordId, action.issuedByName, action.reason, actionLabel(action.type), bodyLabel(action.bodyId)]
+    const since = asOf - windowDays * 86_400_000;
+    return source.filter((action) => {
+      if (new Date(action.createdAt).getTime() < since) return false;
+      if (type === "verbal" && !isVerbal(action.type)) return false;
+      if (type === "nonverbal" && isVerbal(action.type)) return false;
+      if (!["all", "verbal", "nonverbal"].includes(type) && action.type !== type) return false;
+      if (body === "staff" && sourceOf(action.bodyId) !== "staff") return false;
+      if (body === "department" && sourceOf(action.bodyId) !== "department") return false;
+      if (!["all", "staff", "department"].includes(body) && action.bodyId !== body) return false;
+      if (!needle) return true;
+      return [action.targetName, action.targetDiscordId, action.issuedByName, action.reason]
         .join(" ")
         .toLowerCase()
-        .includes(needle),
-    );
-  }, [data, tab, query]);
+        .includes(needle);
+    });
+  }, [source, query, type, body, windowDays, asOf]);
 
-  const canFileAnywhere = filingBodiesFor(ctx).length > 0;
-  const totals = data?.totals ?? { mine: 0, all: 0 };
+  // Searching an exact Discord ID is a background check, not a search. A person
+  // picked from the results (or "My records") takes precedence over the box.
+  // Lookups of anyone's record need discipline.view, so a non-viewer never gets one.
+  const idQuery = /^\d{17,20}$/.test(query.trim()) ? query.trim() : null;
+  const subjectId = canViewAll ? (selectedId ?? idQuery) : null;
+
+  const background = useMemo(
+    () => (subjectId ? backgroundFor(allActions, { discordId: subjectId, windowDays, now: asOf }) : null),
+    [subjectId, allActions, windowDays, asOf],
+  );
+
+  const nameForId = useCallback(
+    (id) =>
+      allActions
+        .filter((action) => action.targetDiscordId === id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]?.targetName ?? "",
+    [allActions],
+  );
+
+  const subjectName = subjectId
+    ? subjectId === user?.id
+      ? nameForId(subjectId) || user?.displayName || "You"
+      : nameForId(subjectId) || "Unknown member"
+    : "";
+
+  // The distinct people a name/reason search turned up, so one click opens a
+  // profile. Only for a viewer, when the box holds a name rather than an ID.
+  const people = useMemo(() => {
+    if (!canViewAll || subjectId || !query.trim()) return [];
+    const map = new Map();
+    for (const action of filtered) {
+      const id = action.targetDiscordId;
+      if (!id) continue;
+      const at = new Date(action.createdAt).getTime();
+      const seen = map.get(id);
+      if (!seen) {
+        map.set(id, { id, name: action.targetName, total: 1, latest: at });
+      } else {
+        seen.total += 1;
+        if (at > seen.latest) {
+          seen.latest = at;
+          seen.name = action.targetName;
+        }
+      }
+    }
+    return [...map.values()].sort((a, b) => b.latest - a.latest);
+  }, [filtered, query, subjectId, canViewAll]);
+
+  // Filing against the record you are reading should not mean copying the ID
+  // back out of the search box.
+  const prefill = useMemo(() => {
+    if (!subjectId) return undefined;
+    return { targetDiscordId: subjectId, targetName: nameForId(subjectId) };
+  }, [subjectId, nameForId]);
+
+  // While a profile is open the row list is that person's own record.
+  const subjectActions = useMemo(() => {
+    if (!subjectId) return [];
+    const since = asOf - windowDays * 86_400_000;
+    return allActions
+      .filter((action) => action.targetDiscordId === subjectId)
+      .filter((action) => new Date(action.createdAt).getTime() >= since)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [subjectId, allActions, windowDays, asOf]);
+
+  const clearSubject = () => {
+    setSelectedId(null);
+    if (idQuery) setQuery("");
+  };
+
+  const rows = subjectId ? subjectActions : filtered;
 
   return (
     <>
@@ -86,129 +216,195 @@ export default function HubDaHub() {
         icon="Gavel"
         eyebrow="Staff Hub"
         title="Disciplinary Action Hub"
-        subtitle="Every action taken against a member, by the staff team or by a department. This is the record /bgcheck reads in Discord."
+        subtitle={
+          canViewAll
+            ? "Every action on record, across the staff team and every department. Paste a Discord ID for the same summary /bgcheck gives in Discord."
+            : "File an action and see what you have filed. This is the record /bgcheck reads in Discord."
+        }
+        actions={
+          <div className="flex items-center gap-3">
+            <Badge tone="rose">Handle with discretion</Badge>
+            {canViewAll && /^\d{17,20}$/.test(String(user?.id ?? "")) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedId(user.id);
+                  setQuery("");
+                }}
+              >
+                <UserRound className="size-4" />
+                My records
+              </Button>
+            )}
+            {canFile && (
+              <Button size="sm" onClick={() => setAdding(true)}>
+                <Plus className="size-4" />
+                Add DA
+              </Button>
+            )}
+          </div>
+        }
       />
 
-      {canFileAnywhere && (
-        <Card className="mb-6 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setFormOpen((v) => !v)}
-            aria-expanded={formOpen}
-            className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-white/[0.02]"
-          >
-            <span className="size-1.5 shrink-0 rounded-full bg-primary-500" aria-hidden />
-            <span className="flex-1 text-sm font-bold text-white">Add disciplinary action</span>
-            <ChevronDown className={cn("size-4 text-slate-500 transition-transform", formOpen && "rotate-180")} />
-          </button>
-          {formOpen && (
-            <div className="border-t border-white/[0.06] px-5 py-5">
-              <DaActionForm
-                ctx={ctx}
-                onFiled={() => {
-                  setFormOpen(false);
-                  load();
-                }}
-              />
-            </div>
-          )}
-        </Card>
-      )}
-
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <div className="flex gap-2">
-          <TabButton active={tab === "mine"} onClick={() => setTab("mine")} label="My actions" count={totals.mine} />
-          {data?.canViewAll && (
-            <TabButton active={tab === "all"} onClick={() => setTab("all")} label="All actions" count={totals.all} />
-          )}
-        </div>
-        <div className="relative ml-auto w-full sm:w-72">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative sm:col-span-2">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
           <TextInput
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, ID or reason"
-            aria-label="Search actions"
-            className="pl-10"
+            placeholder={canViewAll ? "Name, reason, or paste a Discord ID" : "Search what you have filed"}
+            aria-label="Search the record"
+            className="pl-11"
           />
+        </div>
+        <Select value={type} onChange={setType} options={TYPE_OPTIONS} />
+        <Select value={body} onChange={setBody} options={BODY_OPTIONS} />
+        <div className="sm:col-span-2 lg:col-span-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {WINDOWS.map((entry) => (
+              <button
+                key={entry.value}
+                type="button"
+                onClick={() => setWindow(entry.value)}
+                className={cn(
+                  "rounded-xl px-3 py-1.5 text-xs font-semibold ring-1 ring-inset transition",
+                  window === entry.value
+                    ? "bg-primary-500/15 text-white ring-primary-400/40"
+                    : "bg-black/20 text-slate-400 ring-white/[0.06] hover:text-white",
+                )}
+              >
+                {entry.label}
+              </button>
+            ))}
+            {/* Whose actions the list draws from, when you may see more than your own. */}
+            {canViewAll && !subjectId && (
+              <div className="ml-auto flex gap-2">
+                <TabButton active={tab === "mine"} onClick={() => setTab("mine")} label="Mine" count={totals.mine} />
+                <TabButton active={tab === "all"} onClick={() => setTab("all")} label="All" count={totals.all} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="border-b border-white/[0.06] px-5 py-4">
-          <p className="flex items-center gap-2 text-sm font-bold text-white">
-            <span className="size-1.5 rounded-full bg-primary-500" aria-hidden />
-            {tab === "mine" ? "My recent actions" : "Every action"}
+      {people.length > 0 && (
+        <div className="mb-6">
+          <p className="mb-2 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-500">
+            {plural(people.length, "member")} found
           </p>
-        </div>
-
-        {data === null ? (
-          <div className="space-y-2 p-5">
-            {[0, 1, 2].map((n) => (
-              <div key={n} className="h-12 animate-pulse rounded-xl bg-white/[0.03]" />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {people.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                onClick={() => setSelectedId(person.id)}
+                className="flex items-center gap-3 rounded-xl bg-black/20 px-4 py-3 text-left ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.04] hover:ring-primary-400/30"
+              >
+                <UserRound className="size-4 shrink-0 text-slate-500" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-white">{person.name}</span>
+                  <code className="text-[0.68rem] text-slate-600">{person.id}</code>
+                </span>
+                <Badge tone="slate">{plural(person.total, "action")}</Badge>
+                <ChevronRight className="size-4 shrink-0 text-slate-600" />
+              </button>
             ))}
           </div>
-        ) : rows.length === 0 ? (
-          <p className="p-10 text-center text-sm text-slate-400">
-            {query ? "Nothing matches that." : tab === "mine" ? "You have not filed any." : "Nothing on record."}
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[64rem] text-left text-sm">
-              <thead className="text-[0.68rem] uppercase tracking-[0.14em] text-slate-500">
-                <tr className="border-b border-white/[0.06]">
-                  <th className="px-5 py-3 font-bold">ID</th>
-                  <th className="px-3 py-3 font-bold">Type</th>
-                  <th className="px-3 py-3 font-bold">Target</th>
-                  <th className="px-3 py-3 font-bold">By</th>
-                  <th className="px-3 py-3 font-bold">Body</th>
-                  <th className="px-3 py-3 font-bold">Reason</th>
-                  <th className="px-3 py-3 font-bold">Date</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.06]">
-                {rows.map((action) => (
-                  <tr key={action.id} className={cn("transition hover:bg-white/[0.02]", action.voided && "opacity-55")}>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-slate-500">#{action.id}</td>
-                    <td className="px-3 py-3.5">
-                      <Badge tone={actionTone(action.type)}>{actionLabel(action.type)}</Badge>
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <p className={cn("font-semibold text-white", action.voided && "line-through")}>
-                        {action.targetName}
-                      </p>
-                      <code className="text-[0.68rem] text-slate-600">{action.targetDiscordId}</code>
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <p className="text-slate-300">{action.issuedByName}</p>
-                      <code className="text-[0.68rem] text-slate-600">{action.issuedByDiscordId}</code>
-                    </td>
-                    <td className="px-3 py-3.5 text-xs text-slate-400">{bodyLabel(action.bodyId)}</td>
-                    <td className="max-w-md px-3 py-3.5">
-                      <p className="text-slate-300">{action.reason}</p>
-                      {action.voided && (
-                        <p className="mt-1 text-xs text-rose-300">Voided — {action.voidReason}</p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3.5 text-xs text-slate-500">
-                      {formatDateTime(action.createdAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right">
-                      {canEditAction(action, ctx) && !action.voided && (
-                        <span className="flex justify-end gap-1.5">
-                          <Button variant="ghost" size="sm" onClick={() => setEditing(action)}>Edit</Button>
-                          <Button variant="ghost" size="sm" onClick={() => setVoiding(action)}>Void</Button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        </div>
+      )}
+
+      {subjectId && (
+        <div className="mb-3 flex items-center gap-3">
+          <UserRound className="size-4 text-slate-400" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">
+              {subjectName}
+              {subjectId === user?.id && <span className="ml-2 text-xs font-normal text-slate-500">— you</span>}
+            </p>
+            <code className="text-[0.68rem] text-slate-600">{subjectId}</code>
           </div>
-        )}
-      </Card>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={clearSubject}>
+            <X className="size-4" />
+            Back to search
+          </Button>
+        </div>
+      )}
+
+      {background && <BackgroundPanel background={background} />}
+
+      {data === null ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map((n) => (
+            <div key={n} className="h-20 animate-pulse rounded-2xl bg-white/[0.03]" />
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <Card className="p-10 text-center">
+          <p className="text-sm text-slate-400">
+            {subjectId
+              ? "Nothing on record for this member in this window."
+              : query
+                ? "Nothing on record matches that."
+                : canViewAll && tab === "all"
+                  ? "Nothing on record."
+                  : "You have not filed any."}
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((action) => (
+            <Card key={action.id} className={cn("p-5", action.voided && "opacity-60")}>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Badge tone={actionTone(action.type)}>{actionLabel(action.type)}</Badge>
+                <Badge tone={sourceOf(action.bodyId) === "staff" ? "primary" : "brand"}>
+                  {bodyLabel(action.bodyId)}
+                </Badge>
+                {action.voided && <Badge tone="slate">Voided</Badge>}
+                <span className="ml-auto text-xs text-slate-500">{formatDateTime(action.createdAt)}</span>
+              </div>
+              <p className={cn("mt-3 text-sm font-semibold text-white", action.voided && "line-through")}>
+                {action.targetName}{" "}
+                <code className="ml-1 text-[0.68rem] font-normal text-slate-600">{action.targetDiscordId}</code>
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-300">{action.reason}</p>
+              {action.voided && <p className="mt-1 text-xs text-rose-300">Withdrawn — {action.voidReason}</p>}
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-xs text-slate-500">Filed by {action.issuedByName}</p>
+                {canEditAction(action, ctx) && !action.voided && (
+                  <span className="ml-auto flex gap-1.5">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(action)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setVoiding(action)}>
+                      Void
+                    </Button>
+                  </span>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Modal
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add disciplinary action"
+        subtitle="It lands on the same record /bgcheck reads in Discord."
+        className="max-w-2xl"
+      >
+        <DaActionForm
+          key={`${adding}:${prefill?.targetDiscordId ?? ""}`}
+          ctx={ctx}
+          prefill={prefill}
+          onFiled={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      </Modal>
 
       <VoidModal
         action={voiding}
@@ -237,7 +433,7 @@ function TabButton({ active, onClick, label, count }) {
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-xl px-4 py-2 text-sm font-semibold ring-1 ring-inset transition",
+        "rounded-xl px-3 py-1.5 text-xs font-semibold ring-1 ring-inset transition",
         active
           ? "bg-primary-500/15 text-white ring-primary-400/40"
           : "bg-black/20 text-slate-400 ring-white/[0.06] hover:text-white",
@@ -245,6 +441,79 @@ function TabButton({ active, onClick, label, count }) {
     >
       {label} <span className="tabular-nums text-slate-500">({count})</span>
     </button>
+  );
+}
+
+/** The folded summary, laid out the way the Discord embed lays it out. */
+function BackgroundPanel({ background }) {
+  const buckets = [
+    { label: "Verbal · Staff", list: background.verbal.staff },
+    { label: "Verbal · Department", list: background.verbal.department },
+    { label: "Non-verbal · Staff", list: background.nonVerbal.staff },
+    { label: "Non-verbal · Department", list: background.nonVerbal.department },
+  ];
+
+  return (
+    <Card
+      className={cn(
+        "mb-6 p-6 ring-1 ring-inset",
+        background.total === 0
+          ? "ring-emerald-400/25"
+          : background.nonVerbal.total > 0
+            ? "ring-rose-400/25"
+            : "ring-amber-400/25",
+      )}
+    >
+      <p className="flex items-center gap-2 text-sm font-bold text-white">
+        <ShieldAlert className="size-4 text-slate-400" />
+        Background check
+      </p>
+      <p className="mt-2 text-sm text-slate-300">{background.headline}</p>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Last {background.windowDays} days · {background.verbal.total} verbal ·{" "}
+        {background.nonVerbal.total} non-verbal
+        {background.voided.length ? ` · ${background.voided.length} voided` : ""}
+      </p>
+
+      {background.active.length > 0 && (
+        <div className="mt-4 rounded-xl bg-rose-500/[0.07] p-4 ring-1 ring-inset ring-rose-400/25">
+          <p className="flex items-center gap-2 text-sm font-semibold text-rose-200">
+            <TriangleAlert className="size-4" />
+            In effect right now
+          </p>
+          <ul className="mt-2 space-y-1">
+            {background.active.map((action) => (
+              <li key={action.id} className="text-sm text-slate-300">
+                {actionLabel(action.type)} — {bodyLabel(action.bodyId)}, until{" "}
+                {formatDateTime(action.expiresAt)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {buckets.map((bucket) => (
+          <div key={bucket.label} className="rounded-xl bg-black/20 p-4 ring-1 ring-inset ring-white/[0.06]">
+            <p className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-400">
+              {bucket.label}
+            </p>
+            {bucket.list.length === 0 ? (
+              <p className="mt-1.5 text-sm text-slate-600">None</p>
+            ) : (
+              <ul className="mt-2 space-y-1.5">
+                {bucket.list.map((action) => (
+                  <li key={action.id} className="text-sm text-slate-300">
+                    <span className="font-semibold text-white">{actionLabel(action.type)}</span>{" "}
+                    <span className="text-slate-500">· {formatDateTime(action.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

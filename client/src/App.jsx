@@ -41,7 +41,6 @@ import HubHome from "./pages/hub/HubHome";
 import HubRoster from "./pages/hub/HubRoster";
 import HubDashboard from "./pages/hub/HubDashboard";
 import HubChecklist from "./pages/hub/HubChecklist";
-import HubDaDatabase from "./pages/hub/HubDaDatabase";
 import HubDaHub from "./pages/hub/HubDaHub";
 import HubReports from "./pages/hub/HubReports";
 import HubTraining from "./pages/hub/HubTraining";
@@ -178,7 +177,7 @@ export default function App() {
             <Route path="staff-portal" element={<Navigate to="/staff-hub" replace />} />
             <Route path="staff-roster" element={<Navigate to="/staff-hub/roster" replace />} />
             <Route path="trial-mod-checklist" element={<Navigate to="/staff-hub/trial-checklist" replace />} />
-            <Route path="staff-da-database" element={<Navigate to="/staff-hub/da-database" replace />} />
+            <Route path="staff-da-database" element={<Navigate to="/staff-hub/da-hub" replace />} />
             <Route path="staff-hub/director" element={<Navigate to="/staff-hub/head-admin" replace />} />
             <Route path="civilian-portal" element={<Navigate to="/civilian-hub" replace />} />
             <Route path="penal-code" element={<Navigate to="/civilian-hub/penal-code" replace />} />
@@ -207,7 +206,8 @@ export default function App() {
             <Route path="/staff-hub/training" element={<HubTraining />} />
             <Route path="/staff-hub/analytics" element={<HubAnalytics />} />
             <Route path="/staff-hub/administration" element={<HubAdministration />} />
-            <Route path="/staff-hub/da-database" element={<HubDaDatabase />} />
+            {/* The DA Database folded into the DA Hub — the old path still resolves. */}
+            <Route path="/staff-hub/da-database" element={<Navigate to="/staff-hub/da-hub" replace />} />
 
             <Route
               path="/staff-hub/resources"

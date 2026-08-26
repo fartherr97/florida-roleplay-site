@@ -79,10 +79,10 @@ export default function BotRosterDetail() {
         backLabel="All rosters"
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => sync(true)}>
+            <Button variant="ghost" size="sm" onClick={() => sync(true)} disabled={Boolean(jobId)}>
               Preview sync
             </Button>
-            <Button size="sm" onClick={() => sync(false)}>
+            <Button size="sm" onClick={() => sync(false)} disabled={Boolean(jobId)}>
               <RefreshCw className="size-4" />
               Sync now
             </Button>

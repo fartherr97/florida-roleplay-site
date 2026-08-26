@@ -34,10 +34,11 @@ export const GUARDS = [
   { path: "/staff-hub/dashboard", permission: "staff.view" },
   { path: "/staff-hub/trial-checklist", permission: "staff.view" },
   { path: "/staff-hub/resources", permission: "staff.view" },
-  // The hub is the write surface: anybody who can open the Staff Hub can file
-  // against their own department, and the API decides which bodies they may
-  // file for. Reading everybody else's record is the separate, stricter grant
-  // the database below carries.
+  // Anybody who can open the Staff Hub can reach the DA Hub to file against their
+  // own department, and the API decides which bodies they may file for. Reading
+  // everybody else's record and running a background check is the separate,
+  // stricter `discipline.view` grant the API enforces — the lookup surface on the
+  // page hides itself when the caller lacks it.
   { path: "/staff-hub/da-hub", permission: "staff.view" },
   { path: "/staff-hub/reports", permission: "site.moderation" },
   { path: "/staff-hub/training", permission: "staff.view" },
@@ -45,7 +46,6 @@ export const GUARDS = [
   // The launcher itself only lists what you can already open, so it needs no
   // gate beyond the hub's own.
   { path: "/staff-hub/administration", permission: "staff.view" },
-  { path: "/staff-hub/da-database", permission: "staff.da_view" },
   { path: "/staff-hub/administrators", permission: "staff.links.admin" },
   { path: "/staff-hub/senior-admins", permission: "staff.links.senior" },
   { path: "/staff-hub/head-admin", permission: "staff.portal.manage" },

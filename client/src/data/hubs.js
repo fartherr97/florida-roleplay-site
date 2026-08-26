@@ -101,7 +101,6 @@ export const STAFF_HUB = {
     { to: "/staff-hub/reports", label: "Reports", icon: "Megaphone", permission: "site.moderation" },
     { to: "/staff-hub/forms", label: "Forms", icon: "ClipboardList", permission: "staff.view" },
     { to: "/staff-hub/training", label: "Training Dashboard", icon: "GraduationCap", permission: "staff.view" },
-    { to: "/staff-hub/da-database", label: "DA Database", icon: "Search", permission: "staff.da_view" },
     { to: "/staff-hub/analytics", label: "Analytics", icon: "ChartColumn", permission: "staff.view" },
     { to: "/staff-hub/promotion-board", label: "Promotion Board", icon: "Award", permission: "promotions.view" },
   ],
