@@ -26,7 +26,7 @@
 import { DEPARTMENTS, ROLE_MAP } from "../../data/rosterData";
 
 /** The departments a member can transfer between — emergency services only. */
-const TRANSFER_DEPT_IDS = ["fhp", "hcso", "tpd", "hcfr"];
+const TRANSFER_DEPT_IDS = ["fhp", "bcso", "mpd"];
 
 /**
  * Each department's brand hex.
@@ -37,9 +37,8 @@ const TRANSFER_DEPT_IDS = ["fhp", "hcso", "tpd", "hcfr"];
  */
 const DEPT_COLORS = {
   fhp: "#60a5fa",
-  hcso: "#1f8b4c",
-  tpd: "#2e69f1",
-  hcfr: "#e74c3c",
+  bcso: "#1f8b4c",
+  mpd: "#2e69f1",
 };
 
 /**
@@ -47,14 +46,13 @@ const DEPT_COLORS = {
  *
  * The original derives this from the full name with two string replacements.
  * That works for SSRP's names and not for these: "Florida Highway Patrol" and
- * "Hillsborough County Sheriff's Office" both truncate mid-word on a tile,
+ * "Broward County Sheriff's Office" both truncate mid-word on a tile,
  * which reads as broken rather than as abbreviated.
  */
 const DEPT_SHORT = {
   fhp: "Highway Patrol",
-  hcso: "Sheriff's Office",
-  tpd: "Police Dept",
-  hcfr: "Fire Rescue",
+  bcso: "Sheriff's Office",
+  mpd: "Police Dept",
 };
 
 /** DEPTS — keyed by abbreviation, exactly as the original. */
@@ -108,9 +106,8 @@ export const ALL_RANKS = Object.values(RANKS)
 /** The Discord role key that commands each department, for dept-head resolution. */
 export const DEPT_COMMAND_KEYS = {
   FHP: "fhp_colonel",
-  HCSO: "hcso_sheriff",
-  TPD: "tpd_chief",
-  HCFR: "hcfr_fire_chief",
+  BCSO: "bcso_sheriff",
+  MPD: "mpd_chief",
 };
 
 export const STATUS_CFG = {

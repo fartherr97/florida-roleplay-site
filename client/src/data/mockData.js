@@ -209,14 +209,14 @@ export const departments = [
     applicationType: "fhp",
   },
   {
-    id: "hcso",
-    name: "Hillsborough County Sheriff's Office",
-    abbr: "HCSO",
+    id: "bcso",
+    name: "Broward County Sheriff's Office",
+    abbr: "BCSO",
     tone: "green",
     icon: "Shield",
     tagline: "County patrol, K9, marine and aviation units.",
     mission:
-      "HCSO covers unincorporated Hillsborough County with a full patrol division, a K9 detail, marine patrol on the bay and an aviation unit supporting county-wide operations.",
+      "BCSO covers unincorporated Broward County with a full patrol division, a K9 detail, marine patrol on the bay and an aviation unit supporting county-wide operations.",
     roster: 56,
     hiring: true,
     ranks: [
@@ -234,17 +234,17 @@ export const departments = [
       "Marine Patrol Boat",
       "Air-1 Helicopter",
     ],
-    applicationType: "hcso",
+    applicationType: "bcso",
   },
   {
-    id: "tpd",
-    name: "Tampa Police Department",
-    abbr: "TPD",
+    id: "mpd",
+    name: "Miami Police Department",
+    abbr: "MPD",
     tone: "brand",
     icon: "Building2",
     tagline: "City policing, SWAT and community response.",
     mission:
-      "TPD handles calls for service inside Tampa city limits — patrol, criminal investigations, a tactical response team and a community outreach division working the downtown core.",
+      "MPD handles calls for service inside Miami city limits — patrol, criminal investigations, a tactical response team and a community outreach division working the downtown core.",
     roster: 61,
     hiring: true,
     ranks: [
@@ -262,35 +262,7 @@ export const departments = [
       "SWAT Bearcat",
       "Prisoner Transport Van",
     ],
-    applicationType: "tpd",
-  },
-  {
-    id: "hcfr",
-    name: "Hillsborough County Fire Rescue",
-    abbr: "HCFR",
-    tone: "rose",
-    icon: "Flame",
-    tagline: "Fire suppression, rescue and advanced life support.",
-    mission:
-      "HCFR runs engine, ladder and rescue companies county-wide, providing fire suppression, technical rescue, hazmat response and ALS transport to every district.",
-    roster: 38,
-    hiring: true,
-    ranks: [
-      "Probationary Firefighter",
-      "Firefighter",
-      "Firefighter/Paramedic",
-      "Driver Engineer",
-      "Lieutenant",
-      "Battalion Chief",
-      "Fire Chief",
-    ],
-    fleet: [
-      "Engine 12 — Pierce Enforcer",
-      "Ladder 7 — Aerial Platform",
-      "Rescue 3 — ALS Transport",
-      "Battalion 1 Command Unit",
-    ],
-    applicationType: "hcfr",
+    applicationType: "mpd",
   },
 ];
 
@@ -379,6 +351,6 @@ export const heroCopy = {
   headline: "Welcome to",
   brand: "Florida Roleplay",
   subtitle:
-    "A whitelisted FiveM community built around serious, character-driven roleplay on Florida's Gulf Coast — custom scripts, four emergency services and a story that keeps running when you log off.",
+    "A whitelisted FiveM community built around serious, character-driven roleplay on Florida's South Florida — custom scripts, four emergency services and a story that keeps running when you log off.",
   tagline: "Serious RP · Custom Framework · Active Every Night",
 };

@@ -171,7 +171,7 @@ button:disabled { cursor: not-allowed; }
 }
 
 /* A department site's accent. DeptShell sets --dept-accent on its wrapper from
-   the department's config, so the same markup renders in FHP blue, HCFR red or
+   the department's config, so the same markup renders in FHP blue, BCSO green or
    whatever a department picks in the Builder Portal — and the public site's
    orange is untouched the moment you navigate back out of the hub. */
 .dept-accent-text { color: var(--dept-accent-soft, #60a5fa); }

@@ -839,8 +839,8 @@ const WEBHOOK_SAMPLE_VARS = {
   member: "JohnDoe",
   discord: "johndoe",
   rank: "Sergeant",
-  fromDept: "HCSO",
-  toDept: "TPD",
+  fromDept: "BCSO",
+  toDept: "MPD",
   ticketId: "TR-001",
 };
 

@@ -10,7 +10,7 @@ import { useDeptConfig } from "../../context/useDeptConfig";
 /**
  * A department's landing page: a hero carrying its own branding, then whatever
  * content blocks the department has arranged. Everything on it comes from the
- * config, which is why the same component opens FHP's site and HCFR's.
+ * config, which is why the same component opens FHP's site and MPD's.
  */
 export default function DeptHome({ page, config }) {
   const { capabilities } = useDeptConfig();

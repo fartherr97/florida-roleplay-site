@@ -179,9 +179,9 @@ const FHP = department({
   name: "Florida Highway Patrol",
   shortName: "FHP",
   accent: "brand",
-  tagline: "Troop C — Tampa Bay",
+  tagline: "Troop C — South Florida",
   description:
-    "State troopers covering the interstates and state routes across the Tampa Bay region — traffic enforcement, crash investigation and pursuit.",
+    "State troopers covering the interstates and state routes across the South Florida region — traffic enforcement, crash investigation and pursuit.",
   hero: {
     heroKicker: "Florida Highway Patrol",
     heroTitle: "Troop C Operations",
@@ -236,22 +236,22 @@ const FHP = department({
   ],
 });
 
-const HCSO = department({
-  id: "hcso",
-  name: "Hillsborough County Sheriff's Office",
-  shortName: "HCSO",
+const BCSO = department({
+  id: "bcso",
+  name: "Broward County Sheriff's Office",
+  shortName: "BCSO",
   accent: "green",
-  tagline: "Serving Hillsborough County",
+  tagline: "Serving Broward County",
   description:
     "The county's primary law enforcement agency — patrol, criminal investigation, court services and the county jail.",
   hero: {
-    heroKicker: "Hillsborough County Sheriff's Office",
+    heroKicker: "Broward County Sheriff's Office",
     heroTitle: "Deputy Operations",
     heroSubtitle:
       "Roster, districts, fleet and the current general orders for every deputy on the road.",
     blocks: [
       {
-        id: "hcso-b0",
+        id: "bcso-b0",
         type: "links",
         kicker: "Quick access",
         title: "On shift",
@@ -266,31 +266,31 @@ const HCSO = department({
     ],
   },
   categories: [
-    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["hcso_sheriff", "hcso_major"] },
-    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["hcso_lieutenant", "hcso_sergeant", "hcso_corporal"] },
-    { id: "cat-deputies", name: "Deputies", color: "#22c55e", roleKeys: ["hcso_master_deputy", "hcso_deputy"] },
+    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["bcso_sheriff", "bcso_major"] },
+    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["bcso_lieutenant", "bcso_sergeant", "bcso_corporal"] },
+    { id: "cat-deputies", name: "Deputies", color: "#22c55e", roleKeys: ["bcso_master_deputy", "bcso_deputy"] },
   ],
-  grants: access("hcso_sheriff", "Sheriff", [
-    { key: "hcso_major", label: "Major" },
-    { key: "hcso_lieutenant", label: "Lieutenant" },
+  grants: access("bcso_sheriff", "Sheriff", [
+    { key: "bcso_major", label: "Major" },
+    { key: "bcso_lieutenant", label: "Lieutenant" },
   ]),
 });
 
-const TPD = department({
-  id: "tpd",
-  name: "Tampa Police Department",
-  shortName: "TPD",
+const MPD = department({
+  id: "mpd",
+  name: "Miami Police Department",
+  shortName: "MPD",
   accent: "violet",
-  tagline: "City of Tampa",
+  tagline: "City of Miami",
   description:
     "City policing across downtown, Ybor and the waterfront — patrol districts, community response and criminal investigation.",
   hero: {
-    heroKicker: "Tampa Police Department",
+    heroKicker: "Miami Police Department",
     heroTitle: "City Operations",
     heroSubtitle: "District assignments, the fleet, uniform standards and the shift calendar.",
     blocks: [
       {
-        id: "tpd-b0",
+        id: "mpd-b0",
         type: "links",
         kicker: "Quick access",
         title: "On shift",
@@ -305,62 +305,17 @@ const TPD = department({
     ],
   },
   categories: [
-    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["tpd_chief", "tpd_captain"] },
-    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["tpd_lieutenant", "tpd_sergeant", "tpd_corporal"] },
-    { id: "cat-officers", name: "Officers", color: "#22c55e", roleKeys: ["tpd_senior_officer", "tpd_officer"] },
+    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["mpd_chief", "mpd_captain"] },
+    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["mpd_lieutenant", "mpd_sergeant", "mpd_corporal"] },
+    { id: "cat-officers", name: "Officers", color: "#22c55e", roleKeys: ["mpd_senior_officer", "mpd_officer"] },
   ],
-  grants: access("tpd_chief", "Chief of Police", [
-    { key: "tpd_captain", label: "Captain" },
-    { key: "tpd_lieutenant", label: "Lieutenant" },
+  grants: access("mpd_chief", "Chief of Police", [
+    { key: "mpd_captain", label: "Captain" },
+    { key: "mpd_lieutenant", label: "Lieutenant" },
   ]),
 });
 
-const HCFR = department({
-  id: "hcfr",
-  name: "Hillsborough County Fire Rescue",
-  shortName: "HCFR",
-  accent: "rose",
-  tagline: "Fire · Rescue · EMS",
-  description:
-    "Fire suppression, technical rescue and advanced life support across the county — engines, ladders, rescues and command.",
-  hero: {
-    heroKicker: "Hillsborough County Fire Rescue",
-    heroTitle: "Station Operations",
-    heroSubtitle: "Apparatus assignments, the shift roster, certifications and training.",
-    blocks: [
-      {
-        id: "hcfr-b0",
-        type: "links",
-        kicker: "Quick access",
-        title: "On shift",
-        columns: 4,
-        items: [
-          { id: "l1", label: "Roster", icon: "Users", page: "roster" },
-          { id: "l2", label: "Apparatus", icon: "Car", page: "fleet" },
-          { id: "l3", label: "Training", icon: "Calendar", page: "calendar" },
-          { id: "l4", label: "Duty Hours", icon: "Clock", page: "hours" },
-        ],
-      },
-      {
-        id: "hcfr-b1",
-        type: "callout",
-        title: "Paramedic recertification",
-        body: "ALS certifications lapse at the end of the quarter. Book a session with a Battalion Chief through the calendar before then.",
-      },
-    ],
-  },
-  categories: [
-    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["hcfr_fire_chief", "hcfr_battalion_chief"] },
-    { id: "cat-supervisors", name: "Company Officers", color: "#3b82f6", roleKeys: ["hcfr_lieutenant", "hcfr_engineer"] },
-    { id: "cat-firefighters", name: "Firefighters", color: "#22c55e", roleKeys: ["hcfr_paramedic", "hcfr_firefighter", "hcfr_probationary"] },
-  ],
-  grants: access("hcfr_fire_chief", "Fire Chief", [
-    { key: "hcfr_battalion_chief", label: "Battalion Chief" },
-    { key: "hcfr_lieutenant", label: "Lieutenant" },
-  ]),
-});
-
-export const DEPARTMENT_CONFIGS = { fhp: FHP, hcso: HCSO, tpd: TPD, hcfr: HCFR };
+export const DEPARTMENT_CONFIGS = { fhp: FHP, bcso: BCSO, mpd: MPD };
 
 export const DEPARTMENT_IDS = Object.keys(DEPARTMENT_CONFIGS);
 

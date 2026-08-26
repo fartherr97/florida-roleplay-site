@@ -271,12 +271,10 @@ function staffFrom(key) {
 const DEPARTMENT_ROLES = [
   "fhp_trooper", "fhp_senior_trooper", "fhp_corporal", "fhp_sergeant",
   "fhp_lieutenant", "fhp_captain", "fhp_colonel",
-  "hcso_deputy", "hcso_master_deputy", "hcso_corporal", "hcso_sergeant",
-  "hcso_lieutenant", "hcso_major", "hcso_sheriff",
-  "tpd_officer", "tpd_senior_officer", "tpd_corporal", "tpd_sergeant",
-  "tpd_lieutenant", "tpd_captain", "tpd_chief",
-  "hcfr_probationary", "hcfr_firefighter", "hcfr_paramedic", "hcfr_engineer",
-  "hcfr_lieutenant", "hcfr_battalion_chief", "hcfr_fire_chief",
+  "bcso_deputy", "bcso_master_deputy", "bcso_corporal", "bcso_sergeant",
+  "bcso_lieutenant", "bcso_major", "bcso_sheriff",
+  "mpd_officer", "mpd_senior_officer", "mpd_corporal", "mpd_sergeant",
+  "mpd_lieutenant", "mpd_captain", "mpd_chief",
 ];
 
 /**
@@ -286,8 +284,8 @@ const DEPARTMENT_ROLES = [
  */
 export const DEFAULT_GRANTS = {
   "roster.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
-  "roster.edit_status": [...staffFrom("senior_mod"), "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
-  "roster.manage_loa": [...staffFrom("senior_mod"), "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
+  "roster.edit_status": [...staffFrom("senior_mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "roster.manage_loa": [...staffFrom("senior_mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
   "roster.edit_member": staffFrom("junior_admin"),
   "roster.remove": staffFrom("admin"),
 
@@ -353,7 +351,7 @@ export const DEFAULT_GRANTS = {
   "site.moderation": staffFrom("mod"),
   "site.support": STAFF_LADDER,
   "site.leadership": ["head_admin", "directorship", "ownership"],
-  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "hcso_sheriff", "tpd_chief", "hcfr_fire_chief"],
+  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "bcso_sheriff", "mpd_chief"],
 
   // Both of these can be used to grant everything else, so they sit at the top
   // of the ladder. Gating role mapping lower would be cosmetic: anyone able to

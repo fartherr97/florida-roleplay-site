@@ -240,7 +240,7 @@ staff copy about contacting a supervisor.
 ## Department hubs
 
 Every department runs its own internal site at `/departments/<id>/hub` — FHP,
-HCSO, TPD and HCFR ship with one, and more are created from the Builder
+BCSO, MPD and HCFR ship with one, and more are created from the Builder
 Portal without a deploy.
 
 **One engine, many sites.** A department site *is* a config document. There is a
@@ -990,7 +990,7 @@ that, and only the first is a preference:
   and every signed-in request 401s with nothing wrong-looking in the network
   tab. See the section above.
 - A department can have its own hostname whenever you want one:
-  `fhp.flrp.us`, `hcso.flrp.us` and so on resolve to that department with no
+  `fhp.flrp.us`, `bcso.flrp.us` and so on resolve to that department with no
   code change, because `server/src/lib/tenant.js` reads the first DNS label.
   `DEPARTMENT_MAP` is only for hosts that do not follow that shape.
 

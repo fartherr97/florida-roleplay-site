@@ -51,9 +51,8 @@ export const navGroups = [
     items: [
       { label: "All Departments", to: "/departments", icon: "LayoutGrid" },
       { label: "Florida Highway Patrol", to: "/departments/fhp", icon: "Car" },
-      { label: "Hillsborough County SO", to: "/departments/hcso", icon: "Shield" },
-      { label: "Tampa Police Department", to: "/departments/tpd", icon: "Building2" },
-      { label: "Hillsborough County Fire Rescue", to: "/departments/hcfr", icon: "Flame" },
+      { label: "Broward County SO", to: "/departments/bcso", icon: "Shield" },
+      { label: "Miami Police Department", to: "/departments/mpd", icon: "Building2" },
       { label: "Transfer Portal", to: "/transfers", icon: "ArrowLeftRight" },
     ],
   },

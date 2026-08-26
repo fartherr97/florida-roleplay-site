@@ -265,7 +265,7 @@ export default function ApplicationForm() {
                     rows={8}
                     value={form.backstory}
                     onChange={onInput("backstory")}
-                    placeholder="Elena moved to Tampa after…"
+                    placeholder="Elena moved to Miami after…"
                   />
                 </Field>
               </Card>

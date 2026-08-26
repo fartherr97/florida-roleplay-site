@@ -117,7 +117,7 @@ export function DeptLogo({ dept, size = 14, className = "" }) {
     );
   }
   // The whole abbreviation, scaled to fit, rather than its first two letters:
-  // HCSO and HCFR both begin "HC", and two departments that differ only by tile
+  // departments can share a leading pair, and two that differ only by tile
   // colour is not a distinction anybody should have to make at 14px.
   return (
     <span

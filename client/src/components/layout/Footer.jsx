@@ -18,7 +18,7 @@ export default function Footer() {
           </p>
         </div>
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
-          Serious Roleplay · Gulf Coast, Florida
+          Serious Roleplay · South Florida
         </p>
       </div>
     </footer>
