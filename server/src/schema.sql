@@ -436,6 +436,28 @@ CREATE TABLE IF NOT EXISTS civ_penal_code (
   PRIMARY KEY (code)
 );
 
+-- Penal code changes, laid over the seeded charge list. The 561 imported charges
+-- ship in the seed; this table only stores what an editor has since added,
+-- changed or removed, keyed by the charge id. An override on a seeded id edits
+-- that charge (or, with deleted = TRUE, hides it); an id that is not in the seed
+-- is a brand-new charge. Keeping edits here means the seed stays the canonical
+-- import and a redeploy never clobbers a hand-added charge. Codes are not unique
+-- (Sonoran reuses them), so the id — not the code — is the key.
+CREATE TABLE IF NOT EXISTS penal_overrides (
+  id          VARCHAR(40)  NOT NULL,
+  code        VARCHAR(24)  NULL,
+  title       VARCHAR(200) NULL,
+  degree      VARCHAR(48)  NULL,
+  bond        VARCHAR(32)  NULL,
+  fine        VARCHAR(32)  NULL,
+  jail        VARCHAR(48)  NULL,
+  points      INT          NOT NULL DEFAULT 0,
+  notes       TEXT         NULL,
+  deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Community roster (written by the Discord bot)
 -- ---------------------------------------------------------------------------

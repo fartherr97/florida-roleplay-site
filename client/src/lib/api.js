@@ -414,6 +414,14 @@ export const api = {
   },
   civGuides: () => get("/civilian-hub/guides", civ.guides),
 
+  // Penal code editing (gated server-side by civilian.penal.manage).
+  createPenalCharge: (charge) =>
+    post("/civilian-hub/penal-code", charge, () => ({ ok: false, message: NOT_PERSISTED })),
+  updatePenalCharge: (id, charge) =>
+    put(`/civilian-hub/penal-code/${encodeURIComponent(id)}`, charge, () => ({ ok: false, message: NOT_PERSISTED })),
+  deletePenalCharge: (id) =>
+    del(`/civilian-hub/penal-code/${encodeURIComponent(id)}`, () => ({ ok: false, message: NOT_PERSISTED })),
+
   /* -------------------------- Department hubs -------------------------- */
 
   /**

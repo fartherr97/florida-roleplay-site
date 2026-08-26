@@ -60,7 +60,6 @@ export const GUARDS = [
   { path: "/civilian-hub/home", permission: "civilian.view" },
   { path: "/civilian-hub/forms", permission: "forms.view" },
   { path: "/civilian-hub/businesses", permission: "civilian.view" },
-  { path: "/civilian-hub/penal-code", permission: "civilian.view" },
   { path: "/civilian-hub/guides", permission: "civilian.view" },
 ];
 

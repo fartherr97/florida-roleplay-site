@@ -180,7 +180,7 @@ export default function App() {
             <Route path="staff-da-database" element={<Navigate to="/staff-hub/da-hub" replace />} />
             <Route path="staff-hub/director" element={<Navigate to="/staff-hub/head-admin" replace />} />
             <Route path="civilian-portal" element={<Navigate to="/civilian-hub" replace />} />
-            <Route path="penal-code" element={<Navigate to="/civilian-hub/penal-code" replace />} />
+            <Route path="penal-code" element={<CivPenalCode />} />
             <Route path="businesses" element={<Navigate to="/civilian-hub/businesses" replace />} />
             <Route path="connect" element={<Navigate to="/join" replace />} />
             <Route path="login" element={<Navigate to="/sign-in" replace />} />
@@ -265,7 +265,7 @@ export default function App() {
             <Route path="/civilian-hub/home" element={<CivHome />} />
             <Route path="/civilian-hub/forms" element={<CivForms />} />
             <Route path="/civilian-hub/businesses" element={<CivBusinesses />} />
-            <Route path="/civilian-hub/penal-code" element={<CivPenalCode />} />
+            <Route path="/civilian-hub/penal-code" element={<Navigate to="/penal-code" replace />} />
             <Route path="/civilian-hub/guides" element={<CivGuides />} />
           </Route>
 

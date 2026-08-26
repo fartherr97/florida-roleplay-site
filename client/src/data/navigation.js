@@ -8,6 +8,7 @@ import { SITE } from "./mockData";
 export const primaryLinks = [
   { label: "Home", to: "/" },
   { label: "Rules", to: "/rules" },
+  { label: "Penal Code", to: "/penal-code" },
   { label: "Whitelist", to: "/whitelist" },
   // Applications are handled by Sonoran now — this hands off rather than
   // opening a form on the site. SITE.applyUrl is the one place the URL lives.
@@ -33,7 +34,6 @@ export const navGroups = [
       { label: "Civilian Hub", to: "/civilian-hub", icon: "LayoutGrid" },
       { label: "Forms & Assessments", to: "/civilian-hub/forms", icon: "ClipboardList" },
       { label: "Business Directory", to: "/civilian-hub/businesses", icon: "Store" },
-      { label: "Penal Code", to: "/civilian-hub/penal-code", icon: "Scale" },
     ],
   },
   {

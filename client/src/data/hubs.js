@@ -185,7 +185,6 @@ export const CIVILIAN_HUB = {
       label: "Resources",
       tone: TONES.primary,
       items: [
-        { to: "/civilian-hub/penal-code", label: "Penal Code", icon: "Scale", permission: "civilian.view" },
         { to: "/civilian-hub/guides", label: "Civilian Guides", icon: "BookOpen", permission: "civilian.view" },
       ],
     },

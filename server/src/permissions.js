@@ -31,6 +31,7 @@ export const PERMISSION_GROUPS = [
     description: "The civilian community pages — directory, penal code and guides.",
     permissions: [
       { key: "civilian.view", label: "Community pages", detail: "Business directory, penal code and guides." },
+      { key: "civilian.penal.manage", label: "Manage the penal code", detail: "Add, edit and remove charges in the penal code." },
     ],
   },
   {
@@ -321,6 +322,7 @@ export const DEFAULT_GRANTS = {
   "roster.remove": staffFrom("admin"),
 
   "civilian.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
+  "civilian.penal.manage": staffFrom("admin"),
 
   "staff.view": STAFF_LADDER,
   "staff.da_view": staffFrom("junior_admin"),
