@@ -1,11 +1,14 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, MessageCircle, Zap } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
+import { FaDiscord } from "react-icons/fa6";
 import Button from "../../components/ui/Button";
 import SocialLinks from "../../components/layout/SocialLinks";
 import Logo from "../../components/layout/Logo";
 import HubBrandMark from "../../components/hub/HubBrandMark";
 import PreviewModePanel from "../../components/hub/PreviewModePanel";
 import { useAuth } from "../../context/useAuth";
+import { api, loginUrl } from "../../lib/api";
 import { SITE, STAFF_RANKS } from "../../data/mockData";
 import { cn } from "../../lib/cn";
 
@@ -28,6 +31,25 @@ const CHIP_TONES = {
 export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
   const { user, previewRank } = useAuth();
 
+  // The site has one Discord sign-in for everything; a hub landing is just an
+  // entry to it, never a second login. `configured` gates whether that OAuth is
+  // wired on this deployment — when it is not, the button falls back to the
+  // community Discord invite so the page is never a dead end.
+  const [configured, setConfigured] = useState(true);
+  useEffect(() => {
+    let active = true;
+    api.authConfig().then((cfg) => active && setConfigured(Boolean(cfg?.configured)));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const authenticated = Boolean(user?.authenticated);
+  const enterTo = `${hub.base}/home`;
+  const enterLabel = `Enter ${hub.name === "Staff Hub" ? "Hub" : hub.name}`;
+  const signInHref = configured ? loginUrl(enterTo) : SITE.discordInvite;
+  const signInProps = configured ? {} : { target: "_blank", rel: "noreferrer noopener" };
+
   return (
     <div className="landing-bg flex min-h-screen flex-col">
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-[#0a0e1a]/80 px-4 backdrop-blur-xl sm:px-6">
@@ -44,18 +66,24 @@ export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
           </p>
         </div>
 
-        <Button
-          as="a"
-          href={SITE.discordInvite}
-          target="_blank"
-          rel="noreferrer noopener"
-          variant="discord"
-          size="sm"
-          className="ml-auto shrink-0"
-        >
-          <MessageCircle className="size-4" />
-          Connect
-        </Button>
+        {authenticated ? (
+          <Button as={Link} to={enterTo} variant="secondary" size="sm" className="ml-auto shrink-0">
+            {enterLabel}
+            <ArrowRight className="size-4" />
+          </Button>
+        ) : (
+          <Button
+            as="a"
+            href={signInHref}
+            {...signInProps}
+            variant="discord"
+            size="sm"
+            className="ml-auto shrink-0"
+          >
+            <FaDiscord className="size-4" />
+            Sign in
+          </Button>
+        )}
       </header>
 
       <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
@@ -81,34 +109,25 @@ export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
           </p>
 
           <div className="animate-fade-up delay-300 mt-8 space-y-3">
-            <Button
-              as="a"
-              href={SITE.discordInvite}
-              target="_blank"
-              rel="noreferrer noopener"
-              variant="discord"
-              size="lg"
-              block
-            >
-              <MessageCircle className="size-5" />
-              Connect Discord
-            </Button>
-            <Button
-              as={Link}
-              to={`${hub.base}/home`}
-              variant="secondary"
-              size="lg"
-              block
-            >
-              Enter {hub.name === "Staff Hub" ? "Hub" : hub.name}
-              <ArrowRight className="size-5" />
-            </Button>
+            {authenticated ? (
+              <Button as={Link} to={enterTo} variant="primary" size="lg" block>
+                {enterLabel}
+                <ArrowRight className="size-5" />
+              </Button>
+            ) : (
+              <Button as="a" href={signInHref} {...signInProps} variant="discord" size="lg" block>
+                <FaDiscord className="size-5" />
+                Sign in with Discord
+              </Button>
+            )}
           </div>
 
           <p className="animate-fade-up delay-300 mt-4 text-sm text-slate-500">
             {previewRank
               ? `Previewing as ${user?.rank}. Your Discord roles will replace this once OAuth is live.`
-              : "Connect with Discord to load your roles and unlock what they grant."}
+              : authenticated
+                ? "You're signed in — the hub opens to whatever your Discord roles grant."
+                : "One Discord sign-in covers the whole site; your roles decide what opens."}
           </p>
 
           <div className="animate-fade-up delay-400 mt-9 flex flex-wrap justify-center gap-2">
