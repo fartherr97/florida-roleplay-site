@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, Bot, ChevronDown, FileText, MessageCircle, Newspaper,
+  ArrowRight, Bot, ChevronDown, FileText, Newspaper,
   UserPlus,
 } from "lucide-react";
+import { FaDiscord } from "react-icons/fa6";
 import Section from "../components/layout/Section";
 import SocialLinks from "../components/layout/SocialLinks";
 import AssistantModal from "../components/landing/AssistantModal";
@@ -89,7 +90,7 @@ export default function Landing() {
               variant="discord"
               className="w-full sm:w-auto"
             >
-              <MessageCircle className="size-5" />
+              <FaDiscord className="size-5" />
               Discord
             </Button>
           </div>
