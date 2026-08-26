@@ -55,6 +55,17 @@ const DEPT_SHORT = {
   mpd: "Police Dept",
 };
 
+/**
+ * Each department's emblem, served from Florida Roleplay's own image host. When a
+ * logo is set, DeptBadge and the department tiles render the artwork; an empty
+ * string falls back to the abbreviation on a coloured tile.
+ */
+const DEPT_LOGOS = {
+  fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
+  bcso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
+};
+
 /** DEPTS — keyed by abbreviation, exactly as the original. */
 export const DEPTS = Object.fromEntries(
   TRANSFER_DEPT_IDS.map((id) => {
@@ -65,7 +76,7 @@ export const DEPTS = Object.fromEntries(
         id,
         name: dept.label,
         short: DEPT_SHORT[id] ?? dept.label,
-        logo: "",
+        logo: DEPT_LOGOS[id] ?? "",
         color: DEPT_COLORS[id] ?? "#64748b",
       },
     ];
