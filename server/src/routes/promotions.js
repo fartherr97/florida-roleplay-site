@@ -16,7 +16,7 @@ import * as seed from "../promotionSeed.js";
 import { ROLE_MAP } from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser } from "../middleware/requireRole.js";
-import { permissionsFor } from "../permissions.js";
+import { permissionsFor, DEFAULT_GRANTS } from "../permissions.js";
 import { collect, isDiscordId, str } from "../validate.js";
 import {
   CHOICES,
@@ -106,21 +106,29 @@ async function loadRules() {
   return seed.visibilityRules;
 }
 
+// The promotion board is the staff team's, so it only ever ranks staff. The staff
+// ladder is exactly `staff.view`'s default grant, so deriving the set from there keeps
+// it in step with the one definition of who is staff — the board pulls those ranks
+// straight from the Discord role map, department and civilian roles left out.
+const STAFF_KEYS = new Set(DEFAULT_GRANTS["staff.view"]);
+
 async function loadRoleMap() {
   try {
     const rows = await query("SELECT role_key, rank_label, rank_full, sort_order FROM roster_role_map");
     if (rows.length) {
-      return rows.map((row) => ({
-        key: row.role_key,
-        rank: row.rank_label,
-        rankFull: row.rank_full,
-        order: row.sort_order,
-      }));
+      return rows
+        .filter((row) => STAFF_KEYS.has(row.role_key))
+        .map((row) => ({
+          key: row.role_key,
+          rank: row.rank_label,
+          rankFull: row.rank_full,
+          order: row.sort_order,
+        }));
     }
   } catch {
     // No database — the seeds stand.
   }
-  return ROLE_MAP;
+  return ROLE_MAP.filter((role) => STAFF_KEYS.has(role.key));
 }
 
 async function withCaller(req, _res, next) {
