@@ -18,6 +18,7 @@ import Events from "./pages/Events";
 import Reports from "./pages/Reports";
 import Staff from "./pages/Staff";
 import Join from "./pages/Join";
+import Whitelist from "./pages/Whitelist";
 import PatchNotes from "./pages/PatchNotes";
 import SignIn from "./pages/SignIn";
 import CreateAccount from "./pages/CreateAccount";
@@ -164,7 +165,7 @@ export default function App() {
 
             {/* Friendly redirects for legacy paths */}
             <Route path="home" element={<Navigate to="/" replace />} />
-            <Route path="whitelist" element={<Navigate to="/applications/whitelist" replace />} />
+            <Route path="whitelist" element={<Whitelist />} />
             <Route path="donate" element={<Navigate to="/store" replace />} />
             <Route path="shop" element={<Navigate to="/store" replace />} />
             <Route path="faq" element={<Navigate to="/knowledge-base" replace />} />

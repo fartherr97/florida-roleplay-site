@@ -245,6 +245,24 @@ export const api = {
       status: "Pending Review",
     }),
 
+  /**
+   * Submit the soft-whitelist answers. Returns the server's body verbatim
+   * ({ ok, id } or { ok:false, message }) for any status, so the page can show
+   * exactly why a submission did not go through.
+   */
+  submitWhitelist: async (answers) => {
+    try {
+      const res = await fetch(`${BASE}/whitelist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...previewHeaders() },
+        body: JSON.stringify({ answers }),
+      });
+      return await res.json().catch(() => ({ ok: false, message: "Something went wrong." }));
+    } catch {
+      return { ok: false, message: "Could not reach the server. Please try again." };
+    }
+  },
+
   me: () => get("/me", null),
 
   /* Discord OAuth. login is a full-page redirect (see loginUrl); these two are

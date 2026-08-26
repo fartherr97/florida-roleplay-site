@@ -331,6 +331,70 @@ router.get("/applications/:id", (req, res) =>
   ),
 );
 
+/* ------------------------------------------------------------ whitelist */
+
+/**
+ * Soft whitelist: forward a signed-in member's answers to the bot API, which
+ * posts them to a staff review channel with Approve/Deny buttons. The member's
+ * Discord identity comes from their session — never the request body — so an
+ * applicant cannot submit under somebody else's id. Server-to-server, keyed by a
+ * shared ingest token; the bot does the Discord work.
+ */
+router.post("/whitelist", async (req, res) => {
+  const user = req.user;
+  if (!user) {
+    return res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in with Discord to apply." });
+  }
+
+  const rawAnswers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+  const answers = rawAnswers
+    .map((entry) => ({
+      question: String(entry?.question ?? "").slice(0, 300).trim(),
+      answer: String(entry?.answer ?? "").slice(0, 2000).trim(),
+    }))
+    .filter((entry) => entry.question && entry.answer);
+
+  if (answers.length === 0) {
+    return res.status(400).json({ ok: false, message: "Answer the questions before submitting." });
+  }
+
+  const botUrl = process.env.BOT_API_URL;
+  const token = process.env.WHITELIST_INGEST_TOKEN;
+  if (!botUrl || !token) {
+    return res.status(503).json({
+      ok: false,
+      code: "WHITELIST_NOT_CONFIGURED",
+      message: "Whitelist applications are not set up yet. Please check back soon.",
+    });
+  }
+
+  try {
+    const response = await fetch(`${botUrl.replace(/\/$/, "")}/api/whitelist/submissions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-service-token": token },
+      body: JSON.stringify({
+        discordUserId: user.id,
+        username: user.displayName ?? user.username ?? "Unknown",
+        answers,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      return res.status(502).json({
+        ok: false,
+        message: body?.error?.message ?? body?.message ?? "Your application could not be submitted. Please try again.",
+      });
+    }
+
+    const data = await response.json().catch(() => ({}));
+    return res.status(201).json({ ok: true, id: data.id ?? null });
+  } catch {
+    return res.status(502).json({ ok: false, message: "Could not reach the whitelist service. Please try again shortly." });
+  }
+});
+
 /* -------------------------------------------------------------------- me */
 
 router.get("/me", (req, res) => res.json(req.user ?? null));

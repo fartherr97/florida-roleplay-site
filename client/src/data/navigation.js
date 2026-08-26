@@ -8,6 +8,7 @@ import { SITE } from "./mockData";
 export const primaryLinks = [
   { label: "Home", to: "/" },
   { label: "Rules", to: "/rules" },
+  { label: "Whitelist", to: "/whitelist" },
   // Applications are handled by Sonoran now — this hands off rather than
   // opening a form on the site. SITE.applyUrl is the one place the URL lives.
   { label: "Applications", href: SITE.applyUrl, external: true },
