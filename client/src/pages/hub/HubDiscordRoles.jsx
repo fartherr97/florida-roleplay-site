@@ -32,6 +32,29 @@ const DEPARTMENT_OPTIONS = DEPARTMENTS.map((d) => ({
 /** A sample entry so each row can show what its template actually produces. */
 const SAMPLE = { characterName: "Aaron Jones", callsign: "122" };
 
+/**
+ * Every known role from the seed, overlaid with whatever has been saved.
+ *
+ * The server returns only the rows that were saved, so a map saved with just the
+ * staff ranks in it would come back missing every department and civilian rank —
+ * and those divisions would then look empty, with no way to map them. Merging keeps
+ * every rank on the page (saved values winning), so a division is never blank and
+ * one save fills the map out in full. Saved rows with no seed match (custom ranks)
+ * are kept on the end.
+ */
+function mergeMaps(seedList, savedList, matchKey = "key") {
+  const saved = new Map((savedList ?? []).map((row) => [row[matchKey], row]));
+  const merged = seedList.map((seedRow) => {
+    const match = saved.get(seedRow[matchKey]);
+    return match ? { ...seedRow, ...match } : seedRow;
+  });
+  const seedKeys = new Set(seedList.map((row) => row[matchKey]));
+  (savedList ?? []).forEach((row) => {
+    if (!seedKeys.has(row[matchKey])) merged.push(row);
+  });
+  return merged;
+}
+
 function blankRole() {
   return {
     roleId: "",
@@ -68,9 +91,13 @@ export default function HubDiscordRoles() {
     let active = true;
     api.discordRoleMap().then((data) => {
       if (!active || !data?.roles) return;
-      setRoles(data.roles);
-      setSpecial(data.special ?? SPECIAL_ROLES);
-      setSaved({ roles: data.roles, special: data.special ?? SPECIAL_ROLES });
+      // Merge over the seed so every rank stays on the page even if the saved map
+      // only holds a subset — otherwise whole divisions look empty.
+      const roles = mergeMaps(ROLE_MAP, data.roles);
+      const special = mergeMaps(SPECIAL_ROLES, data.special);
+      setRoles(roles);
+      setSpecial(special);
+      setSaved({ roles, special });
       if (data.departments?.length) setDepartments(data.departments);
     });
     return () => {
