@@ -12,7 +12,14 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import BotAuthContext from "./botAuthContext";
-import { ApiError, ApiNotConfiguredError, api, isConfigured, signOut } from "../lib/botApi";
+import {
+  ApiError,
+  ApiNotConfiguredError,
+  api,
+  isConfigured,
+  setCsrfToken,
+  signOut,
+} from "../lib/botApi";
 
 export function BotAuthProvider({ children }) {
   // Stamped with the request it answered, so "still loading" is derived during
@@ -29,6 +36,9 @@ export function BotAuthProvider({ children }) {
     api("/me")
       .then((me) => {
         if (!active) return;
+        // Hold the CSRF token from the session response so writes can echo it
+        // back without depending on the cross-subdomain cookie being readable.
+        setCsrfToken(me?.csrfToken);
         setLoaded({
           key: reloadKey,
           value: {

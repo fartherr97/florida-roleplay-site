@@ -10,8 +10,21 @@
  */
 const BASE = import.meta.env.VITE_API_URL;
 
-/** The CSRF token the API set, or null when signed out. */
+// The CSRF token, held in memory once GET /me returns it. The API also sets it
+// as a readable cookie, but that only reaches us when the cookie is scoped to
+// the shared parent domain — and a dashboard on a different subdomain from the
+// API cannot rely on that. Reading it from the session response instead makes
+// writes work regardless of how the cookie's Domain is configured.
+let sessionCsrf = null;
+
+/** Records the CSRF token the API returned from /me. Pass null to clear it. */
+export function setCsrfToken(token) {
+  sessionCsrf = typeof token === "string" && token ? token : null;
+}
+
+/** The CSRF token to echo back: the one from /me, or the cookie as a fallback. */
 function csrfToken() {
+  if (sessionCsrf) return sessionCsrf;
   return (
     document.cookie
       .split("; ")
@@ -103,7 +116,9 @@ export function signInUrl() {
 }
 
 export function signOut() {
-  return api("/auth/logout", { method: "POST" });
+  const result = api("/auth/logout", { method: "POST" });
+  setCsrfToken(null);
+  return result;
 }
 
 /**
