@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search, ShieldAlert, TriangleAlert } from "lucide-react";
+import { ChevronRight, Plus, Search, ShieldAlert, TriangleAlert, UserRound, X } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -10,7 +10,7 @@ import { TextInput } from "../../components/ui/TextInput";
 import DaActionForm from "../../components/hub/DaActionForm";
 import { useAuth } from "../../context/useAuth";
 import { api } from "../../lib/api";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTime, plural } from "../../lib/format";
 import { cn } from "../../lib/cn";
 import {
   ACTION_BODIES,
@@ -66,6 +66,9 @@ export default function HubDaDatabase() {
   const [type, setType] = useState("all");
   const [body, setBody] = useState("all");
   const [window, setWindow] = useState(String(DEFAULT_WINDOW_DAYS));
+  // A person picked from search (or "My Records"). Drives the profile view
+  // regardless of what is in the search box.
+  const [selectedId, setSelectedId] = useState(null);
 
   const load = useCallback(() => {
     let active = true;
@@ -111,23 +114,78 @@ export default function HubDaDatabase() {
     });
   }, [actions, query, type, body, windowDays, asOf]);
 
-  // Searching an exact Discord ID is a background check, not a search.
+  // Searching an exact Discord ID is a background check, not a search. A person
+  // picked from the results (or "My Records") takes precedence over the box.
   const idQuery = /^\d{17,20}$/.test(query.trim()) ? query.trim() : null;
+  const subjectId = selectedId ?? idQuery;
+
   const background = useMemo(
-    () => (idQuery ? backgroundFor(actions ?? [], { discordId: idQuery, windowDays, now: asOf }) : null),
-    [idQuery, actions, windowDays, asOf],
+    () => (subjectId ? backgroundFor(actions ?? [], { discordId: subjectId, windowDays, now: asOf }) : null),
+    [subjectId, actions, windowDays, asOf],
   );
 
-  // Filing against the record you are already reading should not mean copying
-  // the ID back out of the search box. The name comes from the newest row on
-  // that ID, so a member already on file does not get typed in a second way.
+  // The newest name seen on a Discord ID, so a profile and a filing prefill both
+  // read a person's name without it having to be typed twice.
+  const nameForId = useCallback(
+    (id) =>
+      (actions ?? [])
+        .filter((action) => action.targetDiscordId === id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]?.targetName ?? "",
+    [actions],
+  );
+
+  const subjectName = subjectId
+    ? subjectId === user?.id
+      ? nameForId(subjectId) || user?.displayName || "You"
+      : nameForId(subjectId) || "Unknown member"
+    : "";
+
+  // The distinct people a name/reason search turned up, so one click opens a
+  // profile rather than leaving a reviewer to fold a flat list by hand. Only when
+  // the search is not already an exact ID and no profile is open.
+  const people = useMemo(() => {
+    if (subjectId || !query.trim()) return [];
+    const map = new Map();
+    for (const action of filtered) {
+      const id = action.targetDiscordId;
+      if (!id) continue;
+      const at = new Date(action.createdAt).getTime();
+      const seen = map.get(id);
+      if (!seen) {
+        map.set(id, { id, name: action.targetName, total: 1, latest: at });
+      } else {
+        seen.total += 1;
+        if (at > seen.latest) {
+          seen.latest = at;
+          seen.name = action.targetName;
+        }
+      }
+    }
+    return [...map.values()].sort((a, b) => b.latest - a.latest);
+  }, [filtered, query, subjectId]);
+
   const prefill = useMemo(() => {
-    if (!idQuery) return undefined;
-    const seen = (actions ?? [])
-      .filter((action) => action.targetDiscordId === idQuery)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-    return { targetDiscordId: idQuery, targetName: seen?.targetName ?? "" };
-  }, [idQuery, actions]);
+    if (!subjectId) return undefined;
+    return { targetDiscordId: subjectId, targetName: nameForId(subjectId) };
+  }, [subjectId, nameForId]);
+
+  // While a profile is open the row list is that person's own record, so the raw
+  // entries sit under the folded summary instead of the whole database.
+  const subjectActions = useMemo(() => {
+    if (!subjectId) return [];
+    const since = asOf - windowDays * 86_400_000;
+    return (actions ?? [])
+      .filter((action) => action.targetDiscordId === subjectId)
+      .filter((action) => new Date(action.createdAt).getTime() >= since)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [subjectId, actions, windowDays, asOf]);
+
+  const clearSubject = () => {
+    setSelectedId(null);
+    if (idQuery) setQuery("");
+  };
+
+  const rows = subjectId ? subjectActions : filtered;
 
   return (
     <>
@@ -139,6 +197,19 @@ export default function HubDaDatabase() {
         actions={
           <div className="flex items-center gap-3">
             <Badge tone="rose">Handle with discretion</Badge>
+            {/^\d{17,20}$/.test(String(user?.id ?? "")) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedId(user.id);
+                  setQuery("");
+                }}
+              >
+                <UserRound className="size-4" />
+                My records
+              </Button>
+            )}
             {canFile && (
               <Button size="sm" onClick={() => setAdding(true)}>
                 <Plus className="size-4" />
@@ -184,6 +255,51 @@ export default function HubDaDatabase() {
         </div>
       </div>
 
+      {/* Distinct people a name search found — one click opens a profile. */}
+      {people.length > 0 && (
+        <div className="mb-6">
+          <p className="mb-2 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-500">
+            {plural(people.length, "member")} found
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {people.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                onClick={() => setSelectedId(person.id)}
+                className="flex items-center gap-3 rounded-xl bg-black/20 px-4 py-3 text-left ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.04] hover:ring-primary-400/30"
+              >
+                <UserRound className="size-4 shrink-0 text-slate-500" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-white">{person.name}</span>
+                  <code className="text-[0.68rem] text-slate-600">{person.id}</code>
+                </span>
+                <Badge tone="slate">{plural(person.total, "action")}</Badge>
+                <ChevronRight className="size-4 shrink-0 text-slate-600" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* An open profile: whose record, with a way back to the search. */}
+      {subjectId && (
+        <div className="mb-3 flex items-center gap-3">
+          <UserRound className="size-4 text-slate-400" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">
+              {subjectName}
+              {subjectId === user?.id && <span className="ml-2 text-xs font-normal text-slate-500">— you</span>}
+            </p>
+            <code className="text-[0.68rem] text-slate-600">{subjectId}</code>
+          </div>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={clearSubject}>
+            <X className="size-4" />
+            Back to search
+          </Button>
+        </div>
+      )}
+
       {background && <BackgroundPanel background={background} />}
 
       {actions === null ? (
@@ -192,13 +308,15 @@ export default function HubDaDatabase() {
             <div key={n} className="h-20 animate-pulse rounded-2xl bg-white/[0.03]" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : rows.length === 0 ? (
         <Card className="p-10 text-center">
-          <p className="text-sm text-slate-400">Nothing on record matches that.</p>
+          <p className="text-sm text-slate-400">
+            {subjectId ? "Nothing on record for this member in this window." : "Nothing on record matches that."}
+          </p>
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((action) => (
+          {rows.map((action) => (
             <Card key={action.id} className={cn("p-5", action.voided && "opacity-60")}>
               <div className="flex flex-wrap items-center gap-2.5">
                 <Badge tone={actionTone(action.type)}>{actionLabel(action.type)}</Badge>
