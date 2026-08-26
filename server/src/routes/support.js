@@ -23,9 +23,11 @@ import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { str } from "../validate.js";
 import {
+  DEFAULT_TICKET_TYPES,
   PRIORITY_MAP,
   STATUS_MAP,
-  TYPE_MAP,
+  canConfigureTypes,
+  canOpenType,
   canViewTicket,
   canWorkTicket,
   cleanDetails,
@@ -33,8 +35,11 @@ import {
   isSupportLead,
   makeTicketId,
   normalizeFlow,
+  normalizeTicketTypes,
+  typeMapOf,
   validateFlow,
   validateTicket,
+  validateTicketType,
 } from "../lib/support.js";
 
 const router = Router();
@@ -47,7 +52,30 @@ async function contextFor(req) {
   const user = req.user ?? (await resolveUser(req));
   req.user = user;
   const roleKeys = user?.roles ?? [];
-  return { user, roleKeys, permissions: permissionsFor(roleKeys, await loadGrants()) };
+  return {
+    user,
+    roleKeys,
+    permissions: permissionsFor(roleKeys, await loadGrants()),
+    // The live ticket-category catalogue, so routing honours a renamed or newly
+    // added department queue rather than only the built-in defaults.
+    types: await loadTypes(),
+  };
+}
+
+/**
+ * The configured ticket categories, or the built-in defaults when none are
+ * stored (or there is no database). One singleton row holds the whole ordered
+ * catalogue, which keeps reordering and atomic edits trivial.
+ */
+async function loadTypes() {
+  try {
+    const rows = await query("SELECT document FROM support_type_config WHERE id = 'default' LIMIT 1");
+    const stored = rows[0] ? normalizeTicketTypes(parseJson(rows[0].document, null)) : [];
+    if (stored.length) return stored;
+  } catch {
+    // No database — the defaults stand, so the portal renders without one.
+  }
+  return DEFAULT_TICKET_TYPES;
 }
 
 function requireSignIn(ctx, res) {
@@ -120,14 +148,15 @@ router.get("/", async (req, res) => {
 
   const all = await loadTickets();
   const mine = all.filter((t) => t.openedByDiscordId === ctx.user.id);
+  const agent = isAgent(ctx, ctx.types);
 
-  if (req.query.scope === "mine" || !isAgent(ctx)) {
-    return res.json({ tickets: mine, scope: "mine", agent: isAgent(ctx), lead: isSupportLead(ctx) });
+  if (req.query.scope === "mine" || !agent) {
+    return res.json({ tickets: mine, scope: "mine", agent, lead: isSupportLead(ctx) });
   }
 
-  // The queue, minus the types this agent may not work — a staff report is not
-  // triaged by the staff team.
-  const queue = all.filter((ticket) => canViewTicket(ticket, ctx));
+  // The queue, minus the categories this agent may not work — a department queue
+  // is only theirs, and a staff report is not triaged by the staff team.
+  const queue = all.filter((ticket) => canViewTicket(ticket, ctx, ctx.types));
   res.json({ tickets: queue, mine, scope: "queue", agent: true, lead: isSupportLead(ctx) });
 });
 
@@ -137,12 +166,12 @@ router.get("/:id", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
   const ticket = await loadTicket(str(req.params.id));
   if (!ticket) return res.status(404).json({ ok: false, message: "No such ticket." });
-  if (!canViewTicket(ticket, ctx)) {
+  if (!canViewTicket(ticket, ctx, ctx.types)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That ticket is not yours." });
   }
   res.json({
     ticket,
-    can: { work: canWorkTicket(ticket, ctx), lead: isSupportLead(ctx) },
+    can: { work: canWorkTicket(ticket, ctx, ctx.types), lead: isSupportLead(ctx) },
   });
 });
 
@@ -159,18 +188,18 @@ router.post("/", async (req, res) => {
     details: body.details ?? {},
   };
 
-  const type = TYPE_MAP[draft.type];
-  if (type?.restrictedTo && !ctx.permissions.has(type.restrictedTo)) {
+  const type = typeMapOf(ctx.types)[draft.type];
+  if (!type || !canOpenType(type, ctx.permissions)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That is not a ticket type you can open." });
   }
 
-  const { errors, ok } = validateTicket(draft);
+  const { errors, ok } = validateTicket(draft, ctx.types);
   if (!ok) return res.status(400).json({ ok: false, code: "SUPPORT_INVALID", errors });
 
   const id = makeTicketId();
   const name = ctx.user.displayName ?? ctx.user.username ?? "Unknown";
-  const details = cleanDetails(draft.type, draft.details);
-  const history = [{ action: "opened", actor: name, details: TYPE_MAP[draft.type].label, at: new Date().toISOString() }];
+  const details = cleanDetails(draft.type, draft.details, ctx.types);
+  const history = [{ action: "opened", actor: name, details: type.label, at: new Date().toISOString() }];
 
   try {
     await query(`INSERT INTO support_tickets
@@ -204,7 +233,7 @@ router.patch("/:id", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
   const ticket = await loadTicket(str(req.params.id));
   if (!ticket) return res.status(404).json({ ok: false, message: "No such ticket." });
-  if (!canWorkTicket(ticket, ctx)) {
+  if (!canWorkTicket(ticket, ctx, ctx.types)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Only the support team changes a ticket." });
   }
 
@@ -269,11 +298,11 @@ router.get("/:id/messages", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
   const ticket = await loadTicket(str(req.params.id));
   if (!ticket) return res.status(404).json({ ok: false, message: "No such ticket." });
-  if (!canViewTicket(ticket, ctx)) {
+  if (!canViewTicket(ticket, ctx, ctx.types)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That ticket is not yours." });
   }
 
-  const internal = canWorkTicket(ticket, ctx);
+  const internal = canWorkTicket(ticket, ctx, ctx.types);
   try {
     const rows = await query(`SELECT id, internal, author_id AS "authorId", author_name AS "authorName",
               author_role AS "authorRole", body, reply_to_id AS "replyToId", created_at AS "createdAt"
@@ -296,10 +325,10 @@ router.post("/:id/messages", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
   const ticket = await loadTicket(str(req.params.id));
   if (!ticket) return res.status(404).json({ ok: false, message: "No such ticket." });
-  if (!canViewTicket(ticket, ctx)) {
+  if (!canViewTicket(ticket, ctx, ctx.types)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That ticket is not yours." });
   }
-  if (ticket.status === "closed" && !canWorkTicket(ticket, ctx)) {
+  if (ticket.status === "closed" && !canWorkTicket(ticket, ctx, ctx.types)) {
     return res.status(409).json({ ok: false, code: "SUPPORT_CLOSED", message: "This ticket is closed. Open a new one and reference this ID." });
   }
 
@@ -307,7 +336,7 @@ router.post("/:id/messages", async (req, res) => {
   if (!body) return res.status(400).json({ ok: false, message: "The message is empty." });
 
   const wantsInternal = req.body?.internal === true;
-  if (wantsInternal && !canWorkTicket(ticket, ctx)) {
+  if (wantsInternal && !canWorkTicket(ticket, ctx, ctx.types)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Internal notes are for the support team." });
   }
 
@@ -366,7 +395,7 @@ async function loadFlows() {
 router.get("/flows/list", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
-  if (!isAgent(ctx)) {
+  if (!isAgent(ctx, ctx.types)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Response flows are a support team tool." });
   }
   res.json({ flows: await loadFlows(), canEdit: isSupportLead(ctx) });
@@ -410,6 +439,52 @@ router.delete("/flows/:id", async (req, res) => {
     return noStore(res);
   }
   res.json({ ok: true });
+});
+
+/* ------------------------------------------------------------------ *
+ * Ticket categories (configuration)
+ * ------------------------------------------------------------------ *
+ *
+ * The catalogue is not sensitive to read — every signed-in member needs it to
+ * open a ticket and to see a category's name on their own ticket. Editing it is
+ * gated on `support.configure`. A two-segment path keeps it clear of the
+ * `/:id` ticket route.
+ */
+router.get("/config/ticket-types", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  res.json({ types: ctx.types, canConfigure: canConfigureTypes(ctx) });
+});
+
+router.put("/config/ticket-types", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!canConfigureTypes(ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Configuring ticket categories needs support.configure." });
+  }
+
+  const types = normalizeTicketTypes(req.body?.types);
+  if (types.length === 0) {
+    return res.status(400).json({ ok: false, code: "SUPPORT_TYPES_EMPTY", message: "Keep at least one ticket category." });
+  }
+  // An enabled category must be valid; a disabled one may be a work-in-progress.
+  const problems = types.flatMap((type) =>
+    type.enabled ? validateTicketType(type).map((p) => `${type.label || type.id}: ${p}`) : [],
+  );
+  if (problems.length) {
+    return res.status(400).json({ ok: false, code: "SUPPORT_TYPES_INVALID", problems });
+  }
+
+  try {
+    await query(`INSERT INTO support_type_config (id, document, updated_by)
+       VALUES ('default', $1, $2)
+       ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document, updated_by = EXCLUDED.updated_by`,
+      [JSON.stringify(types), ctx.user.id],
+    );
+  } catch {
+    return noStore(res);
+  }
+  res.json({ ok: true, types });
 });
 
 export default router;

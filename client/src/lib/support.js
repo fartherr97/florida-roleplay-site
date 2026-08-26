@@ -68,16 +68,35 @@ export const PRIORITY_MAP = Object.fromEntries(PRIORITIES.map((p) => [p.id, p]))
  * they were doing — rather than one box labelled "describe your issue" that
  * every reply then has to chase details for.
  *
- * TODO: these are the shape, not the final list. Edit them once the support
- * team has run the portal for a week and knows what it actually receives.
+ * These are now *configuration*, not code: the list below is only the default
+ * catalogue an install starts with. Directorship edits it on the ticket-category
+ * page, and every consumer takes the live list as an argument so a renamed or
+ * newly added category is honoured everywhere. `DEFAULT_TICKET_TYPES` remains the
+ * fallback used when the live config has not loaded (or there is no database).
+ *
+ * Access is described by three fields rather than the old single `restrictedTo`:
+ *   - `openPermission`  the permission required to *open* it; null means anyone
+ *     signed in (support that only answers people who already hold a role is not
+ *     support).
+ *   - `workPermissions` the permissions that let somebody *see and work* it. A
+ *     department category lists that department's support permission, which is
+ *     what routes an FHP ticket to FHP command.
+ *   - `exclusive`       when true, ONLY the listed work permissions may work it,
+ *     and the central support team (`support.work`) does not see it. This is what
+ *     keeps a report about the staff team away from the staff team. When false,
+ *     `support.work`/`support.manage` see it in addition to the listed roles.
  */
-export const TICKET_TYPES = [
+export const DEFAULT_TICKET_TYPES = [
   {
     id: "general",
     label: "General question",
     icon: "LifeBuoy",
     tone: "brand",
     blurb: "Anything that does not fit the others.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: [],
+    exclusive: false,
     fields: [],
   },
   {
@@ -86,6 +105,10 @@ export const TICKET_TYPES = [
     icon: "Gavel",
     tone: "rose",
     blurb: "Appeal a ban from the game server or the Discord.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: [],
+    exclusive: false,
     fields: [
       { id: "where", label: "Where were you banned?", type: "select", options: ["FiveM server", "Discord", "Both"], required: true },
       { id: "when", label: "Roughly when?", type: "date", required: true },
@@ -98,6 +121,10 @@ export const TICKET_TYPES = [
     icon: "Siren",
     tone: "amber",
     blurb: "Rulebreaking, harassment, or anything you want staff to look at.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: [],
+    exclusive: false,
     fields: [
       { id: "who", label: "Who are you reporting?", type: "short", required: true, help: "Their name in game, or their Discord." },
       { id: "when", label: "When did it happen?", type: "short", required: true },
@@ -107,12 +134,15 @@ export const TICKET_TYPES = [
   {
     id: "staff_report",
     label: "Report a staff member",
-    icon: "ShieldAlert",
+    icon: "Shield",
     tone: "rose",
     blurb: "Goes to the directorship, not to the staff team.",
-    // Only the directorship sees these. A report about a staff member that the
-    // staff team triages is not a report.
-    restrictedTo: "support.escalated",
+    enabled: true,
+    // Anyone may open one, but only the directorship works it: a report about the
+    // staff team that the staff team triages is not a report.
+    openPermission: null,
+    workPermissions: ["support.escalated"],
+    exclusive: true,
     fields: [
       { id: "who", label: "Which staff member?", type: "short", required: true },
       { id: "evidence", label: "Link to evidence", type: "short", required: false },
@@ -124,6 +154,10 @@ export const TICKET_TYPES = [
     icon: "Wrench",
     tone: "primary",
     blurb: "Something on the server or the site is broken.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: [],
+    exclusive: false,
     fields: [
       { id: "where", label: "Where did it happen?", type: "select", options: ["In game", "On the website", "In Discord"], required: true },
       { id: "steps", label: "What were you doing?", type: "paragraph", required: true },
@@ -135,63 +169,168 @@ export const TICKET_TYPES = [
     icon: "Store",
     tone: "green",
     blurb: "A purchase that did not arrive, or a question about one.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: [],
+    exclusive: false,
     fields: [
       { id: "order", label: "Order or transaction ID", type: "short", required: false },
     ],
   },
+  {
+    id: "dept_fhp",
+    label: "FHP — Florida Highway Patrol",
+    icon: "Car",
+    tone: "amber",
+    blurb: "A question or request for Florida Highway Patrol command.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: ["support.fhp"],
+    exclusive: false,
+    fields: [
+      { id: "callsign", label: "Your in-game name or callsign", type: "short", required: false },
+    ],
+  },
+  {
+    id: "dept_mpd",
+    label: "MPD — Miami Police Department",
+    icon: "Siren",
+    tone: "sky",
+    blurb: "A question or request for Miami Police Department command.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: ["support.mpd"],
+    exclusive: false,
+    fields: [
+      { id: "callsign", label: "Your in-game name or callsign", type: "short", required: false },
+    ],
+  },
+  {
+    id: "dept_bcso",
+    label: "BCSO — Broward County Sheriff's Office",
+    icon: "Shield",
+    tone: "green",
+    blurb: "A question or request for Broward County Sheriff's Office command.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: ["support.bcso"],
+    exclusive: false,
+    fields: [
+      { id: "callsign", label: "Your in-game name or callsign", type: "short", required: false },
+    ],
+  },
+  {
+    id: "dept_civilian",
+    label: "Civilian Department",
+    icon: "Users",
+    tone: "brand",
+    blurb: "A civilian-side question, request or record change.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: ["support.civilian"],
+    exclusive: false,
+    fields: [
+      { id: "character", label: "Which character is this about?", type: "short", required: false },
+    ],
+  },
+  {
+    id: "directorship",
+    label: "Staff / Directorship",
+    icon: "Crown",
+    tone: "violet",
+    blurb: "A community-level matter for the directorship.",
+    enabled: true,
+    openPermission: null,
+    workPermissions: ["support.escalated"],
+    exclusive: true,
+    fields: [],
+  },
 ];
 
-export const TYPE_MAP = Object.fromEntries(TICKET_TYPES.map((t) => [t.id, t]));
+/** Back-compatible aliases: the default catalogue, used as a display fallback. */
+export const TICKET_TYPES = DEFAULT_TICKET_TYPES;
 
-export function typeLabel(id) {
-  return TYPE_MAP[id]?.label ?? id;
+/** A `{id: type}` map over a types list (defaults to the built-in catalogue). */
+export function typeMapOf(types = DEFAULT_TICKET_TYPES) {
+  return Object.fromEntries((types ?? []).map((t) => [t.id, t]));
 }
 
-/** The types this caller may open. Most are open to everyone. */
-export function typesFor({ permissions = new Set() } = {}) {
-  const perms = permissions instanceof Set ? permissions : new Set(permissions);
-  return TICKET_TYPES.filter((type) => !type.restrictedTo || perms.has(type.restrictedTo));
+export const TYPE_MAP = typeMapOf(DEFAULT_TICKET_TYPES);
+
+export function typeLabel(id, types = DEFAULT_TICKET_TYPES) {
+  return typeMapOf(types)[id]?.label ?? id;
+}
+
+/** Normalises a permission value into a Set. */
+function permSet(permissions) {
+  return permissions instanceof Set ? permissions : new Set(permissions ?? []);
+}
+
+/** Whether this caller may open a ticket of this type. */
+export function canOpenType(type, permissions) {
+  if (!type || type.enabled === false) return false;
+  if (!type.openPermission) return true;
+  return permSet(permissions).has(type.openPermission);
+}
+
+/** Whether this caller may see and work a ticket of this type. */
+export function canWorkType(type, permissions) {
+  if (!type) return false;
+  const perms = permSet(permissions);
+  const listed = (type.workPermissions ?? []).some((key) => perms.has(key));
+  if (type.exclusive) return listed;
+  return listed || perms.has("support.work") || perms.has("support.manage");
+}
+
+/** The types this caller may open, from the live catalogue. */
+export function typesFor({ permissions = new Set(), types = DEFAULT_TICKET_TYPES } = {}) {
+  const perms = permSet(permissions);
+  return (types ?? []).filter((type) => canOpenType(type, perms));
 }
 
 /* ------------------------------------------------------------------ *
  * Access
  * ------------------------------------------------------------------ */
 
-/** Anybody who works tickets rather than only raising them. */
-export function isAgent({ permissions = new Set() } = {}) {
-  const perms = permissions instanceof Set ? permissions : new Set(permissions);
-  return perms.has("support.work") || perms.has("support.manage");
+/**
+ * Anybody who works tickets rather than only raising them. That is the central
+ * support team (`support.work`/`support.manage`) *and* anyone who holds a work
+ * permission that some category routes to — a department commander works their
+ * own department's queue without being on the support team.
+ */
+export function isAgent({ permissions = new Set() } = {}, types = DEFAULT_TICKET_TYPES) {
+  const perms = permSet(permissions);
+  if (perms.has("support.work") || perms.has("support.manage")) return true;
+  return (types ?? []).some((type) => (type.workPermissions ?? []).some((key) => perms.has(key)));
 }
 
 /** The senior tier: staff reports, reassignment across the team, flow editing. */
 export function isSupportLead({ permissions = new Set() } = {}) {
-  const perms = permissions instanceof Set ? permissions : new Set(permissions);
+  const perms = permSet(permissions);
   return perms.has("support.manage");
 }
 
+/** Whether this caller may edit the ticket-category catalogue. */
+export function canConfigureTypes({ permissions = new Set() } = {}) {
+  return permSet(permissions).has("support.configure");
+}
+
 /**
- * Whether a caller may open this ticket.
- *
- * A staff report is the exception that shapes this: it is worked only by
- * whoever holds `support.escalated`, so an ordinary agent must not see it even
- * though they work every other queue.
+ * Whether a caller may see this ticket. The opener always may; otherwise it is
+ * whoever may work the ticket's category — which routes a department ticket to
+ * that department, and keeps a staff report to the directorship.
  */
-export function canViewTicket(ticket, ctx = {}) {
+export function canViewTicket(ticket, ctx = {}, types = DEFAULT_TICKET_TYPES) {
   if (!ticket) return false;
-  const perms = ctx.permissions instanceof Set ? ctx.permissions : new Set(ctx.permissions ?? []);
+  const perms = permSet(ctx.permissions);
   if (ticket.openedByDiscordId && ticket.openedByDiscordId === ctx.user?.id) return true;
-  const type = TYPE_MAP[ticket.type];
-  if (type?.restrictedTo) return perms.has(type.restrictedTo);
-  return isAgent({ permissions: perms });
+  return canWorkType(typeMapOf(types)[ticket.type], perms);
 }
 
 /** Whether a caller may change status, assign, or write internal notes. */
-export function canWorkTicket(ticket, ctx = {}) {
+export function canWorkTicket(ticket, ctx = {}, types = DEFAULT_TICKET_TYPES) {
   if (!ticket) return false;
-  const perms = ctx.permissions instanceof Set ? ctx.permissions : new Set(ctx.permissions ?? []);
-  const type = TYPE_MAP[ticket.type];
-  if (type?.restrictedTo) return perms.has(type.restrictedTo);
-  return isAgent({ permissions: perms });
+  return canWorkType(typeMapOf(types)[ticket.type], permSet(ctx.permissions));
 }
 
 /* ------------------------------------------------------------------ *
@@ -201,9 +340,9 @@ export function canWorkTicket(ticket, ctx = {}) {
 const str = (v, max = 4000) => (typeof v === "string" ? v.slice(0, max) : "");
 
 /** What is wrong with a new ticket, keyed by field. */
-export function validateTicket(draft) {
+export function validateTicket(draft, types = DEFAULT_TICKET_TYPES) {
   const errors = {};
-  const type = TYPE_MAP[draft?.type];
+  const type = typeMapOf(types)[draft?.type];
   if (!type) errors.type = "Pick what this is about.";
   const subject = str(draft?.subject).trim();
   if (subject.length < 4) errors.subject = "Give it a subject.";
@@ -221,8 +360,8 @@ export function validateTicket(draft) {
 }
 
 /** Keeps only the intake fields this type actually declares. */
-export function cleanDetails(typeId, raw = {}) {
-  const type = TYPE_MAP[typeId];
+export function cleanDetails(typeId, raw = {}, types = DEFAULT_TICKET_TYPES) {
+  const type = typeMapOf(types)[typeId];
   if (!type) return {};
   const out = {};
   for (const field of type.fields) {
@@ -232,6 +371,137 @@ export function cleanDetails(typeId, raw = {}) {
     out[field.id] = str(value, 1000);
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * Category configuration
+ * ------------------------------------------------------------------ *
+ *
+ * The ticket-category page edits the catalogue above. Everything here keeps a
+ * stored or user-edited category safe to trust: the display fields are clamped,
+ * the intake fields are re-shaped, and the access fields are coerced to the
+ * three-field model so a document that pre-dates a field still loads.
+ */
+
+/** Icons offered in the category editor. All resolve in the icon registry. */
+export const TICKET_ICON_CHOICES = [
+  "LifeBuoy", "Gavel", "Siren", "Shield", "Wrench", "Store", "Car", "Users",
+  "Building2", "Radio", "Scale", "Crown", "Award", "ClipboardList", "ScrollText",
+  "Briefcase", "Flame", "Heart", "Mail", "Newspaper", "Tag", "UserCog", "Stethoscope",
+];
+
+/** Tones offered in the category editor. */
+export const TICKET_TONE_CHOICES = ["brand", "sky", "green", "amber", "rose", "violet", "primary", "slate"];
+
+/** Intake-field input types. */
+export const FIELD_TYPES = [
+  { id: "short", label: "Short text" },
+  { id: "paragraph", label: "Paragraph" },
+  { id: "select", label: "Dropdown" },
+  { id: "date", label: "Date" },
+];
+
+const FIELD_TYPE_IDS = FIELD_TYPES.map((f) => f.id);
+
+/** A slug safe to use as a stored category id. */
+function slugId(value, fallback) {
+  const slug = String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return slug || fallback;
+}
+
+export function blankTicketType(overrides = {}) {
+  return {
+    id: overrides.id ?? localId("type"),
+    label: "",
+    icon: "LifeBuoy",
+    tone: "brand",
+    blurb: "",
+    enabled: true,
+    openPermission: null,
+    workPermissions: [],
+    exclusive: false,
+    fields: [],
+    ...overrides,
+  };
+}
+
+export function blankTicketField(overrides = {}) {
+  return { id: localId("f"), label: "", type: "short", required: false, options: [], help: "", ...overrides };
+}
+
+function normalizeField(raw, index) {
+  const type = FIELD_TYPE_IDS.includes(raw?.type) ? raw.type : "short";
+  const field = {
+    id: slugId(raw?.id, `field_${index + 1}`),
+    label: str(raw?.label, 120),
+    type,
+    required: raw?.required === true,
+    help: str(raw?.help, 200),
+  };
+  if (type === "select") {
+    field.options = (Array.isArray(raw?.options) ? raw.options : [])
+      .slice(0, 25)
+      .map((option) => str(option, 100).trim())
+      .filter(Boolean);
+  }
+  return field;
+}
+
+export function normalizeTicketType(raw, index = 0) {
+  const tone = TICKET_TONE_CHOICES.includes(raw?.tone) ? raw.tone : "brand";
+  const icon = TICKET_ICON_CHOICES.includes(raw?.icon) ? raw.icon : "LifeBuoy";
+  const open = str(raw?.openPermission, 64).trim();
+  // Legacy: a `restrictedTo` category becomes an exclusive, restricted one.
+  const legacy = str(raw?.restrictedTo, 64).trim();
+  return {
+    id: slugId(raw?.id, `type_${index + 1}`),
+    label: str(raw?.label, 80),
+    icon,
+    tone,
+    blurb: str(raw?.blurb, 240),
+    enabled: raw?.enabled !== false,
+    openPermission: open || (legacy || null),
+    workPermissions: Array.isArray(raw?.workPermissions)
+      ? [...new Set(raw.workPermissions.map((k) => str(k, 64).trim()).filter(Boolean))].slice(0, 12)
+      : legacy
+        ? [legacy]
+        : [],
+    exclusive: raw?.exclusive === true || Boolean(legacy && !raw?.workPermissions),
+    fields: (Array.isArray(raw?.fields) ? raw.fields : []).slice(0, 25).map(normalizeField),
+  };
+}
+
+export function normalizeTicketTypes(list) {
+  const types = (Array.isArray(list) ? list : []).slice(0, 60).map(normalizeTicketType);
+  // Drop entries that lost their id, and de-duplicate by id (last wins).
+  const byId = new Map();
+  for (const type of types) {
+    if (type.id) byId.set(type.id, type);
+  }
+  return [...byId.values()];
+}
+
+/** Problems with a category, for the editor to render beside its save button. */
+export function validateTicketType(type) {
+  const problems = [];
+  if (!type.label?.trim()) problems.push("The category needs a name.");
+  if (!type.id?.trim()) problems.push("The category needs an id.");
+  for (const field of type.fields ?? []) {
+    if (!field.label?.trim()) problems.push("An intake field has no label.");
+    if (field.type === "select" && (!field.options || field.options.length === 0)) {
+      problems.push(`"${field.label || "A dropdown"}" has no options.`);
+    }
+  }
+  if (type.exclusive && (type.workPermissions ?? []).length === 0) {
+    problems.push(
+      `"${type.label || "This category"}" is restricted but names no role that can work it — nobody but Ownership would see it.`,
+    );
+  }
+  return problems;
 }
 
 /* ------------------------------------------------------------------ *

@@ -11,18 +11,14 @@ import AccessDenied from "../../components/auth/AccessDenied";
 import { TicketRow } from "./SupportHome";
 import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
+import { useSupportConfig } from "../../context/useSupportConfig";
 import { cn } from "../../lib/cn";
-import { OPEN_STATUSES, PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from "../../lib/support";
+import { OPEN_STATUSES, PRIORITIES, TICKET_STATUSES } from "../../lib/support";
 
 const STATUS_OPTIONS = [
   { value: "live", label: "Anything live" },
   { value: "all", label: "Every status" },
   ...TICKET_STATUSES.map((s) => ({ value: s.id, label: s.label })),
-];
-
-const TYPE_OPTIONS = [
-  { value: "all", label: "Every type" },
-  ...TICKET_TYPES.map((t) => ({ value: t.id, label: t.label })),
 ];
 
 const PRIORITY_ORDER = Object.fromEntries(PRIORITIES.map((p, i) => [p.id, PRIORITIES.length - i]));
@@ -36,6 +32,11 @@ const PRIORITY_ORDER = Object.fromEntries(PRIORITIES.map((p, i) => [p.id, PRIORI
  */
 export default function SupportQueue() {
   const { user, hasPermission } = useAuth();
+  const { types } = useSupportConfig();
+  const typeOptions = useMemo(
+    () => [{ value: "all", label: "Every type" }, ...types.map((t) => ({ value: t.id, label: t.label }))],
+    [types],
+  );
   const [data, setData] = useState(null);
   const [status, setStatus] = useState("live");
   const [type, setType] = useState("all");
@@ -125,7 +126,7 @@ export default function SupportQueue() {
           aria-label="Search tickets"
         />
         <Select value={status} options={STATUS_OPTIONS} onChange={setStatus} />
-        <Select value={type} options={TYPE_OPTIONS} onChange={setType} />
+        <Select value={type} options={typeOptions} onChange={setType} />
       </div>
 
       {data === null ? (

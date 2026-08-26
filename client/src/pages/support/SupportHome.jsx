@@ -1,6 +1,6 @@
 import { createElement, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Inbox, Plus } from "lucide-react";
+import { ArrowRight, Inbox, Plus, SlidersHorizontal } from "lucide-react";
 import Section from "../../components/layout/Section";
 import PageHeader from "../../components/layout/PageHeader";
 import Card from "../../components/ui/Card";
@@ -11,11 +11,13 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { iconFor } from "../../lib/icons";
 import { formatDateTime } from "../../lib/format";
-import { PRIORITY_MAP, TYPE_MAP, statusLabel, statusTone, typeLabel } from "../../lib/support";
+import { PRIORITY_MAP, statusLabel, statusTone } from "../../lib/support";
+import { useSupportConfig } from "../../context/useSupportConfig";
 
 /** A member's own tickets. Everything they have opened, newest activity first. */
 export default function SupportHome() {
   const { user } = useAuth();
+  const { canConfigure } = useSupportConfig();
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -41,6 +43,12 @@ export default function SupportHome() {
         subtitle="Anything you have asked us about, and where it got to. We answer every one."
         actions={
           <div className="flex flex-wrap gap-2">
+            {canConfigure && (
+              <Button as={Link} to="/support/types" variant="ghost" size="sm">
+                <SlidersHorizontal className="size-4" />
+                Categories
+              </Button>
+            )}
             {data?.agent && (
               <Button as={Link} to="/support/queue" variant="secondary" size="sm">
                 <Inbox className="size-4" />
@@ -81,7 +89,8 @@ export default function SupportHome() {
 }
 
 export function TicketRow({ ticket, showOpener = false }) {
-  const type = TYPE_MAP[ticket.type];
+  const { typeMap } = useSupportConfig();
+  const type = typeMap[ticket.type];
   return (
     <Card as={Link} to={`/support/${ticket.id}`} hover className="flex flex-wrap items-center gap-4 p-5">
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/[0.04] text-slate-300 ring-1 ring-inset ring-white/[0.06]">
@@ -96,7 +105,7 @@ export function TicketRow({ ticket, showOpener = false }) {
           )}
         </p>
         <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span>{typeLabel(ticket.type)}</span>
+          <span>{type?.label ?? ticket.type}</span>
           <span>·</span>
           <code>{ticket.id}</code>
           {showOpener && (

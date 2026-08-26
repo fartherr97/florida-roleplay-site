@@ -20,11 +20,10 @@ import {
   PRIORITIES,
   PRIORITY_MAP,
   TICKET_STATUSES,
-  TYPE_MAP,
   statusLabel,
   statusTone,
-  typeLabel,
 } from "../../lib/support";
+import { useSupportConfig } from "../../context/useSupportConfig";
 
 /**
  * One ticket: the conversation on the left, the controls on the right.
@@ -94,7 +93,8 @@ export default function SupportTicket() {
     };
   }, [can.work]);
 
-  const type = useMemo(() => (ticket ? TYPE_MAP[ticket.type] : null), [ticket]);
+  const { typeMap } = useSupportConfig();
+  const type = useMemo(() => (ticket ? typeMap[ticket.type] : null), [ticket, typeMap]);
 
   if (state.key !== id) {
     return (
@@ -137,7 +137,7 @@ export default function SupportTicket() {
         <div className="min-w-0">
           <div className="mb-5">
             <p className="flex flex-wrap items-center gap-2 text-xs">
-              <Badge tone={type?.tone ?? "slate"}>{typeLabel(ticket.type)}</Badge>
+              <Badge tone={type?.tone ?? "slate"}>{type?.label ?? ticket.type}</Badge>
               <Badge tone={statusTone(ticket.status)}>{statusLabel(ticket.status)}</Badge>
               {ticket.priority !== "normal" && (
                 <Badge tone={PRIORITY_MAP[ticket.priority]?.tone}>{PRIORITY_MAP[ticket.priority]?.label}</Badge>

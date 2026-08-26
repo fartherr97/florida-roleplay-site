@@ -29,6 +29,8 @@ import SupportNew from "./pages/support/SupportNew";
 import SupportQueue from "./pages/support/SupportQueue";
 import SupportFlows from "./pages/support/SupportFlows";
 import SupportTicket from "./pages/support/SupportTicket";
+import SupportTypes from "./pages/support/SupportTypes";
+import SupportLayout from "./pages/support/SupportLayout";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -111,12 +113,16 @@ export default function App() {
 
 
             {/* The support portal. The named routes sit above /:id so a ticket
-                reference can never shadow them. */}
-            <Route path="support" element={<SupportHome />} />
-            <Route path="support/new" element={<SupportNew />} />
-            <Route path="support/queue" element={<SupportQueue />} />
-            <Route path="support/flows" element={<SupportFlows />} />
-            <Route path="support/:id" element={<SupportTicket />} />
+                reference can never shadow them. The layout loads the live
+                ticket-category catalogue once for every screen under it. */}
+            <Route element={<SupportLayout />}>
+              <Route path="support" element={<SupportHome />} />
+              <Route path="support/new" element={<SupportNew />} />
+              <Route path="support/queue" element={<SupportQueue />} />
+              <Route path="support/flows" element={<SupportFlows />} />
+              <Route path="support/types" element={<SupportTypes />} />
+              <Route path="support/:id" element={<SupportTicket />} />
+            </Route>
 
             <Route path="departments" element={<Departments />} />
             <Route path="departments/:id" element={<DepartmentDetail />} />

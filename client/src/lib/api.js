@@ -13,6 +13,7 @@ import * as promotionMock from "../data/promotionData";
 import * as disciplineSeed from "../data/disciplineSeed";
 import * as supportSeed from "../data/supportSeed";
 import { gradeSubmission } from "./forms";
+import { DEFAULT_TICKET_TYPES } from "./support";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { projectRoster } from "./deptRoster";
 import { BASE_ROLES, DEFAULT_GRANTS, PERMISSION_GROUPS } from "../data/permissions";
@@ -83,6 +84,7 @@ async function request(path, options = {}) {
     const err = new Error(body?.message || `Request failed (${res.status})`);
     err.status = res.status;
     err.errors = body?.errors;
+    err.problems = body?.problems;
     throw err;
   }
   return body;
@@ -550,6 +552,16 @@ export const api = {
 
   deleteSupportFlow: (id) =>
     del(`/support/flows/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
+
+  supportTypes: () =>
+    get("/support/config/ticket-types", { types: DEFAULT_TICKET_TYPES, canConfigure: false }),
+
+  saveSupportTypes: (types) =>
+    put("/support/config/ticket-types", { types }, () => ({
+      ok: true,
+      types,
+      message: NOT_PERSISTED,
+    })),
 
   /* ------------------------- Disciplinary actions ------------------------- */
 

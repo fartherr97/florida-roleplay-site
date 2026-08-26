@@ -132,6 +132,25 @@ export const PERMISSION_GROUPS = [
           "Hand a ticket to somebody else, and build the response flows agents walk. Without it an agent can take a ticket but not push one onto a colleague.",
         sensitive: true,
       },
+      {
+        key: "support.configure",
+        label: "Configure ticket categories",
+        detail:
+          "Add, edit, reorder and remove the categories a member picks when opening a ticket, and set who opens and who works each. Whoever holds it decides how every ticket is routed, so it sits with Directorship and Ownership.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
+    id: "department_support",
+    label: "Department support queues",
+    description:
+      "Who works each department's own ticket category. Holding one lets that department's command see and work its queue without being on the central support team — which still sees everything.",
+    permissions: [
+      { key: "support.fhp", label: "Work FHP tickets", detail: "See and work tickets opened for Florida Highway Patrol." },
+      { key: "support.mpd", label: "Work MPD tickets", detail: "See and work tickets opened for Miami Police Department." },
+      { key: "support.bcso", label: "Work BCSO tickets", detail: "See and work tickets opened for Broward County Sheriff's Office." },
+      { key: "support.civilian", label: "Work Civilian Department tickets", detail: "See and work tickets opened for the Civilian Department." },
     ],
   },
   {
@@ -350,6 +369,14 @@ export const DEFAULT_GRANTS = {
   "support.work": staffFrom("trial_mod"),
   "support.escalated": ["directorship", "ownership"],
   "support.manage": ["head_admin", "directorship", "ownership"],
+  "support.configure": ["directorship", "ownership"],
+
+  // Each department's own queue is worked by that department's command. The
+  // central support team (support.work) and Directorship still see every queue.
+  "support.fhp": ["fhp_lieutenant", "fhp_captain", "fhp_colonel"],
+  "support.mpd": ["mpd_lieutenant", "mpd_captain", "mpd_chief"],
+  "support.bcso": ["bcso_lieutenant", "bcso_major", "bcso_sheriff"],
+  "support.civilian": ["senior_admin", "head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

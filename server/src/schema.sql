@@ -873,6 +873,19 @@ CREATE TABLE IF NOT EXISTS support_flows (
   PRIMARY KEY (id)
 );
 
+-- Ticket categories: the whole ordered catalogue in one JSONB document, edited
+-- as a whole by Directorship on the category page. A singleton row ('default')
+-- keeps ordering and atomic edits trivial; absent, the code falls back to the
+-- built-in default catalogue.
+CREATE TABLE IF NOT EXISTS support_type_config (
+  id          VARCHAR(32) NOT NULL DEFAULT 'default',
+  document    JSONB        NOT NULL,
+  updated_by  VARCHAR(20) NULL,
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
 -- ------------------------------------------------------------------ --
 -- Indexes
 --
@@ -1051,4 +1064,7 @@ CREATE TRIGGER touch_support_tickets BEFORE UPDATE ON support_tickets
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 DROP TRIGGER IF EXISTS touch_support_flows ON support_flows;
 CREATE TRIGGER touch_support_flows BEFORE UPDATE ON support_flows
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_support_type_config ON support_type_config;
+CREATE TRIGGER touch_support_type_config BEFORE UPDATE ON support_type_config
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();

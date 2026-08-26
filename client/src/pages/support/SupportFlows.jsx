@@ -14,13 +14,13 @@ import { useAuth } from "../../context/useAuth";
 import { cn } from "../../lib/cn";
 import {
   REPLY_VARIABLES,
-  TICKET_TYPES,
   blankFlow,
   blankNode,
   nodeById,
   normalizeFlow,
   validateFlow,
 } from "../../lib/support";
+import { useSupportConfig } from "../../context/useSupportConfig";
 
 /**
  * The flow builder.
@@ -139,6 +139,7 @@ export default function SupportFlows() {
 }
 
 function FlowEditor({ flow, onChange, onDeleted }) {
+  const { types: ticketTypes } = useSupportConfig();
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const problems = useMemo(() => validateFlow(flow), [flow]);
@@ -201,7 +202,7 @@ function FlowEditor({ flow, onChange, onDeleted }) {
           </Field>
           <Field label="Offered on" hint="Leave all unticked to offer it on every ticket type.">
             <div className="flex flex-wrap gap-1.5">
-              {TICKET_TYPES.map((type) => {
+              {ticketTypes.map((type) => {
                 const on = flow.ticketTypes.includes(type.id);
                 return (
                   <button

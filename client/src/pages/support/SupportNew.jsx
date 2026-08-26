@@ -11,10 +11,11 @@ import { TextArea, TextInput } from "../../components/ui/TextInput";
 import AccessDenied from "../../components/auth/AccessDenied";
 import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
+import { useSupportConfig } from "../../context/useSupportConfig";
 import { iconFor } from "../../lib/icons";
 import { toneTile } from "../../lib/tones";
 import { cn } from "../../lib/cn";
-import { typesFor, validateTicket } from "../../lib/support";
+import { validateTicket } from "../../lib/support";
 
 /**
  * Opening a ticket.
@@ -27,10 +28,16 @@ import { typesFor, validateTicket } from "../../lib/support";
 export default function SupportNew() {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
+  const { types: catalogue } = useSupportConfig();
 
+  // The categories this member may open: enabled, and either open to everyone or
+  // gated on a permission they hold. The server re-checks on submit.
   const types = useMemo(
-    () => typesFor({ permissions: new Set(hasPermission("support.escalated") ? ["support.escalated"] : []) }),
-    [hasPermission],
+    () =>
+      catalogue.filter(
+        (type) => type.enabled !== false && (!type.openPermission || hasPermission(type.openPermission)),
+      ),
+    [catalogue, hasPermission],
   );
 
   const [draft, setDraft] = useState({ type: "", subject: "", body: "", details: {} });
@@ -50,7 +57,7 @@ export default function SupportNew() {
 
   async function submit(event) {
     event.preventDefault();
-    const check = validateTicket(draft);
+    const check = validateTicket(draft, catalogue);
     if (!check.ok) {
       setErrors(check.errors);
       return;
