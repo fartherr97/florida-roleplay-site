@@ -4,6 +4,7 @@ import {
   Layers,
   Pencil,
   Plus,
+  Search,
   ShieldCheck,
   Tag,
   Trash2,
@@ -285,6 +286,25 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
   const [selected, setSelected] = useState(() => new Set(tier?.capabilities ?? []));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [capSearch, setCapSearch] = useState("");
+
+  // The abilities filtered by the search box — matched on their description, key
+  // or category, with empty groups dropped. Runs over the live catalogue, so
+  // anything newly added to the bot is searchable the moment it appears.
+  const shownGroups = useMemo(() => {
+    const needle = capSearch.trim().toLowerCase();
+    if (!needle) return grouped;
+    return grouped
+      .map(([category, list]) => [
+        category,
+        list.filter((cap) =>
+          [cap.description, cap.key, category, categoryLabel(category)]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(needle)),
+        ),
+      ])
+      .filter(([, list]) => list.length > 0);
+  }, [grouped, capSearch]);
 
   const toggle = (key) => {
     setSelected((prev) => {
@@ -421,8 +441,25 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
           ) : catalogue.loading ? (
             <Loading />
           ) : (
-            <div className="space-y-4 rounded-2xl bg-black/20 p-4 ring-1 ring-inset ring-white/[0.06]">
-              {grouped.map(([category, list]) => (
+            <>
+              <div className="relative mb-2">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                <TextInput
+                  type="search"
+                  value={capSearch}
+                  onChange={(e) => setCapSearch(e.target.value)}
+                  placeholder="Search abilities…"
+                  aria-label="Search abilities"
+                  className="pl-10"
+                />
+              </div>
+              <div className="space-y-4 rounded-2xl bg-black/20 p-4 ring-1 ring-inset ring-white/[0.06]">
+                {shownGroups.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-500">
+                    No abilities match “{capSearch}”.
+                  </p>
+                ) : (
+                  shownGroups.map(([category, list]) => (
                 <div key={category}>
                   <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     {categoryLabel(category)}
@@ -454,8 +491,10 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
+                  ))
+                )}
+              </div>
+            </>
           )}
         </div>
 
