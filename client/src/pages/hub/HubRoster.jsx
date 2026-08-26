@@ -8,6 +8,7 @@ import RosterTable from "../../components/roster/RosterTable";
 import { api as botApi, isConfigured as botConfigured } from "../../lib/botApi";
 import { SITE } from "../../data/mockData";
 import { formatDate } from "../../lib/format";
+import { cn } from "../../lib/cn";
 
 /**
  * The staff roster, projected straight from the roster the bot maintains.
