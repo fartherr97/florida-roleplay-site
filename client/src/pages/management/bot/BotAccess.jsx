@@ -22,6 +22,7 @@ import DiscordRolePicker from "../../../components/bot/DiscordRolePicker";
 import { useBotResource } from "../../../lib/useBotResource";
 import { useBotAuth } from "../../../context/useBotAuth";
 import { api } from "../../../lib/botApi";
+import { cn } from "../../../lib/cn";
 
 /**
  * Access tiers — the whole access model, in two plain-language pieces.
@@ -47,6 +48,47 @@ const LEVELS = [
 
 function levelMeta(value) {
   return LEVELS.find((l) => l.value === Number(value)) ?? { label: `Level ${value}`, tone: "slate" };
+}
+
+// A small palette so tiers read as distinct at a glance without a free-form
+// picker. The stored value is the hex, so any colour works, but these are the
+// one-click options.
+const PRESET_COLORS = [
+  "#22c55e", "#10b981", "#14b8a6", "#38bdf8", "#3b82f6", "#6366f1",
+  "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e", "#ef4444", "#f97316",
+  "#f59e0b", "#eab308", "#84cc16", "#94a3b8",
+];
+const DEFAULT_TIER_COLOR = PRESET_COLORS[0];
+
+/** Inline styles for a pill tinted to an arbitrary hex colour. */
+function colorPillStyle(hex) {
+  if (!hex) return null;
+  return {
+    color: hex,
+    backgroundColor: `${hex}1f`, // ~12% alpha
+    boxShadow: `inset 0 0 0 1px ${hex}59`, // ~35% alpha ring
+  };
+}
+
+/** A tier's coloured badge — its own hex when set, otherwise the brand tone. */
+function TierBadge({ name, color, icon: Icon }) {
+  if (!color) {
+    return (
+      <Badge tone="brand">
+        {Icon && <Icon className="size-3" />}
+        {name}
+      </Badge>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider"
+      style={colorPillStyle(color)}
+    >
+      {Icon && <Icon className="size-3" />}
+      {name}
+    </span>
+  );
 }
 
 // Plain-language headings for the capability catalogue's raw category keys.
@@ -147,7 +189,13 @@ function TiersSection() {
             <Card key={tier.id} className="flex flex-col gap-3 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{tier.name}</p>
+                  <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: tier.color ?? "#f97316" }}
+                    />
+                    <span className="truncate">{tier.name}</span>
+                  </p>
                   {tier.description && (
                     <p className="mt-0.5 line-clamp-2 text-xs text-slate-400">{tier.description}</p>
                   )}
@@ -172,10 +220,12 @@ function TiersSection() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <Badge tone="brand">
-                  {tier.capabilities?.length ?? 0}{" "}
-                  {tier.capabilities?.length === 1 ? "ability" : "abilities"}
-                </Badge>
+                <TierBadge
+                  name={`${tier.capabilities?.length ?? 0} ${
+                    tier.capabilities?.length === 1 ? "ability" : "abilities"
+                  }`}
+                  color={tier.color}
+                />
                 <span>
                   Used by {tier.roleCount ?? 0} {tier.roleCount === 1 ? "role" : "roles"}
                 </span>
@@ -228,6 +278,7 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
 
   const [name, setName] = useState(tier?.name ?? "");
   const [description, setDescription] = useState(tier?.description ?? "");
+  const [color, setColor] = useState(tier?.color ?? DEFAULT_TIER_COLOR);
   const [selected, setSelected] = useState(() => new Set(tier?.capabilities ?? []));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -261,6 +312,7 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
           body: {
             name: name.trim(),
             description: description.trim() || null,
+            color,
             capabilities: capabilitiesList,
           },
         });
@@ -270,6 +322,7 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
           body: {
             name: name.trim(),
             description: description.trim() || undefined,
+            color,
             capabilities: capabilitiesList,
           },
         });
@@ -311,6 +364,46 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
             maxLength={300}
           />
         </Field>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Colour
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {PRESET_COLORS.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                onClick={() => setColor(hex)}
+                aria-label={`Use ${hex}`}
+                aria-pressed={color === hex}
+                className={cn(
+                  "size-7 rounded-full transition",
+                  color === hex
+                    ? "ring-2 ring-white ring-offset-2 ring-offset-[#1a2234]"
+                    : "ring-1 ring-inset ring-white/15 hover:scale-110",
+                )}
+                style={{ backgroundColor: hex }}
+              />
+            ))}
+            <label
+              className="ml-1 inline-flex size-7 cursor-pointer items-center justify-center rounded-full ring-1 ring-inset ring-white/15"
+              title="Custom colour"
+              style={{ backgroundColor: color }}
+            >
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="size-0 opacity-0"
+                aria-label="Custom colour"
+              />
+            </label>
+            <span className="ml-1">
+              <TierBadge name={name.trim() || "Preview"} color={color} />
+            </span>
+          </div>
+        </div>
 
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -485,8 +578,8 @@ function AssignmentsSection() {
       ) : (
         <Card className="divide-y divide-white/[0.06]">
           {items.map((rule) => {
-            const tierName = rule.accessTier?.name;
-            const meta = tierName ? null : levelMeta(rule.permissionLevel);
+            const tier = rule.accessTier;
+            const meta = tier ? null : levelMeta(rule.permissionLevel);
             return (
               <div key={rule.discordRoleId} className="flex items-center gap-4 px-5 py-3.5">
                 <div className="min-w-0 flex-1">
@@ -495,11 +588,8 @@ function AssignmentsSection() {
                   </p>
                   <p className="truncate text-xs text-slate-500">{rule.discordRoleId}</p>
                 </div>
-                {tierName ? (
-                  <Badge tone="brand">
-                    <ShieldCheck className="size-3" />
-                    {tierName}
-                  </Badge>
+                {tier ? (
+                  <TierBadge name={tier.name} color={tier.color} icon={ShieldCheck} />
                 ) : (
                   <Badge tone={meta.tone}>{meta.label}</Badge>
                 )}
@@ -655,8 +745,8 @@ function RemoveRuleDialog({ rule, onClose, onRemoved }) {
     }
   };
 
-  const tierName = rule.accessTier?.name;
-  const meta = tierName ? null : levelMeta(rule.permissionLevel);
+  const tier = rule.accessTier;
+  const meta = tier ? null : levelMeta(rule.permissionLevel);
 
   return (
     <Modal open onClose={onClose} title="Remove this assignment?">
@@ -664,8 +754,8 @@ function RemoveRuleDialog({ rule, onClose, onRemoved }) {
         <p className="text-sm text-slate-300">
           <span className="font-semibold text-white">{rule.roleName ?? rule.discordRoleId}</span>{" "}
           will lose its{" "}
-          {tierName ? (
-            <Badge tone="brand">{tierName}</Badge>
+          {tier ? (
+            <TierBadge name={tier.name} color={tier.color} />
           ) : (
             <Badge tone={meta.tone}>{meta.label}</Badge>
           )}{" "}
