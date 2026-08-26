@@ -451,7 +451,7 @@ router.get("/chat", async (req, res) => {
   const includeInternal = canUseInternal(session, transfer);
   const rows = await query(
     includeInternal
-      ? "SELECT * FROM transfer_messages WHERE transfer_id = ? ORDER BY created_at ASC"
+      ? "SELECT * FROM transfer_messages WHERE transfer_id = $1 ORDER BY created_at ASC"
       : "SELECT * FROM transfer_messages WHERE transfer_id = $1 AND internal = false ORDER BY created_at ASC",
     [transferId],
   );
@@ -765,14 +765,12 @@ router.patch("/:id", async (req, res) => {
     return res.json(await getTransfer(id));
   }
 
-  /* ── Direct status change ────────────────────────────────────────────── */
-  const status = str(body.status);
-  if (status) {
-    if (!STATUSES.includes(status)) return res.status(400).json({ error: "unknown status" });
-    await query("UPDATE transfers SET status = $1 WHERE id = $2", [status, id]);
-    return res.json(await getTransfer(id));
-  }
-
+  // No generic status setter: every legitimate transition has its own guarded
+  // action above (approve/revoke/reject are department-scoped, close/reopen are
+  // management-only, and process requires both departments to have approved).
+  // A raw status write here would let a single department head jump a transfer
+  // straight to completed/closed/approved, bypassing every one of those guards
+  // and leaving no history entry, so it is deliberately not offered.
   return res.status(400).json({ error: "unknown action" });
 });
 

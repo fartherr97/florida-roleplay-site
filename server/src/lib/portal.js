@@ -73,9 +73,19 @@ export function isStaff(session) {
   return !!session && (session.isManagement || session.isDeptHead);
 }
 
-/** True when the session belongs to the transferee who created this ticket. */
+/**
+ * True when the session belongs to the transferee who created this ticket.
+ *
+ * The submitter's immutable user id is authoritative: once a ticket records
+ * `createdById`, ownership is decided by that id alone. The name/username
+ * comparison is a fallback ONLY for legacy rows created before the id column
+ * existed — matching on the mutable, non-unique `member`/`discord` free-text
+ * fields would otherwise let anyone rename themselves to a target's name and
+ * read that ticket.
+ */
 export function isOwnTicket(session, transfer) {
   if (!session || !transfer) return false;
+  if (transfer.createdById) return !!session.id && transfer.createdById === session.id;
   const u = session.username?.toLowerCase();
   const d = session.displayName?.toLowerCase();
   return (

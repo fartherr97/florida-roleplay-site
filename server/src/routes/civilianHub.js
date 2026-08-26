@@ -38,11 +38,15 @@ function isoDate(value) {
 
 /* --------------------------- personal records --------------------------- */
 
-router.get("/characters", requireWhitelist(), (_req, res) =>
+router.get("/characters", requireWhitelist(), (req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query("SELECT * FROM civ_characters ORDER BY is_primary DESC, name",
+      // Personal records: a member sees only their OWN characters, keyed by the
+      // Discord id on the session — never the whole community's records.
+      const rows = await query(
+        "SELECT * FROM civ_characters WHERE discord_id = $1 ORDER BY is_primary DESC, name",
+        [req.user.id],
       );
       return rows.map((row) => ({
         id: row.id,
@@ -62,11 +66,15 @@ router.get("/characters", requireWhitelist(), (_req, res) =>
   ),
 );
 
-router.get("/vehicles", requireWhitelist(), (_req, res) =>
+router.get("/vehicles", requireWhitelist(), (req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query("SELECT * FROM civ_vehicles ORDER BY plate");
+      const rows = await query(
+        "SELECT * FROM civ_vehicles WHERE owner_character IN " +
+          "(SELECT id FROM civ_characters WHERE discord_id = $1) ORDER BY plate",
+        [req.user.id],
+      );
       return rows.map((row) => ({
         id: row.id,
         plate: row.plate,
@@ -85,11 +93,15 @@ router.get("/vehicles", requireWhitelist(), (_req, res) =>
   ),
 );
 
-router.get("/properties", requireWhitelist(), (_req, res) =>
+router.get("/properties", requireWhitelist(), (req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query("SELECT * FROM civ_properties ORDER BY address");
+      const rows = await query(
+        "SELECT * FROM civ_properties WHERE owner_character IN " +
+          "(SELECT id FROM civ_characters WHERE discord_id = $1) ORDER BY address",
+        [req.user.id],
+      );
       return rows.map((row) => ({
         id: row.id,
         address: row.address,
@@ -106,11 +118,14 @@ router.get("/properties", requireWhitelist(), (_req, res) =>
   ),
 );
 
-router.get("/licences", requireWhitelist(), (_req, res) =>
+router.get("/licences", requireWhitelist(), (req, res) =>
   safe(
     res,
     async () => {
-      const rows = await query("SELECT * FROM civ_licences ORDER BY holder_name, licence_type",
+      const rows = await query(
+        "SELECT * FROM civ_licences WHERE holder_character IN " +
+          "(SELECT id FROM civ_characters WHERE discord_id = $1) ORDER BY holder_name, licence_type",
+        [req.user.id],
       );
       return rows.map((row) => ({
         id: row.id,

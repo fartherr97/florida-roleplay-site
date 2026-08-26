@@ -25,6 +25,13 @@ ENV VITE_API_URL=$VITE_API_URL
 # Installs client dev deps, builds the client, installs server prod deps.
 RUN npm run build
 
+# Run in production mode by default. This is set AFTER the build so npm still
+# installs the client's dev dependencies (Vite) to build the bundle; at runtime
+# it disables the development auth affordances (the x-preview-rank / x-discord-id
+# header paths) and forces Secure cookies. Baking it here means a deploy cannot
+# fail open by forgetting to set NODE_ENV — the safe state is the default.
+ENV NODE_ENV=production
+
 # The server reads PORT; Northflank routes to whatever container port you set.
 # 4000 is the app's own default, so it works with or without PORT injected.
 ENV PORT=4000

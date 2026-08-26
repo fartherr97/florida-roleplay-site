@@ -9,7 +9,14 @@ import { query } from "../db.js";
 import { readCookie, readSession, SESSION_COOKIE } from "../lib/session.js";
 import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
 
-const DEV_MODE = process.env.NODE_ENV !== "production";
+// The development auth affordances (x-preview-rank / x-discord-id header paths)
+// are fail-CLOSED by default: they require BOTH a non-production NODE_ENV *and*
+// an explicit ALLOW_DEV_AUTH=1 opt-in. That way a deployment can never enable a
+// header-based auth bypass by merely forgetting to set NODE_ENV — the operator
+// has to deliberately turn the dev paths on. For local development, set
+// ALLOW_DEV_AUTH=1 in your .env.
+const DEV_MODE =
+  process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_AUTH === "1";
 
 /**
  * The highest staff rank a set of role keys carries, as a label.
