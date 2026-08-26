@@ -22,7 +22,7 @@ import { fetchMemberRoles } from "./discord.js";
 import * as rosterSeed from "../rosterSeed.js";
 
 /** How long a refreshed snapshot is trusted before the next request re-reads Discord. */
-const TTL_MS = Math.max(5, Number(process.env.ROLE_REFRESH_TTL_SECONDS) || 20) * 1000;
+const TTL_MS = Math.max(3, Number(process.env.ROLE_REFRESH_TTL_SECONDS) || 5) * 1000;
 /** After a failed read, wait this long before trying again rather than hammering Discord. */
 const ERROR_BACKOFF_MS = 10_000;
 

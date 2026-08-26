@@ -65,6 +65,7 @@ export const navGroups = [
       { label: "Promotion Board", to: "/staff-hub/promotion-board", icon: "Award" },
       { label: "Staff Dashboard", to: "/staff-hub/dashboard", icon: "ChartColumn" },
       { label: "Trial Mod Checklist", to: "/staff-hub/trial-checklist", icon: "ListChecks" },
+      { label: "DA Hub", to: "/staff-hub/da-hub", icon: "Gavel" },
       { label: "Staff DA Database", to: "/staff-hub/da-database", icon: "Gavel" },
       { label: "Staff Resources", to: "/staff-hub/resources", icon: "BookOpen" },
       { label: "Staff Team", to: "/staff", icon: "Shield" },

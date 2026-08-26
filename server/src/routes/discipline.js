@@ -17,6 +17,8 @@ import { loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
+import { fetchMemberRoles } from "../lib/discord.js";
+import { resolveRoleKeys } from "../lib/roleSync.js";
 import { str } from "../validate.js";
 import {
   ACTION_TYPE_MAP,
@@ -296,17 +298,53 @@ router.post("/:id/void", async (req, res) => {
  * ------------------------------------------------------------------ */
 
 /**
+ * Resolves whether the Discord user who invoked `/bgcheck` may read records.
+ *
+ * A background check is staff-only, exactly as the DA Hub is: the bot token proves
+ * the request came from our bot, but the *person* who ran the command still has to
+ * hold `discipline.view`. We own that decision here rather than in the bot, off the
+ * caller's live Discord roles — so it can never disagree with the hub, and it works
+ * even for a staff member who has never opened the website. Fails closed: no id, not
+ * in the guild, or an unreadable role list all deny.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function actorMayViewRecords(actorDiscordId) {
+  if (!/^\d{17,20}$/.test(actorDiscordId)) return false;
+  try {
+    const membership = await fetchMemberRoles(actorDiscordId);
+    if (membership === null) return false; // not in the guild
+    const roleKeys = await resolveRoleKeys(membership.roles);
+    const permissions = permissionsFor(roleKeys, await loadGrants());
+    return canViewAll({ permissions });
+  } catch {
+    return false; // could not verify — deny
+  }
+}
+
+/**
  * What `/bgcheck` calls.
  *
  * Answers with both the folded record and the finished embed. The bot may post
  * the embed as it stands or build its own from the data — but the default costs
  * it nothing, and it means the site owns what a record looks like rather than
  * two renderers drifting apart.
+ *
+ * The bot passes the invoking user's Discord id as `actor`; only a caller who holds
+ * `discipline.view` is answered, so the bot never has to reimplement the DA Hub's
+ * permission model.
  */
 router.get("/bot/background/:discordId", requireBot, async (req, res) => {
   const discordId = str(req.params.discordId);
   if (!/^\d{17,20}$/.test(discordId)) {
     return res.status(400).json({ ok: false, message: "That is not a Discord ID." });
+  }
+  if (!(await actorMayViewRecords(str(req.query.actor)))) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: "You don't have permission to run background checks.",
+    });
   }
   const windowDays = clampWindow(req.query.days);
   const actions = await loadActions({ targetDiscordId: discordId });
