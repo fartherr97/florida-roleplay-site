@@ -19,6 +19,25 @@ import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
 const DEV_MODE =
   process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_AUTH === "1";
 
+// Break-glass owner access. Discord IDs listed here always resolve as `ownership`, no matter
+// what the role map or the live refresh says — the same idea as the bot's
+// GLOBAL_ADMIN_DISCORD_IDS. Its whole purpose is that a mapping mistake or a bad refresh can
+// never lock the community's owner out of the very page that fixes the mapping.
+const OWNER_DISCORD_IDS = new Set(
+  (process.env.SITE_OWNER_DISCORD_IDS || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
+);
+
+/** Guarantees `ownership` for a break-glass owner id, otherwise returns the roles unchanged. */
+function withOwnerOverride(userId, roles) {
+  if (OWNER_DISCORD_IDS.has(String(userId)) && !roles.includes("ownership")) {
+    return [...roles, "ownership"];
+  }
+  return roles;
+}
+
 /**
  * The highest staff rank a set of role keys carries, as a label.
  *
@@ -78,7 +97,11 @@ export async function resolveUser(req) {
         // `authenticated` marks a real Discord session, so the client ends
         // preview mode and never treats this for a dev/seed caller.
         if (user) {
-          const roles = refreshed ?? user.roles;
+          // Only take the refreshed set when it actually carries roles — a null or empty
+          // result means "no authoritative change", so the stored snapshot stands rather
+          // than being replaced by nothing.
+          const base = refreshed && refreshed.length ? refreshed : user.roles;
+          const roles = withOwnerOverride(userId, base);
           return { ...user, roles, rank: rankFor(roles), authenticated: true };
         }
       }

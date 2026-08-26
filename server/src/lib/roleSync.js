@@ -91,9 +91,12 @@ function canRefresh() {
 export async function refreshUserRoles(userId) {
   const membership = await fetchMemberRoles(userId);
   if (membership === null) {
-    // Authoritative: they are no longer in the guild, so they hold nothing here.
-    await writeUserRoles(userId, []);
-    return { inGuild: false, roles: [] };
+    // A 404 is ambiguous — it can mean "left the guild", but it can equally mean a
+    // misconfigured guild id, a token that can't see the member, or an edge blip. Wiping
+    // someone's roles on that is how a background sweep locks a whole staff team (and the
+    // owner) out, so this refresh NEVER strips on a 404: it leaves the snapshot untouched.
+    // A genuine departure is still caught at sign-in, which fails closed with "not in guild".
+    return { inGuild: false, roles: null };
   }
   const roles = await resolveRoleKeys(membership.roles);
   await writeUserRoles(userId, roles);
