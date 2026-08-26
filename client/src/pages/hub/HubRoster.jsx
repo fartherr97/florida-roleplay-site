@@ -119,32 +119,43 @@ export default function HubRoster() {
 
   const ranks = useMemo(() => roster?.ranks ?? [], [roster]);
 
-  const filled = useMemo(
-    () => ranks.reduce((sum, rank) => sum + (rank.members?.length ?? 0), 0),
-    [ranks],
-  );
-
-  const seats = useMemo(
-    () =>
-      ranks.reduce(
-        (sum, rank) => sum + (isBlock(rank) ? rank.callsignRangeEnd - rank.callsignRangeStart + 1 : rank.members?.length ?? 0),
-        0,
-      ),
-    [ranks],
-  );
+  const { seats, filled, vacant } = useMemo(() => {
+    let s = 0;
+    let f = 0;
+    let v = 0;
+    for (const rank of ranks) {
+      const members = rank.members ?? [];
+      f += members.length;
+      if (isBlock(rank)) {
+        const size = rank.callsignRangeEnd - rank.callsignRangeStart + 1;
+        const inBlock = members.filter((m) => {
+          const n = /^\d+$/.test(String(m.callsign ?? "")) ? Number(m.callsign) : null;
+          return n !== null && n >= rank.callsignRangeStart && n <= rank.callsignRangeEnd;
+        }).length;
+        s += size;
+        v += Math.max(0, size - inBlock);
+      } else {
+        s += members.length;
+      }
+    }
+    return { seats: s, filled: f, vacant: v };
+  }, [ranks]);
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return ranks
       .map((rank, index) => {
-        let rows = rowsForRank(rank);
+        // Each row carries the rank it sits under, so the Position column reads the
+        // same for a filled seat and a vacant one.
+        const positionNote = rank.shortName && rank.shortName !== rank.name ? rank.shortName : null;
+        let rows = rowsForRank(rank).map((row) => ({ ...row, position: rank.name, positionNote }));
         if (needle) {
           // Searching is about people, so a vacancy — which has no name — drops
           // out. An unfiltered view is about seats, so it keeps them.
           rows = rows.filter(
             (row) =>
               !row.vacant &&
-              [row.name, row.callsign, row.discordId]
+              [row.name, row.callsign, row.discordId, row.position]
                 .filter(Boolean)
                 .some((value) => String(value).toLowerCase().includes(needle)),
           );
@@ -152,7 +163,9 @@ export default function HubRoster() {
         return {
           id: rank.discordRoleId ?? rank.name,
           label: rank.shortName && rank.shortName !== rank.name ? `${rank.name} · ${rank.shortName}` : rank.name,
-          color: RANK_COLORS[index % RANK_COLORS.length],
+          // The bound Discord role's colour, falling back to a cycled palette only when
+          // the role has none set.
+          color: rank.color || RANK_COLORS[index % RANK_COLORS.length],
           rows,
         };
       })
@@ -181,6 +194,19 @@ export default function HubRoster() {
         ),
     },
     {
+      key: "position",
+      label: "Position",
+      hideBelow: "md",
+      render: (row) => (
+        <div className="min-w-0">
+          <p className={cn("truncate text-sm font-semibold", row.vacant ? "text-slate-500" : "text-brand-300")}>
+            {row.position}
+          </p>
+          {row.positionNote && <p className="truncate text-xs text-slate-500">{row.positionNote}</p>}
+        </div>
+      ),
+    },
+    {
       key: "discordId",
       label: "Discord UID",
       hideBelow: "lg",
@@ -193,11 +219,35 @@ export default function HubRoster() {
     },
     {
       key: "since",
-      label: "Since",
+      label: "Hired",
       hideBelow: "xl",
       render: (row) =>
         row.since ? (
           <span className="whitespace-nowrap text-slate-400">{formatDate(row.since)}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) =>
+        row.vacant ? (
+          <span className="text-slate-600">—</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-400/25">
+            <span className="size-1.5 rounded-full bg-emerald-400" />
+            Active
+          </span>
+        ),
+    },
+    {
+      key: "notes",
+      label: "Notes",
+      hideBelow: "2xl",
+      render: (row) =>
+        row.vacant ? (
+          <span className="text-xs italic text-slate-600">Position unoccupied</span>
         ) : (
           <span className="text-slate-600">—</span>
         ),
@@ -215,8 +265,11 @@ export default function HubRoster() {
             : "Every seat on the team, and who holds it."
         }
         onRefresh={() => setReloadKey((key) => key + 1)}
-        total={filled}
-        counts={[]}
+        total={seats}
+        counts={[
+          { label: "Filled", value: filled, color: "#10b981" },
+          { label: "Vacant", value: vacant, color: "#64748b" },
+        ]}
       />
 
       <RosterFilters
@@ -252,17 +305,48 @@ export default function HubRoster() {
             <div key={n} className="h-16 animate-pulse rounded-2xl bg-white/[0.03]" />
           ))}
         </div>
-      ) : (
-        <RosterTable
-          columns={columns}
-          groups={groups}
-          empty={
-            query
-              ? "Nobody on the roster matches that search."
-              : "No ranks are bound to Discord roles yet."
-          }
-        />
-      )}
+      ) : state === "ready" ? (
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <RosterTable
+            columns={columns}
+            groups={groups}
+            empty={
+              query
+                ? "Nobody on the roster matches that search."
+                : "No ranks are bound to Discord roles yet."
+            }
+          />
+
+          <aside className="space-y-5">
+            <Card className="flex items-center justify-center p-8">
+              <Logo size="size-20" />
+            </Card>
+            <Card className="p-5">
+              <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                Statistics
+              </h2>
+              <dl className="space-y-2.5">
+                <Stat label="Total seats" value={seats} />
+                <Stat label="Filled" value={filled} accent="text-emerald-300" />
+                <Stat label="Vacant" value={vacant} accent="text-slate-400" />
+                <Stat
+                  label="Fill rate"
+                  value={seats ? `${Math.round((filled / seats) * 100)}%` : "—"}
+                />
+              </dl>
+            </Card>
+          </aside>
+        </div>
+      ) : null}
     </>
+  );
+}
+
+function Stat({ label, value, accent = "text-white" }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-sm text-slate-400">{label}</dt>
+      <dd className={cn("text-sm font-bold tabular-nums", accent)}>{value}</dd>
+    </div>
   );
 }
