@@ -68,10 +68,6 @@ export default function SupportHome() {
             Ban appeals, reports, bugs, store questions — anything you need a
             person to look at.
           </p>
-          <Button as={Link} to="/support/new" size="sm" className="mt-5">
-            <Plus className="size-4" />
-            Open a ticket
-          </Button>
         </Card>
       ) : (
         <div className="space-y-3">
