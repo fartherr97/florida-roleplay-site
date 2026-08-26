@@ -6,7 +6,24 @@ import Badge from "../../components/ui/Badge";
 import { api } from "../../lib/api";
 import { penalCode as seedPenalCode } from "../../data/civilianHubData";
 
-const DEGREE_TONES = { Felony: "rose", Misdemeanour: "amber", Infraction: "slate" };
+/** The Sonoran classes fold into three colours by their category word. */
+function degreeTone(degree = "") {
+  const d = degree.toLowerCase();
+  if (d.includes("felony") || d.includes("capital") || d.includes("life")) return "rose";
+  if (d.includes("misdemean")) return "amber";
+  if (d.includes("infraction")) return "slate";
+  return "slate";
+}
+
+/** Bail disposition, coloured so "No bail" reads at a glance. */
+function bondClass(bond = "") {
+  const b = bond.toLowerCase();
+  if (b.includes("no bail")) return "text-rose-300";
+  if (b.includes("bond")) return "text-emerald-300";
+  if (b.includes("citation")) return "text-sky-300";
+  if (b.includes("cash")) return "text-amber-300";
+  return "text-slate-500";
+}
 
 /** Searchable penal code — charges, fines, jail time and licence points. */
 export default function CivPenalCode() {
@@ -42,17 +59,34 @@ export default function CivPenalCode() {
       render: (e) => (
         <>
           <p className="font-semibold text-white">{e.title}</p>
-          <p className="mt-0.5 text-xs text-slate-500">{e.notes}</p>
+          {e.notes && <p className="mt-0.5 text-xs text-slate-500">{e.notes}</p>}
         </>
       ),
     },
     {
       key: "degree",
-      label: "Degree",
-      render: (e) => <Badge tone={DEGREE_TONES[e.degree] ?? "slate"}>{e.degree}</Badge>,
+      label: "Class",
+      render: (e) => <Badge tone={degreeTone(e.degree)}>{e.degree}</Badge>,
     },
-    { key: "fine", label: "Fine", align: "right", render: (e) => <span className="font-semibold text-white">{e.fine}</span> },
-    { key: "jail", label: "Jail", align: "right", render: (e) => <span className="text-slate-400">{e.jail}</span> },
+    {
+      key: "bond",
+      label: "Bail",
+      render: (e) => <span className={`text-sm font-medium ${bondClass(e.bond)}`}>{e.bond || "—"}</span>,
+    },
+    {
+      key: "jail",
+      label: "Jail",
+      align: "right",
+      render: (e) => <span className="whitespace-nowrap text-slate-300">{e.jail || "—"}</span>,
+    },
+    {
+      key: "fine",
+      label: "Fine",
+      align: "right",
+      render: (e) => (
+        <span className={e.fine ? "font-semibold text-white" : "text-slate-600"}>{e.fine || "—"}</span>
+      ),
+    },
     {
       key: "points",
       label: "Points",
@@ -76,7 +110,7 @@ export default function CivPenalCode() {
 
       <SearchHero
         title="Search the penal code"
-        subtitle="By charge, code or keyword — try 'firearm', 'P-207' or 'reckless'."
+        subtitle="By charge, code or keyword — try 'firearm', '316.193' or 'reckless'."
         value={query}
         onChange={setQuery}
         placeholder="Search charges"
@@ -86,7 +120,7 @@ export default function CivPenalCode() {
         <DataTable
           columns={columns}
           rows={entries}
-          rowKey={(e) => e.code}
+          rowKey={(e) => e.id ?? e.code}
           empty={`No charges match “${query}”.`}
         />
       </div>
