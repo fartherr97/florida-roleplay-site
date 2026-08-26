@@ -31,7 +31,7 @@ const OWNER_DISCORD_IDS = new Set(
 );
 
 /** Guarantees `ownership` for a break-glass owner id, otherwise returns the roles unchanged. */
-function withOwnerOverride(userId, roles) {
+export function withOwnerOverride(userId, roles) {
   if (OWNER_DISCORD_IDS.has(String(userId)) && !roles.includes("ownership")) {
     return [...roles, "ownership"];
   }

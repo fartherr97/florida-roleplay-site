@@ -14,7 +14,7 @@ import { Router } from "express";
 import { execute, query, changedRows } from "../db.js";
 import * as seed from "../disciplineSeed.js";
 import { loadGrants } from "../middleware/requirePermission.js";
-import { resolveUser } from "../middleware/requireRole.js";
+import { resolveUser, withOwnerOverride } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { fetchMemberRoles } from "../lib/discord.js";
@@ -314,7 +314,9 @@ async function actorMayViewRecords(actorDiscordId) {
   try {
     const membership = await fetchMemberRoles(actorDiscordId);
     if (membership === null) return false; // not in the guild
-    const roleKeys = await resolveRoleKeys(membership.roles);
+    // Apply the same break-glass owner override the website uses, so a listed owner can run
+    // a background check even when their Discord role is not mapped to a staff key yet.
+    const roleKeys = withOwnerOverride(actorDiscordId, await resolveRoleKeys(membership.roles));
     const permissions = permissionsFor(roleKeys, await loadGrants());
     return canViewAll({ permissions });
   } catch {
