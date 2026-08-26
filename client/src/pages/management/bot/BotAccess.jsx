@@ -117,6 +117,10 @@ export default function BotAccess() {
     return typeof key === "string" && key.toUpperCase() === "ACCESS.MANAGE";
   });
 
+  // One tier list, shared by both sections, so a tier created above is
+  // immediately assignable below without a page refresh.
+  const tiers = useBotResource("/access/tiers", { skip: !canManage });
+
   if (!canManage) {
     return (
       <Empty title="Access management is restricted">
@@ -136,8 +140,8 @@ export default function BotAccess() {
         access goes with it.
       </p>
 
-      <TiersSection />
-      <AssignmentsSection />
+      <TiersSection tiers={tiers} />
+      <AssignmentsSection tiers={tiers} />
     </div>
   );
 }
@@ -146,8 +150,7 @@ export default function BotAccess() {
 /* Section 1 — the reusable tier definitions                                  */
 /* -------------------------------------------------------------------------- */
 
-function TiersSection() {
-  const tiers = useBotResource("/access/tiers");
+function TiersSection({ tiers }) {
   const [editing, setEditing] = useState(null); // tier object, or "new"
   const [removing, setRemoving] = useState(null);
 
@@ -524,9 +527,8 @@ function DeleteTierDialog({ tier, onClose, onDeleted }) {
 /* Section 2 — mapping Discord roles to tiers                                 */
 /* -------------------------------------------------------------------------- */
 
-function AssignmentsSection() {
+function AssignmentsSection({ tiers }) {
   const rules = useBotResource("/access");
-  const tiers = useBotResource("/access/tiers");
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(null);
 
@@ -614,6 +616,7 @@ function AssignmentsSection() {
           onSaved={() => {
             setAdding(false);
             rules.reload();
+            tiers.reload();
           }}
         />
       )}
@@ -625,6 +628,7 @@ function AssignmentsSection() {
           onRemoved={() => {
             setRemoving(null);
             rules.reload();
+            tiers.reload();
           }}
         />
       )}
