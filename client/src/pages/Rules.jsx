@@ -62,6 +62,14 @@ export default function Rules() {
       prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
     );
 
+  // Jump to a section from the side nav: open it, then scroll it into view.
+  const jumpTo = (id) => {
+    setOpenIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
+
   return (
     <Section>
       <SearchHero
@@ -84,11 +92,34 @@ export default function Rules() {
           </p>
         </Card>
       ) : (
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
+          {/* Section index — sticky beside the rules so any clause is one click away. */}
+          <nav className="mb-4 lg:sticky lg:top-24 lg:mb-0">
+            <Card className="p-2">
+              <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                Sections
+              </p>
+              <ul className="max-h-[70vh] space-y-0.5 overflow-y-auto">
+                {groups.map((group) => (
+                  <li key={group.id}>
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(group.id)}
+                      className="block w-full truncate rounded-lg px-3 py-1.5 text-left text-sm text-slate-400 transition hover:bg-primary-500/10 hover:text-white"
+                    >
+                      {group.category}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </nav>
+
+          <div className="space-y-4">
           {groups.map((group) => {
             const isOpen = openIds.includes(group.id);
             return (
-              <Card key={group.id} className="overflow-hidden">
+              <Card key={group.id} id={group.id} className="scroll-mt-24 overflow-hidden">
                 <button
                   type="button"
                   aria-expanded={isOpen}
@@ -155,6 +186,7 @@ export default function Rules() {
               </Card>
             );
           })}
+          </div>
         </div>
       )}
     </Section>
