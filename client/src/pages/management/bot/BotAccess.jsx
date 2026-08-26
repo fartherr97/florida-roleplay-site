@@ -151,8 +151,10 @@ function AddRuleDialog({ onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Default to the only guild, or the first, once loaded.
-  const effectiveGuild = guildId || guildItems[0]?.id || "";
+  // Access tiers are main-guild roles, so default to the main community server
+  // (falling back to the first) rather than whichever guild happens to sort first.
+  const mainGuild = guildItems.find((g) => g.type === "MAIN_COMMUNITY");
+  const effectiveGuild = guildId || mainGuild?.id || guildItems[0]?.id || "";
 
   const submit = async (event) => {
     event.preventDefault();
@@ -198,11 +200,19 @@ function AddRuleDialog({ onClose, onSaved }) {
         )}
 
         <Field label="Discord role" required>
-          <DiscordRolePicker
-            guildId={effectiveGuild}
-            value={role?.id}
-            onChange={setRole}
-          />
+          {guilds.error ? (
+            <BotError error={guilds.error} onRetry={guilds.reload} />
+          ) : guilds.loading ? (
+            <Loading />
+          ) : guildItems.length === 0 ? (
+            <Empty title="No servers connected">
+              The bot has no approved server yet, so there are no roles to map. Add your
+              community Discord server on the <strong>Servers</strong> tab first, then come
+              back here.
+            </Empty>
+          ) : (
+            <DiscordRolePicker guildId={effectiveGuild} value={role?.id} onChange={setRole} />
+          )}
         </Field>
 
         <Field label="Access tier" htmlFor="a-level" required>
