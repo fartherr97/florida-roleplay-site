@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { Info } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Info, Pencil } from "lucide-react";
 import Card from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
+import Field from "../../components/ui/Field";
+import Select from "../../components/ui/Select";
+import { TextInput } from "../../components/ui/TextInput";
 import Logo from "../../components/layout/Logo";
 import RosterFilters from "../../components/roster/RosterFilters";
 import RosterHeader from "../../components/roster/RosterHeader";
 import RosterTable from "../../components/roster/RosterTable";
+import { useAuth } from "../../context/useAuth";
+import { api } from "../../lib/api";
 import { api as botApi, isConfigured as botConfigured } from "../../lib/botApi";
+import { ACTIVITY_STATUSES, statusColor } from "../../data/rosterData";
 import { SITE } from "../../data/mockData";
 import { formatDate } from "../../lib/format";
 import { cn } from "../../lib/cn";
@@ -89,12 +97,33 @@ function rowsForRank(rank) {
 }
 
 export default function HubRoster() {
+  const { hasPermission } = useAuth();
+  const canEditStatus = hasPermission("roster.edit_status");
+
   const [roster, setRoster] = useState(null);
+  const [activity, setActivity] = useState({});
+  const [editing, setEditing] = useState(null);
+  const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   // loading | ready | empty | error. Starts as error when there is no bot API to
   // call at all, so the effect never has to set that synchronously.
   const [state, setState] = useState(botConfigured ? "loading" : "error");
   const [reloadKey, setReloadKey] = useState(0);
+
+  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
+
+  // The activity overlay lives on this site, keyed by Discord id. Loaded beside
+  // the bot roster and merged in below; failure just leaves everyone Active.
+  useEffect(() => {
+    let active = true;
+    api
+      .staffActivity()
+      .then((map) => active && setActivity(map ?? {}))
+      .catch(() => active && setActivity({}));
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
 
   useEffect(() => {
     if (!botConfigured) return undefined;
@@ -147,9 +176,22 @@ export default function HubRoster() {
     return ranks
       .map((rank, index) => {
         // Each row carries the rank it sits under, so the Position column reads the
-        // same for a filled seat and a vacant one.
+        // same for a filled seat and a vacant one, plus the site's activity overlay
+        // for a filled seat (Active until somebody says otherwise).
         const positionNote = rank.shortName && rank.shortName !== rank.name ? rank.shortName : null;
-        let rows = rowsForRank(rank).map((row) => ({ ...row, position: rank.name, positionNote }));
+        let rows = rowsForRank(rank).map((row) => {
+          const a = row.vacant ? {} : activity[row.discordId] ?? {};
+          return {
+            ...row,
+            position: rank.name,
+            positionNote,
+            status: row.vacant ? null : a.status ?? "Active",
+            loaUntil: a.loaUntil ?? null,
+            loaReason: a.loaReason ?? null,
+            probationUntil: a.probationUntil ?? null,
+            lastMove: a.lastMove ?? null,
+          };
+        });
         if (needle) {
           // Searching is about people, so a vacancy — which has no name — drops
           // out. An unfiltered view is about seats, so it keeps them.
@@ -171,7 +213,7 @@ export default function HubRoster() {
         };
       })
       .filter((group) => group.rows.length > 0);
-  }, [ranks, query]);
+  }, [ranks, query, activity]);
 
   const columns = [
     {
@@ -208,9 +250,51 @@ export default function HubRoster() {
       ),
     },
     {
+      key: "status",
+      label: "Status",
+      render: (row) => (row.vacant ? <span className="text-slate-600">—</span> : <StatusChip status={row.status} />),
+    },
+    {
+      key: "loa",
+      label: "LOA",
+      hideBelow: "lg",
+      render: (row) =>
+        row.vacant ? (
+          <span className="text-slate-600">—</span>
+        ) : row.status === "LOA" && row.loaUntil ? (
+          <span className="whitespace-nowrap text-amber-300" title={row.loaReason || undefined}>
+            until {formatDate(row.loaUntil)}
+          </span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "probation",
+      label: "Probation ends",
+      hideBelow: "xl",
+      render: (row) =>
+        !row.vacant && row.probationUntil ? (
+          <span className="whitespace-nowrap text-slate-300">{formatDate(row.probationUntil)}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
+      key: "lastMove",
+      label: "Last move",
+      hideBelow: "xl",
+      render: (row) =>
+        !row.vacant && row.lastMove ? (
+          <span className="whitespace-nowrap text-slate-400">{formatDate(row.lastMove)}</span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
+    {
       key: "discordId",
       label: "Discord UID",
-      hideBelow: "lg",
+      hideBelow: "2xl",
       render: (row) =>
         row.discordId ? (
           <code className="text-[11px] text-slate-500">{row.discordId}</code>
@@ -218,41 +302,26 @@ export default function HubRoster() {
           <span className="text-slate-600">—</span>
         ),
     },
-    {
-      key: "since",
-      label: "Hired",
-      hideBelow: "xl",
-      render: (row) =>
-        row.since ? (
-          <span className="whitespace-nowrap text-slate-400">{formatDate(row.since)}</span>
-        ) : (
-          <span className="text-slate-600">—</span>
-        ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (row) =>
-        row.vacant ? (
-          <span className="text-slate-600">—</span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-400/25">
-            <span className="size-1.5 rounded-full bg-emerald-400" />
-            Active
-          </span>
-        ),
-    },
-    {
-      key: "notes",
-      label: "Notes",
-      hideBelow: "2xl",
-      render: (row) =>
-        row.vacant ? (
-          <span className="text-xs italic text-slate-600">Position unoccupied</span>
-        ) : (
-          <span className="text-slate-600">—</span>
-        ),
-    },
+    ...(canEditStatus
+      ? [
+          {
+            key: "edit",
+            label: "",
+            align: "right",
+            render: (row) =>
+              row.vacant ? null : (
+                <button
+                  type="button"
+                  onClick={() => setEditing(row)}
+                  aria-label={`Edit ${row.name}'s activity`}
+                  className="rounded-lg p-1.5 text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
+                >
+                  <Pencil className="size-4" />
+                </button>
+              ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -278,6 +347,12 @@ export default function HubRoster() {
         onQuery={setQuery}
         placeholder="Search name, callsign or Discord ID…"
       />
+
+      {notice && (
+        <Card className="mb-5 p-4">
+          <p className="text-sm font-semibold text-amber-300">{notice}</p>
+        </Card>
+      )}
 
       {state === "error" && (
         <Card className="mb-5 flex items-start gap-3 p-5">
@@ -339,6 +414,20 @@ export default function HubRoster() {
           </aside>
         </div>
       ) : null}
+
+      {editing && (
+        <ActivityEditor
+          key={editing.discordId}
+          member={editing}
+          canManageLoa={hasPermission("roster.manage_loa")}
+          onClose={() => setEditing(null)}
+          onSaved={(message) => {
+            setEditing(null);
+            setNotice(message ?? "");
+            reload();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -349,5 +438,138 @@ function Stat({ label, value, accent = "text-white" }) {
       <dt className="text-sm text-slate-400">{label}</dt>
       <dd className={cn("text-sm font-bold tabular-nums", accent)}>{value}</dd>
     </div>
+  );
+}
+
+/** The activity status as a coloured pill, tinted by the status's own colour. */
+function StatusChip({ status }) {
+  const color = statusColor(status);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
+      style={{
+        color,
+        backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+        borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,
+      }}
+    >
+      <span className="size-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {status}
+    </span>
+  );
+}
+
+const STATUS_OPTIONS = ACTIVITY_STATUSES.map((s) => ({ value: s.id, label: s.label }));
+const NEEDS_LOA_DATE = new Set(ACTIVITY_STATUSES.filter((s) => s.requiresDate).map((s) => s.id));
+
+/**
+ * Edits one member's activity overlay — status, and the dates a Discord role
+ * cannot carry: an LOA return, a probation end, and when they last moved rank.
+ * The overlay is stored on this site keyed by Discord id, so it rides alongside
+ * the bot's roster without the bot needing to know about it.
+ */
+function ActivityEditor({ member, canManageLoa, onClose, onSaved }) {
+  const [status, setStatus] = useState(member.status ?? "Active");
+  const [loaUntil, setLoaUntil] = useState(member.loaUntil ?? "");
+  const [loaReason, setLoaReason] = useState(member.loaReason ?? "");
+  const [probationUntil, setProbationUntil] = useState(member.probationUntil ?? "");
+  const [lastMove, setLastMove] = useState(member.lastMove ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const needsLoa = NEEDS_LOA_DATE.has(status);
+  const loaBlocked = needsLoa && !canManageLoa;
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setError(null);
+    if (needsLoa && !loaUntil) {
+      setError("An LOA needs a return date.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await api.updateStaffActivity(member.discordId, {
+        status,
+        loaUntil: needsLoa ? loaUntil : null,
+        loaReason: needsLoa ? loaReason : "",
+        probationUntil: probationUntil || null,
+        lastMove: lastMove || null,
+      });
+      if (result?.ok === false) {
+        setError(result.message ?? result.errors?.[0] ?? "That was not saved.");
+        setSaving(false);
+        return;
+      }
+      onSaved(result?.message ?? "");
+    } catch (err) {
+      setError(err?.message ?? "That was not saved.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={member.name} subtitle={`Callsign ${member.callsign || "—"}`}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Activity status" htmlFor="a-status">
+          <Select id="a-status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+        </Field>
+
+        {needsLoa && (
+          <>
+            <Field
+              label="LOA return date"
+              htmlFor="a-loa"
+              hint={loaBlocked ? "Putting someone on leave needs the roster.manage_loa permission." : undefined}
+            >
+              <TextInput
+                id="a-loa"
+                type="date"
+                value={loaUntil}
+                disabled={loaBlocked}
+                onChange={(e) => setLoaUntil(e.target.value)}
+              />
+            </Field>
+            <Field label="LOA reason" htmlFor="a-loa-reason" hint="Optional.">
+              <TextInput
+                id="a-loa-reason"
+                value={loaReason}
+                disabled={loaBlocked}
+                onChange={(e) => setLoaReason(e.target.value)}
+              />
+            </Field>
+          </>
+        )}
+
+        <Field label="Probation ends" htmlFor="a-prob" hint="Leave empty if they are not on probation.">
+          <TextInput
+            id="a-prob"
+            type="date"
+            value={probationUntil}
+            onChange={(e) => setProbationUntil(e.target.value)}
+          />
+        </Field>
+
+        <Field label="Last move" htmlFor="a-move" hint="When their rank last changed.">
+          <TextInput
+            id="a-move"
+            type="date"
+            value={lastMove}
+            onChange={(e) => setLastMove(e.target.value)}
+          />
+        </Field>
+
+        {error && <p className="text-sm text-rose-300">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={saving || loaBlocked}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

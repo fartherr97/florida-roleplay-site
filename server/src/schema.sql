@@ -508,6 +508,22 @@ ALTER TABLE roster_members
   ADD COLUMN IF NOT EXISTS loa_until  DATE NULL,
   ADD COLUMN IF NOT EXISTS loa_reason TEXT NULL;
 
+-- Staff activity overlay. The bot owns who is on the roster and at what rank;
+-- this holds the human-managed activity a Discord role cannot express — status,
+-- leave, probation and when they last moved rank — keyed by Discord id so it
+-- rides alongside the bot's roster without the bot needing to know about it. A
+-- missing row means Active, so a member never has to be created here first.
+CREATE TABLE IF NOT EXISTS staff_activity (
+  discord_id       VARCHAR(20)  NOT NULL,
+  status           VARCHAR(32)  NOT NULL DEFAULT 'Active',
+  loa_until        DATE         NULL,
+  loa_reason       TEXT         NULL,
+  probation_until  DATE         NULL,
+  last_move        DATE         NULL,
+  updated_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (discord_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Department sites (the department hub engine)
 -- ---------------------------------------------------------------------------

@@ -304,6 +304,17 @@ export const api = {
 
   hubRoster: () => get("/staff-hub/roster", hub.roster),
   hubTraining: () => get("/staff-hub/training", hub.training),
+
+  // The staff activity overlay (status, LOA, probation, last move), keyed by
+  // Discord id and laid over the bot's roster. Empty without a database.
+  staffActivity: () => get("/roster/activity", {}),
+  updateStaffActivity: (discordId, payload) =>
+    post(`/roster/activity/${encodeURIComponent(discordId)}`, payload, () => ({
+      ok: true,
+      ...payload,
+      persisted: false,
+      message: "Accepted, but not persisted — no database is configured.",
+    })),
   hubDashboard: () => get("/staff-hub/dashboard", hub.dashboard),
   hubChecklist: () => get("/staff-hub/checklist", hub.checklist),
   hubDisciplinary: () => get("/staff-hub/disciplinary", hub.disciplinaryActions),

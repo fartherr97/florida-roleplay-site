@@ -376,6 +376,123 @@ router.post("/:id/status", requirePermission("roster.edit_status"), async (req, 
   });
 });
 
+/* --------------------------------------------------- staff activity overlay */
+
+/** A YYYY-MM-DD string, or null when it is anything else. */
+function isoOrNull(value) {
+  const text = str(value);
+  return ISO_DATE.test(text) ? text : null;
+}
+
+/**
+ * GET /api/roster/activity — the activity overlay, keyed by Discord id.
+ *
+ * The bot owns the roster; this is the human-managed layer on top of it —
+ * status, leave, probation and the last rank move. A member with no row here is
+ * simply Active, so the map only carries the ones somebody has touched.
+ */
+router.get("/activity", requirePermission("roster.view"), async (_req, res) => {
+  try {
+    const rows = await query("SELECT * FROM staff_activity");
+    const map = {};
+    for (const row of rows) {
+      map[row.discord_id] = {
+        status: row.status,
+        loaUntil: isoDate(row.loa_until),
+        loaReason: row.loa_reason,
+        probationUntil: isoDate(row.probation_until),
+        lastMove: isoDate(row.last_move),
+      };
+    }
+    return res.json(map);
+  } catch {
+    return res.json({});
+  }
+});
+
+/**
+ * POST /api/roster/activity/:discordId — set a member's activity overlay.
+ *
+ * Upserts, because a missing row means Active — the first edit is what creates
+ * it. LOA carries its own grant, exactly as the roster status endpoint does, so
+ * marking someone inactive does not also let you put them on leave.
+ */
+router.post("/activity/:discordId", requirePermission("roster.edit_status"), async (req, res) => {
+  const discordId = str(req.params.discordId);
+  if (!isDiscordId(discordId)) {
+    return res
+      .status(400)
+      .json({ ok: false, errors: ["A valid 17–20 digit Discord user ID is required."] });
+  }
+
+  const body = req.body ?? {};
+  const status = str(body.status) || "Active";
+  if (!STATUS_IDS.includes(status)) {
+    return res
+      .status(400)
+      .json({ ok: false, errors: [`status must be one of: ${STATUS_IDS.join(", ")}.`] });
+  }
+
+  const needsDate = seed.ACTIVITY_STATUSES.find((s) => s.id === status)?.requiresDate;
+  const loaUntil = isoOrNull(body.loaUntil);
+  const probationUntil = isoOrNull(body.probationUntil);
+  const lastMove = isoOrNull(body.lastMove);
+
+  const errors = collect([
+    [!needsDate || Boolean(loaUntil), "An LOA needs a return date (YYYY-MM-DD)."],
+    [!needsDate || !loaUntil || loaUntil >= todayIso(), "The LOA return date cannot be in the past."],
+    [str(body.loaReason).length <= 500, "loaReason must be under 500 characters."],
+    [body.probationUntil == null || body.probationUntil === "" || Boolean(probationUntil), "probationUntil must be a YYYY-MM-DD date."],
+    [body.lastMove == null || body.lastMove === "" || Boolean(lastMove), "lastMove must be a YYYY-MM-DD date."],
+  ]);
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+
+  if (status === "LOA") {
+    const grants = await loadGrants();
+    if (!grantsPermission("roster.manage_loa", req.user?.roles ?? [], grants)) {
+      return res.status(403).json({
+        ok: false,
+        code: "AUTH_ROLE_MISSING",
+        permission: "roster.manage_loa",
+        message: "Granting LOA needs the roster.manage_loa permission.",
+      });
+    }
+  }
+
+  const value = {
+    status,
+    loaUntil: needsDate ? loaUntil : null,
+    loaReason: needsDate ? str(body.loaReason) : "",
+    probationUntil,
+    lastMove,
+  };
+
+  try {
+    await query(
+      `INSERT INTO staff_activity
+         (discord_id, status, loa_until, loa_reason, probation_until, last_move, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       ON CONFLICT (discord_id) DO UPDATE SET
+         status          = EXCLUDED.status,
+         loa_until       = EXCLUDED.loa_until,
+         loa_reason      = EXCLUDED.loa_reason,
+         probation_until = EXCLUDED.probation_until,
+         last_move       = EXCLUDED.last_move,
+         updated_at      = CURRENT_TIMESTAMP`,
+      [discordId, value.status, value.loaUntil, value.loaReason || null, value.probationUntil, value.lastMove],
+    );
+    return res.json({ ok: true, discordId, ...value });
+  } catch {
+    return res.json({
+      ok: true,
+      discordId,
+      ...value,
+      persisted: false,
+      message: "Accepted, but not persisted — no database configured.",
+    });
+  }
+});
+
 /**
  * GET /api/roster/loa/expired — the bot polls this on a timer and removes the
  * LOA tag from everyone it returns, then POSTs their status back to Active.
