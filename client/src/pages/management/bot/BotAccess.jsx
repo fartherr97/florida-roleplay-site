@@ -87,7 +87,7 @@ export default function BotAccess() {
       ) : (
         <Card className="divide-y divide-white/[0.06]">
           {items.map((rule) => {
-            const meta = levelMeta(rule.level);
+            const meta = levelMeta(rule.permissionLevel ?? rule.level);
             return (
               <div
                 key={rule.discordRoleId}
@@ -266,7 +266,7 @@ function RemoveRuleDialog({ rule, onClose, onRemoved }) {
     }
   };
 
-  const meta = levelMeta(rule.level);
+  const meta = levelMeta(rule.permissionLevel ?? rule.level);
 
   return (
     <Modal open onClose={onClose} title="Remove this access rule?">
