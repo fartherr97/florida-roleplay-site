@@ -27,13 +27,22 @@ export default function NavDropdown({
   // the split, hovering (which happens first) would open the panel and the click
   // that follows would immediately toggle it shut.
   //
-  // Hover state is shared (owned by the top bar) so only one group is ever open:
-  // moving onto another group's trigger sets `hoverGroup` to it, which closes
-  // this one on the same frame rather than letting the close timer run and the
-  // two panels overlap. Clicking still pins locally.
-  const hovered = hoverGroup === groupId;
-  const setHovered = (value) =>
-    onHover?.((current) => (value ? groupId : current === groupId ? null : current));
+  // Hover can be *coordinated* — the top bar owns a shared `hoverGroup` so only one
+  // group is ever open and moving onto another trigger closes this one on the same
+  // frame — or *standalone*, where each dropdown keeps its own local hover. A bar
+  // that does not pass `onHover` gets the standalone behaviour; crucially it must
+  // not read `hoverGroup === groupId` (both `undefined`), which would report every
+  // dropdown as hovered and open them all at once.
+  const coordinated = typeof onHover === "function";
+  const [localHovered, setLocalHovered] = useState(false);
+  const hovered = coordinated ? hoverGroup === groupId : localHovered;
+  const setHovered = (value) => {
+    if (coordinated) {
+      onHover((current) => (value ? groupId : current === groupId ? null : current));
+    } else {
+      setLocalHovered(value);
+    }
+  };
   const [pinned, setPinned] = useState(false);
   const open = pinned || hovered;
   const rootRef = useRef(null);
@@ -51,6 +60,9 @@ export default function NavDropdown({
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname);
     setPinned(false);
+    // Coordinated hover is reset by the top bar; a standalone dropdown clears its
+    // own so the panel never outlives the navigation.
+    if (!coordinated) setLocalHovered(false);
   }
 
   const cancelClose = () => {

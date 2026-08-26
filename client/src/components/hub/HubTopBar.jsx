@@ -42,10 +42,14 @@ export default function HubTopBar({ hub }) {
   const location = useLocation();
   const { user, hasPermission, loading, previewRank } = useAuth();
 
+  // Shared so only one group dropdown is open at a time (see NavDropdown).
+  const [hoverGroup, setHoverGroup] = useState(null);
+
   const [lastPath, setLastPath] = useState(location.pathname);
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname);
     setDrawerOpen(false);
+    setHoverGroup(null);
   }
 
   useEffect(() => {
@@ -197,6 +201,9 @@ export default function HubTopBar({ hub }) {
                     tone={overflowActive ? TAB_MENU_TONE_ACTIVE : TAB_MENU_TONE}
                     items={overflowTabs}
                     resolveIcon={hubIcon}
+                    groupId="more"
+                    hoverGroup={hoverGroup}
+                    onHover={setHoverGroup}
                   />
                   {overflowActive && (
                     <span className="absolute inset-x-2 -bottom-1.5 h-0.5 rounded-full bg-primary-500" />
@@ -215,6 +222,9 @@ export default function HubTopBar({ hub }) {
                     tone={group.tone}
                     items={group.items}
                     resolveIcon={hubIcon}
+                    groupId={group.id}
+                    hoverGroup={hoverGroup}
+                    onHover={setHoverGroup}
                   />
                 </div>
               ))}
