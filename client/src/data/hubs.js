@@ -104,7 +104,6 @@ export const STAFF_HUB = {
     { to: "/staff-hub/da-database", label: "DA Database", icon: "Search", permission: "staff.da_view" },
     { to: "/staff-hub/analytics", label: "Analytics", icon: "ChartColumn", permission: "staff.view" },
     { to: "/staff-hub/promotion-board", label: "Promotion Board", icon: "Award", permission: "promotions.view" },
-    { to: "/staff-hub/administration", label: "Site Administration", icon: "SlidersHorizontal", permission: "staff.view", accent: true },
   ],
 
   /**
