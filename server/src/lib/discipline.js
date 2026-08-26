@@ -268,22 +268,32 @@ function headlineFor(live, worst) {
 const EMBED_COLORS = { clean: 0x10b981, light: 0xf59e0b, heavy: 0xf43f5e };
 
 /**
- * A record's date the way the embed prints it: `M/D/YYYY, h:mm:ss AM/PM` in UTC.
+ * A record's date the way the embed prints it, e.g. `1/15/2025, 3:42:11 PM EST`.
  *
  * The embed's body is a static code block, so the timestamp cannot be a Discord
- * `<t:…>` tag that renders in the reader's zone — it has to be a literal string.
- * UTC keeps it deterministic across whoever runs the check.
+ * `<t:…>` tag that renders in each reader's own zone — it has to be a literal
+ * string. Discord never tells the bot the invoker's timezone either, so the
+ * record is printed in the community's timezone (US Eastern), which switches
+ * between EST and EDT on its own.
  */
 function embedDate(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  const h = d.getUTCHours();
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  const pad = (n) => String(n).padStart(2, "0");
-  return (
-    `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}, ` +
-    `${hour12}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} ${h < 12 ? "AM" : "PM"} UTC`
-  );
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+    }).format(d);
+  } catch {
+    return d.toISOString();
+  }
 }
 
 /**
@@ -349,8 +359,8 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
   ].join("\n");
 
   const fields = [
-    section("🚨 NON-VERBAL DISCIPLINARY LOGS (last 6 mo)", nonVerbal),
-    section("🗣️ VERBAL DISCIPLINARY LOGS (last 6 mo)", verbal),
+    section("NON-VERBAL DISCIPLINARY LOGS (last 6 mo)", nonVerbal),
+    section("VERBAL DISCIPLINARY LOGS (last 6 mo)", verbal),
   ];
 
   return {
