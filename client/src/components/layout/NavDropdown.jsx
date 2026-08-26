@@ -13,12 +13,27 @@ import { cn } from "../../lib/cn";
  * `resolveIcon` lets the hubs supply their own icon registry rather than adding
  * every hub icon to the public site's.
  */
-export default function NavDropdown({ label, tone, items, resolveIcon = iconFor }) {
+export default function NavDropdown({
+  label,
+  tone,
+  items,
+  resolveIcon = iconFor,
+  groupId,
+  hoverGroup,
+  onHover,
+}) {
   // Hover and click are tracked separately: a pointer that merely passes over
   // the trigger opens the panel transiently, while a click pins it open. Without
   // the split, hovering (which happens first) would open the panel and the click
   // that follows would immediately toggle it shut.
-  const [hovered, setHovered] = useState(false);
+  //
+  // Hover state is shared (owned by the top bar) so only one group is ever open:
+  // moving onto another group's trigger sets `hoverGroup` to it, which closes
+  // this one on the same frame rather than letting the close timer run and the
+  // two panels overlap. Clicking still pins locally.
+  const hovered = hoverGroup === groupId;
+  const setHovered = (value) =>
+    onHover?.((current) => (value ? groupId : current === groupId ? null : current));
   const [pinned, setPinned] = useState(false);
   const open = pinned || hovered;
   const rootRef = useRef(null);
@@ -30,11 +45,12 @@ export default function NavDropdown({ label, tone, items, resolveIcon = iconFor 
 
   // Close whenever the route changes — the panel should never outlive a click.
   // Adjusting during render (rather than in an effect) avoids a visible frame
-  // of the old panel on the new page.
+  // of the old panel on the new page. Only the local pin is cleared here; the
+  // shared hover state is reset by the top bar (updating it mid-render would
+  // touch a parent component during this one's render).
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname);
     setPinned(false);
-    setHovered(false);
   }
 
   const cancelClose = () => {
@@ -46,7 +62,9 @@ export default function NavDropdown({ label, tone, items, resolveIcon = iconFor 
 
   const scheduleClose = () => {
     cancelClose();
-    closeTimer.current = setTimeout(() => setHovered(false), 120);
+    // Short enough to feel immediate when the pointer leaves, long enough to let
+    // it cross the small gap between the trigger and the panel.
+    closeTimer.current = setTimeout(() => setHovered(false), 80);
   };
 
   const close = () => {
@@ -146,7 +164,7 @@ export default function NavDropdown({ label, tone, items, resolveIcon = iconFor 
             role="menu"
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98, transition: { duration: 0.1 } }}
             transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
             className="absolute left-0 top-full z-40 mt-3 w-80 rounded-2xl border border-white/10 bg-[#1a2234] p-1.5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]"
           >

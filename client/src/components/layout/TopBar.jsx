@@ -29,6 +29,10 @@ export default function TopBar() {
     () => typeof window !== "undefined" && window.scrollY > 8,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Which dropdown group is open on hover, shared across every NavDropdown so
+  // only one is ever open: moving the pointer onto a new group closes the last
+  // one immediately, instead of leaving it to time out and overlap.
+  const [hoverGroup, setHoverGroup] = useState(null);
   const location = useLocation();
   const { hasPermission, loading } = useAuth();
   const [lastPath, setLastPath] = useState(location.pathname);
@@ -38,6 +42,7 @@ export default function TopBar() {
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname);
     setDrawerOpen(false);
+    setHoverGroup(null);
   }
 
   // The bar only starts transparent where a full-bleed hero sits behind it.
@@ -137,9 +142,12 @@ export default function TopBar() {
               <div key={group.id} className="flex items-center gap-3">
                 {index > 0 && <Divider />}
                 <NavDropdown
+                  groupId={group.id}
                   label={group.label}
                   tone={group.tone}
                   items={group.items}
+                  hoverGroup={hoverGroup}
+                  onHover={setHoverGroup}
                 />
               </div>
             ))}
