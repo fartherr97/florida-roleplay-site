@@ -84,6 +84,8 @@ export const navGroups = [
     items: [
       { label: "Leadership", to: "/management/leadership", icon: "Crown" },
       { label: "Department Heads", to: "/management/department-heads", icon: "UserCog" },
+      { label: "Permissions", to: "/staff-hub/permissions", icon: "ListChecks" },
+      { label: "Discord Role Mapping", to: "/staff-hub/discord-roles", icon: "Tag" },
       { label: "Contact Management", to: "/management/contact", icon: "Mail" },
       { label: "Bot Dashboard", to: "/management/bot", icon: "Bot" },
     ],
