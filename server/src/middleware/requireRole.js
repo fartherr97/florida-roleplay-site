@@ -7,6 +7,7 @@
  */
 import { query } from "../db.js";
 import { readCookie, readSession, SESSION_COOKIE } from "../lib/session.js";
+import { maybeRefreshRoles } from "../lib/roleSync.js";
 import { devUser, RANK_LABELS, STAFF_RANKS } from "../seed.js";
 
 // The development auth affordances (x-preview-rank / x-discord-id header paths)
@@ -68,10 +69,18 @@ export async function resolveUser(req) {
     try {
       const userId = await readSession(sessionToken);
       if (userId) {
+        // Bring the role snapshot up to date with live Discord roles first, on a
+        // short interval, so a demotion in Discord revokes access here on the very
+        // next request rather than only at the next sign-in. Fails safe: on any
+        // trouble it leaves the existing snapshot in place.
+        const refreshed = await maybeRefreshRoles(userId);
         const user = await loadDbUser(userId);
         // `authenticated` marks a real Discord session, so the client ends
         // preview mode and never treats this for a dev/seed caller.
-        if (user) return { ...user, authenticated: true };
+        if (user) {
+          const roles = refreshed ?? user.roles;
+          return { ...user, roles, rank: rankFor(roles), authenticated: true };
+        }
       }
     } catch {
       // Database unavailable — fall through to the dev paths (dev only).

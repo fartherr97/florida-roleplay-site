@@ -13,7 +13,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
-import { execute, query } from "../db.js";
+import { execute } from "../db.js";
 import {
   authorizeUrl,
   exchangeCode,
@@ -29,7 +29,7 @@ import {
   SESSION_COOKIE,
   sessionCookieHeader,
 } from "../lib/session.js";
-import * as rosterSeed from "../rosterSeed.js";
+import { resolveRoleKeys, writeUserRoles } from "../lib/roleSync.js";
 
 const router = Router();
 
@@ -147,43 +147,9 @@ router.post("/logout", async (req, res) => {
 });
 
 /**
- * Maps a member's Discord role IDs to this site's role keys.
- *
- * Every guild member is at least a `member` — being in the Discord is what that
- * key means — and every mapped role they hold is added on top. The map is the
- * same table the bot and the role-mapping page use, so access here can never
- * disagree with how a rank is rostered.
- */
-async function resolveRoleKeys(discordRoleIds) {
-  const held = new Set(["member"]);
-  const ids = discordRoleIds.map(String);
-  if (!ids.length) return [...held];
-
-  try {
-    const rows = await query(
-      `SELECT DISTINCT role_key FROM roster_role_map WHERE role_id = ANY($1)`,
-      [ids],
-    );
-    if (rows.length) {
-      rows.forEach((row) => held.add(row.role_key));
-      return [...held];
-    }
-  } catch {
-    // fall through to the seed map
-  }
-
-  // No database, or nothing mapped yet — resolve against the seeded map so the
-  // flow works end-to-end before the real snowflakes are entered.
-  const idSet = new Set(ids);
-  [...rosterSeed.ROLE_MAP, ...rosterSeed.SPECIAL_ROLES].forEach((entry) => {
-    if (idSet.has(String(entry.roleId))) held.add(entry.key);
-  });
-  return [...held];
-}
-
-/**
- * Writes the user and their current role set, replacing the roles wholesale so a
- * demotion in Discord removes access here rather than only ever adding it.
+ * Writes the user and their current role set. Role mapping and the wholesale role
+ * rewrite live in lib/roleSync.js, which is also what the per-request live refresh
+ * uses, so sign-in and refresh can never disagree on how a rank is rostered.
  */
 async function upsertUser(identity, roleKeys) {
   await execute(
@@ -197,14 +163,7 @@ async function upsertUser(identity, roleKeys) {
     [identity.id, identity.username, identity.displayName, identity.avatar],
   );
 
-  await execute(`DELETE FROM user_roles WHERE user_id = $1`, [identity.id]);
-  for (const role of roleKeys) {
-    await execute(
-      `INSERT INTO user_roles (user_id, role) VALUES ($1, $2)
-       ON CONFLICT (user_id, role) DO NOTHING`,
-      [identity.id, role],
-    );
-  }
+  await writeUserRoles(identity.id, roleKeys);
 }
 
 /** A tiny standalone HTML page for the unconfigured-login case. */
