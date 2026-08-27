@@ -12,6 +12,13 @@ const FIELDS = [
   { id: "date", label: "Date", type: "date" },
   { id: "member", label: "Member", type: "text" },
   {
+    id: "discordId",
+    label: "Member Discord ID",
+    type: "text",
+    hint: "Needed for a disciplinary entry to reach the member's background check.",
+    hideInTable: true,
+  },
+  {
     id: "action",
     label: "Action",
     type: "select",
@@ -46,6 +53,11 @@ export default function DeptAdminLog({ page, config }) {
         <p className="text-xs leading-relaxed text-slate-400">
           Entries here are the department's own record. They do not change anyone's Discord
           roles — a promotion takes effect when the role is granted, and the roster follows it.
+          {" "}
+          <span className="text-slate-300">
+            A disciplinary entry (written warning, suspension, demotion, removal) with a member's
+            Discord ID is also filed to that member's background check under this department.
+          </span>
           {config.webhooks?.adminlog?.enabled && (
             <>
               {" "}

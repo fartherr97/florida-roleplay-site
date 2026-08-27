@@ -27,6 +27,7 @@ import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { projectRoster } from "../lib/deptRoster.js";
 import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
+import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
 import { resolveDepartmentId } from "../lib/tenant.js";
 import { collect, str } from "../validate.js";
 import {
@@ -383,17 +384,19 @@ router.put(
       ),
     };
 
-    // The Emergency-Services admin log posts each newly-filed entry to Discord.
-    // The diff is taken here, against the stored page, so re-saving never
-    // re-posts; the webhook fires only after the entry actually persists.
+    // The Emergency-Services admin log has two side effects, both keyed off the
+    // newly-added entries (diffed against the stored page, so re-saving never
+    // repeats them) and both fired only after the entry actually persists: it
+    // posts each entry to Discord, and it files the disciplinary ones into the
+    // background-check store under this department.
     const onCommitted =
       page.type === "adminlog"
-        ? () =>
-            fireAdminLogWebhook(
-              req.deptConfig,
-              page.config?.entries,
-              req.body.config?.entries,
-            )
+        ? () => {
+            const before = page.config?.entries;
+            const after = req.body.config?.entries;
+            fireAdminLogWebhook(req.deptConfig, before, after);
+            fileAdminLogDiscipline(req.departmentId, before, after, req.user);
+          }
         : undefined;
 
     await saveConfig(req, res, next_, "page.save", `Edited the "${page.label}" page.`, onCommitted);
