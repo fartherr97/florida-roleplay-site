@@ -435,15 +435,10 @@ function RecordForm({ record, fields, singular, onClose, onSubmit }) {
               <Select
                 id={field.id}
                 value={values[field.id] ?? ""}
-                onChange={(e) => set(field.id, e.target.value)}
-              >
-                <option value="">Choose…</option>
-                {field.options.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </Select>
+                onChange={(next) => set(field.id, next)}
+                options={field.options}
+                placeholder="Choose…"
+              />
             ) : (
               <TextInput
                 id={field.id}
