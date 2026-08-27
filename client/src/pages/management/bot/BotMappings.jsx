@@ -50,6 +50,9 @@ export default function BotMappings() {
       reload?.();
     } catch (err) {
       setError(err);
+      // The error banner is at the top of the page; an Enable button can be well below the
+      // fold, so bring the reason into view rather than leaving the click looking ignored.
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
