@@ -79,7 +79,7 @@ export default function DeptChain({ page, config }) {
                   {tier.members.map((member) => (
                     <div
                       key={member.id}
-                      className="rounded-2xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.06]"
+                      className="hub-card-hover rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">

@@ -226,7 +226,7 @@ export default function DeptRoster({ page, config }) {
                   {totals.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
+                      className="hub-card-hover rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
                     >
                       <div className="dept-accent-text text-xl font-extrabold tracking-tight">
                         {item.value}
