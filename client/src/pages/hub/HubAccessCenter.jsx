@@ -264,14 +264,16 @@ export default function HubAccessCenter() {
     setStatus(null);
     try {
       const messages = [];
-      if (JSON.stringify(normalise(grants)) !== JSON.stringify(normalise(savedGrants))) {
-        const res = await api.savePermissionGrants(grants);
-        setSavedGrants(grants);
-        if (res?.message) messages.push(res.message);
-      }
+      // Role map FIRST: it registers any just-imported guild roles, so the grant save (which
+      // the server validates against the saved role map) does not reject them as unknown.
       if (JSON.stringify(roleMap.roles) !== JSON.stringify(savedRoleMap.roles)) {
         const res = await api.saveDiscordRoleMap({ roles: roleMap.roles, special: roleMap.special });
         setSavedRoleMap(roleMap);
+        if (res?.message) messages.push(res.message);
+      }
+      if (JSON.stringify(normalise(grants)) !== JSON.stringify(normalise(savedGrants))) {
+        const res = await api.savePermissionGrants(grants);
+        setSavedGrants(grants);
         if (res?.message) messages.push(res.message);
       }
       for (const [id, access] of Object.entries(deptAccess)) {
