@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { FlaskConical, Plus, Power, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, Trash2 } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
@@ -9,7 +10,6 @@ import { TextInput } from "../../../components/ui/TextInput";
 import BotError from "../../../components/bot/BotError";
 import Loading from "../../../components/bot/Loading";
 import Empty from "../../../components/bot/Empty";
-import MappingPreview from "../../../components/bot/MappingPreview";
 import { useBotResource } from "../../../lib/useBotResource";
 import { api } from "../../../lib/botApi";
 import { cn } from "../../../lib/cn";
@@ -25,10 +25,8 @@ import { cn } from "../../../lib/cn";
  */
 export default function BotServers() {
   const guilds = useBotResource("/guilds");
-  const mappings = useBotResource("/mappings");
   const roles = useBotResource("/roles");
   const [error, setError] = useState(null);
-  const [testResult, setTestResult] = useState(null);
   const [addingGuild, setAddingGuild] = useState(false);
 
   const act = async (fn, reload) => {
@@ -88,108 +86,18 @@ export default function BotServers() {
         <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-slate-400">
           Mappings
         </h2>
-        <p className="mb-4 text-sm text-slate-400">
-          A mapping is a rule the bot applies to members. Test one before enabling it —
-          the preview shows exactly who it would affect without touching anybody.
-        </p>
-
-        {testResult && (
-          <Card className="mb-4 p-5 ring-1 ring-inset ring-brand-400/25">
-            <div className="flex items-start gap-3">
-              <FlaskConical className="mt-0.5 size-5 shrink-0 text-brand-400" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">
-                  Preview — nothing was applied
-                </p>
-                <MappingPreview result={testResult} />
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setTestResult(null)}>
-                Dismiss
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {mappings.error ? (
-          <BotError error={mappings.error} onRetry={mappings.reload} />
-        ) : mappings.loading ? (
-          <Loading rows={3} />
-        ) : (mappings.data?.items ?? []).length === 0 ? (
-          <Empty title="No mappings yet">
-            Nothing is being applied automatically.
-          </Empty>
-        ) : (
-          <div className="space-y-3">
-            {mappings.data.items.map((mapping) => (
-              <Card key={mapping.id} className="flex flex-wrap items-center gap-3 p-5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-white">
-                      {mapping.name ?? mapping.type ?? `Mapping ${mapping.id}`}
-                    </span>
-                    <Badge tone={mapping.enabled ? "green" : "slate"} dot={mapping.enabled}>
-                      {mapping.enabled ? "Enabled" : "Disabled"}
-                    </Badge>
-                  </div>
-                  {mapping.description && (
-                    <p className="mt-1.5 text-sm text-slate-400">{mapping.description}</p>
-                  )}
-                  <code className="mt-1.5 block text-xs text-slate-600">{mapping.id}</code>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    act(async () => {
-                      const result = await api(
-                        `/mappings/${encodeURIComponent(mapping.id)}/test`,
-                        { method: "POST" },
-                      );
-                      setTestResult(result);
-                    })
-                  }
-                >
-                  <FlaskConical className="size-4" />
-                  Test
-                </Button>
-
-                <Button
-                  variant={mapping.enabled ? "ghost" : "secondary"}
-                  size="sm"
-                  onClick={() =>
-                    act(
-                      () =>
-                        api(`/mappings/${encodeURIComponent(mapping.id)}/enabled`, {
-                          method: "POST",
-                          body: { enabled: !mapping.enabled },
-                        }),
-                      mappings.reload,
-                    )
-                  }
-                >
-                  <Power className="size-4" />
-                  {mapping.enabled ? "Disable" : "Enable"}
-                </Button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    act(
-                      () =>
-                        api(`/mappings/${encodeURIComponent(mapping.id)}`, { method: "DELETE" }),
-                      mappings.reload,
-                    )
-                  }
-                  aria-label="Delete mapping"
-                  className="rounded-lg p-1.5 text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </Card>
-            ))}
+        <Card className="flex flex-wrap items-center gap-3 p-5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-white">Role mappings moved</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Set up and manage cross-server role mappings on the Mappings tab — pick a role
+              and the servers it should grant a role in.
+            </p>
           </div>
-        )}
+          <Button as={Link} to="/management/bot/mappings" variant="secondary" size="sm">
+            Open Mappings
+          </Button>
+        </Card>
       </section>
 
       <section>

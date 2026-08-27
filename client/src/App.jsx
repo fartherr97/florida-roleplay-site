@@ -84,6 +84,7 @@ import BotPermissions from "./pages/management/bot/BotPermissions";
 import BotAccess from "./pages/management/bot/BotAccess";
 import BotTransfers from "./pages/management/bot/BotTransfers";
 import BotServers from "./pages/management/bot/BotServers";
+import BotMappings from "./pages/management/bot/BotMappings";
 import BotSync from "./pages/management/bot/BotSync";
 import BotAudit from "./pages/management/bot/BotAudit";
 
@@ -184,6 +185,7 @@ export default function App() {
               <Route path="access" element={<BotAccess />} />
               <Route path="transfers" element={<BotTransfers />} />
               <Route path="servers" element={<BotServers />} />
+              <Route path="mappings" element={<BotMappings />} />
               <Route path="sync" element={<BotSync />} />
               <Route path="audit" element={<BotAudit />} />
             </Route>
