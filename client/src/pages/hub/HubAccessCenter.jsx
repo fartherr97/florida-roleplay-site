@@ -11,9 +11,18 @@ import { iconFor } from "../../lib/icons";
 import { api } from "../../lib/api";
 import { PERMISSION_GROUPS, BASE_ROLES, DEFAULT_GRANTS } from "../../data/permissions";
 import { ROLE_MAP, DEPARTMENTS } from "../../data/rosterData";
+import { CAPABILITIES as DEPT_CAPABILITIES } from "../../lib/departmentConfig";
 import { cn } from "../../lib/cn";
 
 const SNOWFLAKE = /^\d{17,20}$/;
+const DEPT_CAP_KEYS = DEPT_CAPABILITIES.map((c) => c.key);
+
+/** A fresh, all-off department grant for a role. */
+function blankDeptGrant(role) {
+  const grant = { roleKey: role.key, label: role.rankFull || role.rank, level: 1 };
+  for (const key of DEPT_CAP_KEYS) grant[key] = false;
+  return grant;
+}
 
 /** Normalises the grant map so a re-order of role keys does not read as a change. */
 function normalise(grants) {
@@ -45,6 +54,8 @@ export default function HubAccessCenter() {
   const [roleMap, setRoleMap] = useState({ roles: ROLE_MAP, special: [] });
   const [savedRoleMap, setSavedRoleMap] = useState({ roles: ROLE_MAP, special: [] });
   const [depts, setDepts] = useState([]);
+  const [deptAccess, setDeptAccess] = useState({});
+  const [savedDeptAccess, setSavedDeptAccess] = useState({});
   const [selectedKey, setSelectedKey] = useState("");
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
@@ -77,6 +88,29 @@ export default function HubAccessCenter() {
       active = false;
     };
   }, []);
+
+  // Each department's own access table, loaded once so its capabilities can be edited here
+  // rather than only on the department's own page.
+  useEffect(() => {
+    if (!depts.length) return undefined;
+    let active = true;
+    Promise.all(
+      depts.map((d) =>
+        api
+          .deptConfig(d.id)
+          .then((cfg) => [d.id, cfg?.access ?? cfg?.config?.access ?? []])
+          .catch(() => [d.id, []]),
+      ),
+    ).then((pairs) => {
+      if (!active) return;
+      const map = Object.fromEntries(pairs);
+      setDeptAccess(map);
+      setSavedDeptAccess(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [depts]);
 
   /** Every role that can hold access, grouped for the picker. Base tiers have no Discord id. */
   const roleGroups = useMemo(() => {
@@ -132,7 +166,8 @@ export default function HubAccessCenter() {
 
   const dirty =
     JSON.stringify(normalise(grants)) !== JSON.stringify(normalise(savedGrants)) ||
-    JSON.stringify(roleMap.roles) !== JSON.stringify(savedRoleMap.roles);
+    JSON.stringify(roleMap.roles) !== JSON.stringify(savedRoleMap.roles) ||
+    JSON.stringify(deptAccess) !== JSON.stringify(savedDeptAccess);
 
   // The server refuses a save that leaves nobody able to manage permissions; mirror it here
   // so the button explains itself rather than failing on submit.
@@ -145,6 +180,25 @@ export default function HubAccessCenter() {
       if (current.has(selected.key)) current.delete(selected.key);
       else current.add(selected.key);
       return { ...prev, [capKey]: [...current] };
+    });
+  };
+
+  const toggleDeptCap = (deptId, capKey) => {
+    if (!selected) return;
+    setDeptAccess((prev) => {
+      const list = prev[deptId] ?? [];
+      const existing = list.find((g) => g.roleKey === selected.key);
+      let next;
+      if (existing) {
+        const updated = { ...existing, [capKey]: !existing[capKey] };
+        // Drop the grant entirely once nothing is ticked, so the table stays clean.
+        next = DEPT_CAP_KEYS.some((k) => updated[k])
+          ? list.map((g) => (g.roleKey === selected.key ? updated : g))
+          : list.filter((g) => g.roleKey !== selected.key);
+      } else {
+        next = [...list, { ...blankDeptGrant(selected), [capKey]: true }];
+      }
+      return { ...prev, [deptId]: next };
     });
   };
 
@@ -171,6 +225,13 @@ export default function HubAccessCenter() {
         setSavedRoleMap(roleMap);
         if (res?.message) messages.push(res.message);
       }
+      for (const [id, access] of Object.entries(deptAccess)) {
+        if (JSON.stringify(access) !== JSON.stringify(savedDeptAccess[id])) {
+          const res = await api.saveDeptAccess(id, access);
+          if (res?.message) messages.push(res.message);
+        }
+      }
+      setSavedDeptAccess(deptAccess);
       setStatus({ tone: messages.length ? "amber" : "green", text: messages.join(" ") || "Access saved." });
       refresh();
     } catch (err) {
@@ -310,6 +371,9 @@ export default function HubAccessCenter() {
               editable={editable}
               onToggle={toggleCap}
               onRoleId={setRoleId}
+              departments={deptList}
+              deptAccess={deptAccess}
+              onDeptToggle={toggleDeptCap}
             />
           )}
 
@@ -379,8 +443,8 @@ export default function HubAccessCenter() {
   );
 }
 
-/** The selected role: its Discord ID, and every site capability as a toggle tile. */
-function RolePanel({ role, grants, editable, onToggle, onRoleId }) {
+/** The selected role: its Discord ID, every site capability, and per-department access. */
+function RolePanel({ role, grants, editable, onToggle, onRoleId, departments, deptAccess, onDeptToggle }) {
   const idOk = SNOWFLAKE.test(String(role.roleId ?? "").trim());
 
   return (
@@ -461,6 +525,51 @@ function RolePanel({ role, grants, editable, onToggle, onRoleId }) {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Per-department access, edited inline. Writes to each department's own table. */}
+      <p className="mb-1 mt-8 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+        Department access
+      </p>
+      <p className="mb-3 text-[11px] text-slate-500">
+        What this role can do inside each department hub. New grants come in at level 1 — adjust
+        the level on the department's own page if it needs to administer other ranks.
+      </p>
+      <div className="space-y-3">
+        {(departments ?? []).map((dept) => {
+          const grant = (deptAccess?.[dept.id] ?? []).find((g) => g.roleKey === role.key);
+          return (
+            <div key={dept.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="mb-2.5 text-sm font-semibold text-white">
+                {dept.name ?? dept.label ?? dept.id}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DEPT_CAPABILITIES.map((cap) => {
+                  const on = Boolean(grant?.[cap.key]);
+                  return (
+                    <button
+                      key={cap.key}
+                      type="button"
+                      disabled={!editable}
+                      onClick={() => onDeptToggle(dept.id, cap.key)}
+                      title={cap.detail}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition",
+                        on
+                          ? "bg-primary-500/15 text-primary-200 ring-primary-400/30"
+                          : "text-slate-400 ring-white/10",
+                        editable ? "hover:text-white" : "cursor-not-allowed opacity-70",
+                      )}
+                    >
+                      {on && <Check className="size-3" />}
+                      {cap.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

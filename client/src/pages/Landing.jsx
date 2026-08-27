@@ -229,7 +229,13 @@ export default function Landing() {
               application and you could be on the road this weekend.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button as={Link} to="/applications/whitelist" size="lg">
+              <Button
+                as="a"
+                href="https://flrp.us/whitelist"
+                target="_blank"
+                rel="noreferrer noopener"
+                size="lg"
+              >
                 Apply for Whitelist
               </Button>
               <Button as={Link} to="/rules" size="lg" variant="secondary">
