@@ -105,7 +105,9 @@ export default function TicketThread({
         </div>
       )}
 
-      <div className="space-y-4">
+      {/* A tall minimum so a two-message ticket still reads as a conversation
+          with room to breathe, rather than a cramped strip. */}
+      <div className="min-h-[55vh] space-y-4">
         {/* The system greeting opens every thread. */}
         <div className="rounded-2xl bg-white/[0.03] px-4 py-3.5 text-sm leading-relaxed text-slate-300 ring-1 ring-inset ring-white/[0.06]">
           <p className="mb-1 flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary-400">

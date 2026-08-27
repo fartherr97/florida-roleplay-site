@@ -140,7 +140,7 @@ export default function SupportTicket() {
 
   if (state.key !== id) {
     return (
-      <Section className="max-w-3xl">
+      <Section className="max-w-4xl">
         <div className="h-96 animate-pulse rounded-2xl bg-white/[0.03]" />
       </Section>
     );
@@ -185,7 +185,7 @@ export default function SupportTicket() {
   const hasDetails = Object.keys(ticket.details ?? {}).length > 0;
 
   return (
-    <Section className="max-w-3xl">
+    <Section className="max-w-4xl">
       <Button as={Link} to={can.work ? "/support/queue" : "/support"} variant="ghost" size="sm" className="mb-4">
         <ArrowLeft className="size-4" />
         {can.work ? "Back to the queue" : "My tickets"}
