@@ -25,6 +25,7 @@ const SECTIONS = [
   { to: "/management/bot/transfers", label: "Transfers" },
   { to: "/management/bot/servers", label: "Servers" },
   { to: "/management/bot/mappings", label: "Mappings" },
+  { to: "/management/bot/webhooks", label: "Webhooks" },
   { to: "/management/bot/sync", label: "Sync" },
   { to: "/management/bot/audit", label: "Audit" },
 ];

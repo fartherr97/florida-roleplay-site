@@ -85,6 +85,7 @@ import BotAccess from "./pages/management/bot/BotAccess";
 import BotTransfers from "./pages/management/bot/BotTransfers";
 import BotServers from "./pages/management/bot/BotServers";
 import BotMappings from "./pages/management/bot/BotMappings";
+import BotWebhooks from "./pages/management/bot/BotWebhooks";
 import BotSync from "./pages/management/bot/BotSync";
 import BotAudit from "./pages/management/bot/BotAudit";
 
@@ -186,6 +187,7 @@ export default function App() {
               <Route path="transfers" element={<BotTransfers />} />
               <Route path="servers" element={<BotServers />} />
               <Route path="mappings" element={<BotMappings />} />
+              <Route path="webhooks" element={<BotWebhooks />} />
               <Route path="sync" element={<BotSync />} />
               <Route path="audit" element={<BotAudit />} />
             </Route>
