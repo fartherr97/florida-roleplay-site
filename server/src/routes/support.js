@@ -19,7 +19,7 @@ import { Router } from "express";
 import { execute, query, changedRows } from "../db.js";
 import * as seed from "../supportSeed.js";
 import { loadGrants } from "../middleware/requirePermission.js";
-import { resolveUser } from "../middleware/requireRole.js";
+import { rankFor, resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { str } from "../validate.js";
 import {
@@ -470,6 +470,68 @@ router.post("/:id/presence", async (req, res) => {
       ok: true,
       viewers: leaving ? [] : [{ discordId: ctx.user.id, name, avatar: ctx.user.avatar ?? null, typing, self: true }],
     });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Assignable staff
+ * ------------------------------------------------------------------ *
+ *
+ * Who a lead may hand a ticket to: the senior tiers — Admin, Sr. Admin, Head
+ * Admin, Directorship and Ownership — read straight from the roles people hold,
+ * so the list follows promotions and demotions with nothing to maintain. The
+ * callsign is filled in from the synced roster when there is one, so an option
+ * reads "100 | Owner | Mike".
+ */
+const ASSIGNABLE_ROLES = ["admin", "senior_admin", "head_admin", "directorship", "ownership"];
+const ASSIGNABLE_SENIORITY = { admin: 1, senior_admin: 2, head_admin: 3, directorship: 4, ownership: 5 };
+
+router.get("/staff/list", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!isSupportLead(ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Reassigning to somebody else needs support.manage." });
+  }
+
+  try {
+    const rows = await query(
+      `SELECT u.id AS "discordId", u.display_name AS "displayName", u.username, u.avatar,
+              ARRAY(SELECT role FROM user_roles WHERE user_id = u.id) AS roles,
+              (SELECT callsign FROM roster_members
+                 WHERE discord_id = u.id AND callsign IS NOT NULL AND callsign <> ''
+                 ORDER BY synced_at DESC LIMIT 1) AS callsign,
+              (SELECT rank_label FROM roster_members
+                 WHERE discord_id = u.id AND callsign IS NOT NULL AND callsign <> ''
+                 ORDER BY synced_at DESC LIMIT 1) AS "rosterRank"
+         FROM users u
+        WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ANY($1))`,
+      [ASSIGNABLE_ROLES],
+    );
+
+    const staff = rows
+      .map((row) => {
+        const roles = row.roles ?? [];
+        const rank = rankFor(roles) ?? row.rosterRank ?? null;
+        const name = row.displayName ?? row.username ?? "Unknown";
+        const seniority = Math.max(0, ...roles.map((r) => ASSIGNABLE_SENIORITY[r] ?? 0));
+        return {
+          discordId: row.discordId,
+          name,
+          rank,
+          callsign: row.callsign ?? null,
+          avatar: row.avatar ?? null,
+          // The full roster label, which is also what we store as the assignee.
+          label: [row.callsign, rank, name].filter(Boolean).join(" | "),
+          seniority,
+        };
+      })
+      // Most senior first, then alphabetical — the order a lead scans.
+      .sort((a, b) => b.seniority - a.seniority || a.name.localeCompare(b.name));
+
+    return res.json({ staff });
+  } catch {
+    // No database — no directory to offer.
+    return res.json({ staff: [] });
   }
 });
 

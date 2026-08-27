@@ -577,6 +577,9 @@ export const api = {
   supportPresence: (id, payload = {}) =>
     post(`/support/${encodeURIComponent(id)}/presence`, payload, () => ({ ok: true, viewers: [] })),
 
+  /** Senior staff a lead may reassign a ticket to, newest roles and all. */
+  supportAssignable: () => get("/support/staff/list", { staff: [] }),
+
   supportFlows: () =>
     get("/support/flows/list", { flows: supportSeed.FLOWS, canEdit: false }),
 

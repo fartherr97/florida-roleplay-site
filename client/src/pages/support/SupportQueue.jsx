@@ -18,10 +18,9 @@ import PageHeader from "../../components/layout/PageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
-import Field from "../../components/ui/Field";
-import Modal from "../../components/ui/Modal";
 import { TextInput } from "../../components/ui/TextInput";
 import AccessDenied from "../../components/auth/AccessDenied";
+import ReassignDialog from "../../components/support/ReassignDialog";
 import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { useSupportConfig } from "../../context/useSupportConfig";
@@ -323,9 +322,9 @@ export default function SupportQueue() {
         </div>
       )}
 
-      <ReassignModal
+      <ReassignDialog
         key={reassigning?.id ?? "none"}
-        ticket={reassigning}
+        open={Boolean(reassigning)}
         onClose={() => setReassigning(null)}
         onConfirm={async (discordId, name) => {
           const result = await api.updateSupportTicket(reassigning.id, { assign: { discordId, name } });
@@ -485,42 +484,3 @@ function TicketCard({ ticket, now, meId, lead, onTake, onReassign }) {
   );
 }
 
-function ReassignModal({ ticket, onClose, onConfirm }) {
-  const [discordId, setDiscordId] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState(null);
-
-  return (
-    <Modal open={Boolean(ticket)} onClose={onClose} title="Reassign this ticket">
-      <p className="text-sm leading-relaxed text-slate-300">
-        It moves to their queue and the change is written into the ticket's history with your name on it.
-      </p>
-      <Field label="Their Discord ID" className="mt-4">
-        <TextInput
-          value={discordId}
-          inputMode="numeric"
-          onChange={(e) => setDiscordId(e.target.value.trim())}
-          className="font-mono text-sm"
-        />
-      </Field>
-      <Field label="Their name" className="mt-4">
-        <TextInput value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
-      <div className="mt-6 flex justify-end gap-3">
-        <Button variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          disabled={!/^\d{17,20}$/.test(discordId)}
-          onClick={async () => {
-            const result = await onConfirm(discordId, name);
-            if (result && !result.ok) setError(result.message ?? "That did not go through.");
-          }}
-        >
-          Reassign
-        </Button>
-      </div>
-    </Modal>
-  );
-}
