@@ -65,11 +65,19 @@ export default function DeptChain({ page, config }) {
                   className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-3"
                   style={{ backgroundColor: `color-mix(in srgb, ${tier.color} 12%, transparent)` }}
                 >
-                  <span
-                    className="size-2.5 rounded-full"
-                    style={{ backgroundColor: tier.color }}
-                    aria-hidden="true"
-                  />
+                  {tier.insigniaUrl ? (
+                    <img
+                      src={tier.insigniaUrl}
+                      alt=""
+                      className="size-6 shrink-0 object-contain"
+                    />
+                  ) : (
+                    <span
+                      className="size-2.5 rounded-full"
+                      style={{ backgroundColor: tier.color }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
                     {tier.name}
                   </h2>

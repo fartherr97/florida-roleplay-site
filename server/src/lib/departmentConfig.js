@@ -348,6 +348,8 @@ export function normalizeConfig(raw, id) {
               id: String(cat.id ?? `cat-${catIndex}`),
               name: String(cat.name ?? `Category ${catIndex + 1}`),
               color: cat.color || "#64748b",
+              // An optional badge/insignia shown on the roster band and chain.
+              insigniaUrl: cat.insigniaUrl || "",
               roleKeys: Array.isArray(cat.roleKeys) ? cat.roleKeys.map(String) : [],
               members: Array.isArray(cat.members) ? cat.members : [],
             }),

@@ -121,6 +121,21 @@ export default function RosterTab({ config }) {
                     onChange={(e) => updateCategory(sub.id, category.id, { name: e.target.value })}
                     className="max-w-56"
                   />
+                  {category.insigniaUrl ? (
+                    <img
+                      src={category.insigniaUrl}
+                      alt=""
+                      className="size-7 shrink-0 rounded object-contain ring-1 ring-inset ring-white/10"
+                    />
+                  ) : null}
+                  <TextInput
+                    value={category.insigniaUrl ?? ""}
+                    onChange={(e) =>
+                      updateCategory(sub.id, category.id, { insigniaUrl: e.target.value })
+                    }
+                    placeholder="Insignia image URL (optional)"
+                    className="max-w-64 flex-1"
+                  />
                   <span className="text-xs text-slate-500">
                     {(category.roleKeys ?? []).length} ranks
                   </span>

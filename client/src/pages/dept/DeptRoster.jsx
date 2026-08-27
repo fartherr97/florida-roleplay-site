@@ -77,6 +77,7 @@ export default function DeptRoster({ page, config }) {
         id: category.id,
         label: category.name,
         color: category.color,
+        insigniaUrl: category.insigniaUrl,
         rows: category.members.filter((member) => {
           if (status !== "all" && member.status !== status) return false;
           if (!needle) return true;

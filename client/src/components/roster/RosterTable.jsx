@@ -85,6 +85,13 @@ export default function RosterTable({
                         backgroundColor: `color-mix(in srgb, ${group.color} 10%, transparent)`,
                       }}
                     >
+                      {group.insigniaUrl && (
+                        <img
+                          src={group.insigniaUrl}
+                          alt=""
+                          className="size-5 shrink-0 object-contain"
+                        />
+                      )}
                       <span
                         className="text-[11px] font-bold uppercase tracking-[0.16em]"
                         style={{ color: group.color }}
