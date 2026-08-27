@@ -1,5 +1,5 @@
 import { createElement, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Loader2, Send } from "lucide-react";
 import Section from "../../components/layout/Section";
 import PageHeader from "../../components/layout/PageHeader";
@@ -16,6 +16,13 @@ import { toneTile } from "../../lib/tones";
 import { cn } from "../../lib/cn";
 import { validateTicket } from "../../lib/support";
 
+/** Department categories that show their emblem instead of a toned icon tile. */
+const DEPT_LOGOS = {
+  dept_fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
+  dept_bcso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  dept_mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
+};
+
 /**
  * Opening a ticket.
  *
@@ -26,6 +33,7 @@ import { validateTicket } from "../../lib/support";
  */
 export default function SupportNew() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { user, hasPermission } = useAuth();
   const { types: catalogue } = useSupportConfig();
 
@@ -39,7 +47,15 @@ export default function SupportNew() {
     [catalogue, hasPermission],
   );
 
-  const [draft, setDraft] = useState({ type: "", subject: "", body: "", details: {} });
+  // Landing cards deep-link with ?type=<id>, so the chosen category is already
+  // expanded here. Ignored if it is not a category this member may open.
+  const preselect = params.get("type");
+  const [draft, setDraft] = useState({
+    type: types.some((t) => t.id === preselect) ? preselect : "",
+    subject: "",
+    body: "",
+    details: {},
+  });
   const [errors, setErrors] = useState({});
   const [failure, setFailure] = useState(null);
   const [sending, setSending] = useState(false);
@@ -112,9 +128,17 @@ export default function SupportNew() {
                   aria-expanded={expanded}
                   className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-white/[0.03]"
                 >
-                  <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset", toneTile(entry.tone))}>
-                    {createElement(iconFor(entry.icon), { className: "size-5" })}
-                  </span>
+                  {DEPT_LOGOS[entry.id] ? (
+                    <img
+                      src={DEPT_LOGOS[entry.id]}
+                      alt=""
+                      className="size-10 shrink-0 rounded-xl object-contain ring-1 ring-inset ring-white/[0.06]"
+                    />
+                  ) : (
+                    <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset", toneTile(entry.tone))}>
+                      {createElement(iconFor(entry.icon), { className: "size-5" })}
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-white">{entry.label}</span>
                     <span className="mt-0.5 block text-xs leading-relaxed text-slate-400">{entry.blurb}</span>
