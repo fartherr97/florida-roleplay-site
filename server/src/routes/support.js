@@ -479,8 +479,11 @@ router.post("/:id/presence", async (req, res) => {
  * callsign is filled in from the synced roster when there is one, so an option
  * reads "100 | Owner | Mike".
  */
-const ASSIGNABLE_ROLES = ["admin", "senior_admin", "head_admin", "directorship", "ownership"];
-const ASSIGNABLE_SENIORITY = { admin: 1, senior_admin: 2, head_admin: 3, directorship: 4, ownership: 5 };
+// The permissions that make somebody a hand-off target: anyone who works the
+// support queue at all, however their Discord roles are mapped. Keyed off the
+// permission rather than a fixed rank, so a community that grants support.work
+// to its own "Support Team" role sees those people here without renaming a thing.
+const ASSIGNABLE_PERMISSIONS = ["support.work", "support.manage", "support.escalated"];
 
 router.get("/staff/list", async (req, res) => {
   const ctx = await contextFor(req);
@@ -490,6 +493,16 @@ router.get("/staff/list", async (req, res) => {
   }
 
   try {
+    // Resolve which role keys currently grant any support-work permission, from
+    // the live grants (stored overrides on top of the shipped defaults). Then
+    // list the members who hold one of those roles — the people who can actually
+    // work a ticket, whatever the roles are named.
+    const grants = await loadGrants();
+    const roleKeys = new Set(["ownership"]); // ownership implicitly holds everything
+    for (const perm of ASSIGNABLE_PERMISSIONS) {
+      for (const key of grants[perm] ?? []) roleKeys.add(key);
+    }
+
     const rows = await query(
       `SELECT u.id AS "discordId", u.display_name AS "displayName", u.username, u.avatar,
               ARRAY(SELECT role FROM user_roles WHERE user_id = u.id) AS roles,
@@ -498,7 +511,7 @@ router.get("/staff/list", async (req, res) => {
                  ORDER BY synced_at DESC LIMIT 1) AS "rosterName"
          FROM users u
         WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ANY($1))`,
-      [ASSIGNABLE_ROLES],
+      [[...roleKeys]],
     );
 
     const staff = rows
@@ -506,7 +519,6 @@ router.get("/staff/list", async (req, res) => {
         const roles = row.roles ?? [];
         const rank = rankFor(roles) ?? null;
         const name = row.displayName ?? row.username ?? "Unknown";
-        const seniority = Math.max(0, ...roles.map((r) => ASSIGNABLE_SENIORITY[r] ?? 0));
         return {
           discordId: row.discordId,
           name,
@@ -515,11 +527,9 @@ router.get("/staff/list", async (req, res) => {
           // Their guild display name — the "100 | Owner | Mike" the bot keeps —
           // which is also what the ticket records as the assignee.
           label: row.rosterName || (rank ? `${rank} | ${name}` : name),
-          seniority,
         };
       })
-      // Most senior first, then alphabetical — the order a lead scans.
-      .sort((a, b) => b.seniority - a.seniority || a.name.localeCompare(b.name));
+      .sort((a, b) => a.label.localeCompare(b.label));
 
     return res.json({ staff });
   } catch {
