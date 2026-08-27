@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, X } from "lucide-react";
-import Logo from "../layout/Logo";
+import DeptBrandMark from "./DeptBrandMark";
 import { hubIcon } from "../../lib/hubIcons";
 import { cn } from "../../lib/cn";
 
@@ -43,11 +43,11 @@ export default function DeptDrawer({ open, onClose, config, base, groups }) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-white/[0.06] bg-[#0a0e1a]"
+            className="dept-hub absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-white/[0.06] bg-[#0b1424]"
           >
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/[0.06] px-4">
               <Link to={base} onClick={onClose} className="flex min-w-0 items-center gap-2.5">
-                <Logo />
+                <DeptBrandMark config={config} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-bold text-white">
                     {config.branding.shortName}

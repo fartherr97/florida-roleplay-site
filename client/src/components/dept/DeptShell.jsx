@@ -1,7 +1,6 @@
 import { Suspense, lazy, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import Glow from "../layout/Glow";
 import Footer from "../layout/Footer";
 import DeptTopBar from "./DeptTopBar";
 import AccessDenied from "../auth/AccessDenied";
@@ -103,8 +102,10 @@ function DeptShellInner() {
   const Component = named ? PAGE_COMPONENTS[named.type] ?? DeptContent : null;
 
   return (
-    <div className="flex min-h-full flex-col" style={themeVars(config.branding)}>
-      <Glow />
+    <div
+      className="dept-hub hub-shell-gradient flex min-h-full flex-col"
+      style={themeVars(config.branding)}
+    >
       <DeptTopBar
         config={config}
         base={base}

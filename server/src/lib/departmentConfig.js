@@ -234,7 +234,19 @@ export function accentOf(branding) {
 
 export function themeVars(branding) {
   const accent = accentOf(branding);
-  return { "--dept-accent": accent.color, "--dept-accent-soft": accent.soft };
+  // Two families on one wrapper: the legacy --dept-accent tokens the older dept
+  // pages read, and the flat --color-* tokens the ported "CAD" utilities and the
+  // shared FLRP components read. Both are driven by the same accent so a
+  // department reskins its whole site from one colour. The navy surfaces are
+  // fixed in the .dept-hub CSS; only the accent-derived tokens are set here.
+  return {
+    "--dept-accent": accent.color,
+    "--dept-accent-soft": accent.soft,
+    "--color-primary": accent.color,
+    "--color-hover": accent.soft,
+    "--color-border": `color-mix(in srgb, ${accent.color} 20%, transparent)`,
+    "--color-border-strong": `color-mix(in srgb, ${accent.color} 36%, transparent)`,
+  };
 }
 
 /* ------------------------------------------------------------------ *

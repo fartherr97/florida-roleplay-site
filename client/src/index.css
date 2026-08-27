@@ -185,3 +185,171 @@ button:disabled { cursor: not-allowed; }
 .dept-accent-bg { background-color: var(--dept-accent, #3b82f6); }
 
 .dept-accent-ring { --tw-ring-color: color-mix(in srgb, var(--dept-accent, #3b82f6) 30%, transparent); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Department hub "CAD" design system
+
+   Ported from fartherr97/ssrp-department-hub so a department site reads like
+   that reference app: a deep navy shell, the department's own accent driving
+   every border, nav and menu highlight, and the signature press/lift motion.
+
+   Everything here is scoped under `.dept-hub` — the wrapper DeptShell puts on
+   one department site — so it is fully contained: the public site, the staff
+   hub and the civilian hub keep their orange palette untouched. DeptShell also
+   sets the flat --color-* tokens on that same wrapper (navy surfaces + the
+   department accent as --color-primary), so these utilities theme per
+   department without any of them being redefined per department in CSS.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.dept-hub {
+  /* Fixed CAD surfaces. The accent tokens (--color-primary / --color-hover /
+     --color-border*) are set inline by DeptShell from the department config. */
+  --color-body-bg: #0b1424;
+  --color-bg: #101d31;
+  --color-surface-1: #13233b;
+  --color-surface-2: #192f4d;
+  --color-text: #dde6f1;
+  --color-text-muted: #93a4bd;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--color-text);
+}
+
+.dept-hub .hub-shell-gradient,
+.dept-hub.hub-shell-gradient {
+  background:
+    radial-gradient(circle at 50% -14%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 28%),
+    radial-gradient(circle at 18% 0%, rgba(47, 71, 116, 0.36), transparent 28%),
+    linear-gradient(180deg, var(--color-body-bg) 0%, var(--color-bg) 58%, #0d1320 100%);
+}
+
+.dept-hub .hub-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-surface-1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+
+.dept-hub .hub-pill {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+}
+
+.dept-hub .hub-kicker {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* ─── Nav (top-bar group headings + drawer items) ─── */
+.dept-hub .hub-nav-group {
+  background: linear-gradient(90deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 50%, #ffffff) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dept-hub .hub-nav-item {
+  border: 1px solid transparent;
+  color: #cbd5e1;
+  transition: all 160ms ease;
+}
+.dept-hub .hub-nav-item:hover {
+  border-color: var(--color-border);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 10%, transparent) 0%, color-mix(in srgb, var(--color-primary) 5%, transparent) 55%, rgba(255, 255, 255, 0.015) 100%);
+  color: color-mix(in srgb, var(--color-primary) 28%, #ffffff);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+.dept-hub .hub-nav-item-active {
+  border: 1px solid var(--color-border-strong);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 16%, transparent) 0%, color-mix(in srgb, var(--color-primary) 8%, transparent) 55%, rgba(255, 255, 255, 0.02) 100%);
+  color: color-mix(in srgb, var(--color-primary) 32%, #ffffff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent), 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+/* Top-bar nav link with an accent underline that swipes in on hover / stays lit. */
+.dept-hub .hub-nav-link { position: relative; display: inline-flex; align-items: center; padding-bottom: 6px; }
+.dept-hub .hub-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0.75rem; right: 0.75rem; bottom: 0;
+  height: 2px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 55%, #ffffff));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dept-hub .hub-nav-link:hover::after,
+.dept-hub .hub-nav-link-active::after { transform: scaleX(1); }
+
+/* ─── Dropdown menus (accent top border + animated left bar) ─── */
+.dept-hub .hub-menu {
+  background: var(--color-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid var(--color-primary);
+  border-radius: 0 0 0.75rem 0.75rem;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.5);
+}
+.dept-hub .hub-menu-floating { border-radius: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.dept-hub .hub-menu-item {
+  position: relative; display: flex; align-items: center; gap: 0.5rem;
+  width: 100%; border-radius: 0.5rem; padding: 0.7rem 0.95rem;
+  text-align: left; font-size: 0.9rem; font-weight: 500; color: #cbd5e1;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+.dept-hub .hub-menu-item::before {
+  content: ""; position: absolute; left: 0; top: 7px; bottom: 7px;
+  width: 3px; border-radius: 999px; background: var(--color-primary);
+  transform: scaleY(0); transform-origin: center; transition: transform 160ms ease;
+}
+.dept-hub .hub-menu-item:hover {
+  background: rgba(255, 255, 255, 0.05); color: #ffffff;
+  transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+.dept-hub .hub-menu-item:hover::before,
+.dept-hub .hub-menu-item-active::before { transform: scaleY(1); }
+.dept-hub .hub-menu-item-active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.035) 100%);
+  color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Card hover: lift + accent glow (card grids: fleet, uniforms, exams…) ─── */
+.dept-hub .hub-card-hover {
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.dept-hub .hub-card-hover:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+  box-shadow: 0 14px 34px -14px var(--color-primary);
+}
+
+/* ─── Signature interaction utilities ─── */
+.dept-hub .press { transition: transform 0.09s var(--ease-soft); }
+.dept-hub .press:active { transform: scale(0.94); }
+.dept-hub .press-sm { transition: transform 0.09s var(--ease-soft); }
+.dept-hub .press-sm:active { transform: scale(0.97); }
+.dept-hub .lift {
+  transition: transform 0.16s var(--ease-out), box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.dept-hub .lift:hover { transform: translateY(-2px); }
+
+/* ─── Motion keyframes + utilities (namespaced dhub- to avoid any collision) ─── */
+@keyframes dhubPageFade { from { opacity: 0; transform: translateY(6px) scale(0.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes dhubPopIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes dhubTabIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes dhubStaggerIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.dept-hub .anim-page-fade { animation: dhubPageFade 280ms var(--ease-out); }
+.dept-hub .anim-pop-in { animation: dhubPopIn 0.22s var(--ease-out) both; }
+.dept-hub .anim-tab-in { animation: dhubTabIn 0.28s var(--ease-out) both; will-change: opacity, transform; }
+.dept-hub .stagger-item { animation: dhubStaggerIn 0.34s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 0.04s); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dept-hub .anim-page-fade,
+  .dept-hub .anim-pop-in,
+  .dept-hub .anim-tab-in,
+  .dept-hub .stagger-item { animation: none; }
+  .dept-hub .lift:hover,
+  .dept-hub .hub-card-hover:hover { transform: none; }
+}

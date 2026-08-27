@@ -45,7 +45,7 @@ export default function DeptTopBar({ config, base, groups, saveState, saveMessag
       <header
         className={cn(
           "sticky top-0 z-30 h-16 border-b border-white/[0.06] backdrop-blur-xl transition-colors duration-300",
-          scrolled ? "bg-[#0a0e1a]/80" : "bg-[#0a0e1a]/60",
+          scrolled ? "bg-[#0b1424]/85" : "bg-[#0b1424]/65",
         )}
       >
         <div className="flex h-full items-center gap-3 px-4 sm:px-6 lg:px-8">
