@@ -122,7 +122,12 @@ export default function BotMappings() {
                 () =>
                   api(`/mappings/${encodeURIComponent(mapping.id)}/enabled`, {
                     method: "POST",
-                    body: { enabled: !mapping.enabled },
+                    body: {
+                      enabled: !mapping.enabled,
+                      reason: mapping.enabled
+                        ? "Disabled from the bot dashboard"
+                        : "Enabled from the bot dashboard",
+                    },
                   }),
                 mappings.reload,
               )
