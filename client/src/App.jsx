@@ -62,6 +62,7 @@ import HubSubmissions from "./pages/hub/HubSubmissions";
 import HubExamMembers from "./pages/hub/HubExamMembers";
 import HubAuditLog from "./pages/hub/HubAuditLog";
 import HubManagement from "./pages/hub/HubManagement";
+import HubAccessCenter from "./pages/hub/HubAccessCenter";
 import HubPermissions from "./pages/hub/HubPermissions";
 import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
 import HubForms from "./pages/hub/HubForms";
@@ -282,6 +283,7 @@ export default function App() {
             <Route path="/staff-hub/exam-members" element={<HubExamMembers />} />
             <Route path="/staff-hub/audit-log" element={<HubAuditLog />} />
             <Route path="/staff-hub/management" element={<HubManagement />} />
+            <Route path="/staff-hub/access" element={<HubAccessCenter />} />
             <Route path="/staff-hub/permissions" element={<HubPermissions />} />
             <Route path="/staff-hub/discord-roles" element={<HubDiscordRoles />} />
           </Route>
