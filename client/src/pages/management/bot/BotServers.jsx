@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Power, Trash2 } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
@@ -67,6 +67,21 @@ export default function BotServers() {
               <GuildCard
                 key={guild.id ?? guild.guildId}
                 guild={guild}
+                onToggleSync={() =>
+                  act(
+                    () =>
+                      api(`/guilds/${encodeURIComponent(guild.id)}`, {
+                        method: "PATCH",
+                        body: {
+                          syncEnabled: !guild.syncEnabled,
+                          reason: guild.syncEnabled
+                            ? "Synchronization paused from the bot dashboard"
+                            : "Synchronization enabled from the bot dashboard",
+                        },
+                      }),
+                    guilds.reload,
+                  )
+                }
                 onDelete={() =>
                   act(
                     () =>
@@ -153,9 +168,10 @@ export default function BotServers() {
 }
 
 /** A server plus its live status, which is a separate call per guild. */
-function GuildCard({ guild, onDelete }) {
+function GuildCard({ guild, onToggleSync, onDelete }) {
   const id = guild.guildId ?? guild.id;
   const status = useBotResource(`/guilds/${encodeURIComponent(id)}/status`);
+  const synced = guild.syncEnabled !== false;
 
   return (
     <Card className="flex flex-wrap items-center gap-3 p-5">
@@ -170,12 +186,24 @@ function GuildCard({ guild, onDelete }) {
               {status.data.connected === false ? "Disconnected" : "Connected"}
             </Badge>
           )}
+          <Badge tone={synced ? "green" : "amber"} dot={synced}>
+            {synced ? "Sync on" : "Sync off"}
+          </Badge>
         </div>
         <code className="mt-1 block text-xs text-slate-600">{id}</code>
+        {!synced && (
+          <p className="mt-1.5 text-sm text-amber-300/90">
+            Role mappings won't apply here until sync is on.
+          </p>
+        )}
         {status.data?.message && (
           <p className="mt-1.5 text-sm text-slate-400">{status.data.message}</p>
         )}
       </div>
+      <Button variant={synced ? "ghost" : "secondary"} size="sm" onClick={onToggleSync}>
+        <Power className="size-4" />
+        {synced ? "Pause sync" : "Enable sync"}
+      </Button>
       <button
         type="button"
         onClick={onDelete}
