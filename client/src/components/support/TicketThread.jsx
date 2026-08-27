@@ -5,7 +5,7 @@ import Button from "../ui/Button";
 import { TextArea } from "../ui/TextInput";
 import { cn } from "../../lib/cn";
 import { toneTile } from "../../lib/tones";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTimeLocal } from "../../lib/format";
 
 /**
  * A staff name reads by its role, the way the team's Discord does — so an owner
@@ -245,7 +245,7 @@ function Message({ message, quoted, mine, onReply }) {
           )}
           {message.internal && <Badge tone="amber">Internal</Badge>}
           {mine && <Badge tone="slate">You</Badge>}
-          <span className="text-slate-600">{formatDateTime(message.createdAt)}</span>
+          <span className="text-slate-600">{formatDateTimeLocal(message.createdAt)}</span>
           <button
             type="button"
             onClick={onReply}

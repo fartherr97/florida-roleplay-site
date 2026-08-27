@@ -42,6 +42,26 @@ export function formatDateTime(value) {
 }
 
 /**
+ * Like formatDateTime, but in the viewer's own timezone with the zone shown —
+ * "Aug 27, 5:49 AM EDT". The site's records are in UTC on purpose so staff
+ * comparing entries agree, but a support chat is read like any other messages
+ * app: the person wants to know it was 5:49 *their* morning, not in UTC. The
+ * appended zone keeps it unambiguous when two people compare screens.
+ */
+export function formatDateTimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+/**
  * "1 rank" / "2 ranks". Counts sit next to nouns all over the dashboard, and
  * "1 members" reads as a bug even when the number is right.
  */

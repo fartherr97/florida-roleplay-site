@@ -15,7 +15,7 @@ import ReassignDialog from "../../components/support/ReassignDialog";
 import { api, ApiForbiddenError } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { cn } from "../../lib/cn";
-import { formatDateTime, relativeTime } from "../../lib/format";
+import { formatDateTimeLocal, relativeTime } from "../../lib/format";
 import {
   PRIORITIES,
   PRIORITY_MAP,
@@ -213,7 +213,7 @@ export default function SupportTicket() {
         <Badge tone={type?.tone ?? "slate"}>{type?.label ?? ticket.type}</Badge>
         <span>Opened by {ticket.openedByName}</span>
         <span>·</span>
-        <span>{formatDateTime(ticket.createdAt)}</span>
+        <span>{formatDateTimeLocal(ticket.createdAt)}</span>
         {ticket.lastMessageAt && ticket.lastMessageAt !== ticket.createdAt && (
           <>
             <span>·</span>
@@ -319,7 +319,7 @@ export default function SupportTicket() {
                           <span className="font-semibold capitalize text-white">{entry.action}</span> {entry.details}
                         </p>
                         <p className="text-slate-600">
-                          {entry.actor} · {formatDateTime(entry.at)}
+                          {entry.actor} · {formatDateTimeLocal(entry.at)}
                         </p>
                       </li>
                     ))}
