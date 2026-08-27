@@ -209,9 +209,9 @@ router.post("/", async (req, res) => {
     );
     // The opening message is the first post in the thread, so the conversation
     // reads as one rather than starting with a reply to something invisible.
-    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, body)
-       VALUES ($1, $2, false, $3, $4, $5)`,
-      [`sm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, id, ctx.user.id, name, draft.body],
+    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_avatar, body)
+       VALUES ($1, $2, false, $3, $4, $5, $6)`,
+      [`sm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, id, ctx.user.id, name, ctx.user.avatar ?? null, draft.body],
     );
   } catch {
     return noStore(res);
@@ -305,7 +305,8 @@ router.get("/:id/messages", async (req, res) => {
   const internal = canWorkTicket(ticket, ctx, ctx.types);
   try {
     const rows = await query(`SELECT id, internal, author_id AS "authorId", author_name AS "authorName",
-              author_role AS "authorRole", body, reply_to_id AS "replyToId", created_at AS "createdAt"
+              author_role AS "authorRole", author_avatar AS "authorAvatar", body,
+              reply_to_id AS "replyToId", created_at AS "createdAt"
          FROM support_messages
         WHERE ticket_id = $1${internal ? "" : " AND internal = false"}
         ORDER BY created_at ASC
@@ -347,15 +348,16 @@ router.post("/:id/messages", async (req, res) => {
     authorId: ctx.user.id,
     authorName: ctx.user.displayName ?? ctx.user.username ?? "Unknown",
     authorRole: ctx.user.rank ?? null,
+    authorAvatar: ctx.user.avatar ?? null,
     body,
     replyToId: str(req.body?.replyToId, 48) || null,
     createdAt: new Date().toISOString(),
   };
 
   try {
-    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, body, reply_to_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [message.id, ticket.id, Boolean(message.internal), message.authorId, message.authorName, message.authorRole, body, message.replyToId],
+    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, author_avatar, body, reply_to_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [message.id, ticket.id, Boolean(message.internal), message.authorId, message.authorName, message.authorRole, message.authorAvatar, body, message.replyToId],
     );
     // An internal note is not the member replying, so it must not move the
     // ticket off "waiting on member" or bump it up the queue.
@@ -375,6 +377,68 @@ router.post("/:id/messages", async (req, res) => {
     return noStore(res);
   }
   res.status(201).json({ ok: true, message });
+});
+
+/* ------------------------------------------------------------------ *
+ * Presence
+ * ------------------------------------------------------------------ *
+ *
+ * Who is looking at a ticket, and who is mid-reply. The open page beats a
+ * heartbeat here every few seconds carrying its typing state; the response is
+ * the current set of viewers, so one call both check in and reads the room. It
+ * is polled, not a socket: a support thread holds a handful of people, and the
+ * cost of a socket server for that is not worth paying.
+ */
+router.post("/:id/presence", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  const ticket = await loadTicket(str(req.params.id));
+  if (!ticket) return res.status(404).json({ ok: false, message: "No such ticket." });
+  if (!canViewTicket(ticket, ctx, ctx.types)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That ticket is not yours." });
+  }
+
+  const name = ctx.user.displayName ?? ctx.user.username ?? "Someone";
+  const typing = req.body?.typing === true;
+  const leaving = req.body?.leaving === true;
+
+  try {
+    if (leaving) {
+      await execute("DELETE FROM support_presence WHERE ticket_id = $1 AND discord_id = $2", [ticket.id, ctx.user.id]);
+    } else {
+      await query(
+        `INSERT INTO support_presence (ticket_id, discord_id, name, avatar, typing, updated_at)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+         ON CONFLICT (ticket_id, discord_id)
+         DO UPDATE SET name = EXCLUDED.name, avatar = EXCLUDED.avatar,
+           typing = EXCLUDED.typing, updated_at = CURRENT_TIMESTAMP`,
+        [ticket.id, ctx.user.id, name, ctx.user.avatar ?? null, typing],
+      );
+    }
+
+    // A viewer who has not checked in for a while has closed the tab — drop them
+    // so the room does not fill with ghosts.
+    await execute("DELETE FROM support_presence WHERE updated_at < CURRENT_TIMESTAMP - INTERVAL '30 seconds'");
+
+    const rows = await query(
+      `SELECT discord_id AS "discordId", name, avatar,
+              (typing AND updated_at > CURRENT_TIMESTAMP - INTERVAL '7 seconds') AS typing
+         FROM support_presence
+        WHERE ticket_id = $1 AND updated_at > CURRENT_TIMESTAMP - INTERVAL '20 seconds'
+        ORDER BY updated_at DESC`,
+      [ticket.id],
+    );
+    return res.json({
+      ok: true,
+      viewers: rows.map((row) => ({ ...row, typing: Boolean(row.typing), self: row.discordId === ctx.user.id })),
+    });
+  } catch {
+    // No database — presence is best-effort, so report just the caller.
+    return res.json({
+      ok: true,
+      viewers: leaving ? [] : [{ discordId: ctx.user.id, name, avatar: ctx.user.avatar ?? null, typing, self: true }],
+    });
+  }
 });
 
 /* ------------------------------------------------------------------ *

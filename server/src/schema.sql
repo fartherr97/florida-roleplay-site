@@ -897,6 +897,30 @@ CREATE TABLE IF NOT EXISTS support_messages (
     REFERENCES support_tickets(id) ON DELETE CASCADE
 );
 
+-- The author's Discord avatar, captured at post time so the thread shows real
+-- faces without a per-render lookup. Nullable: older rows and members with no
+-- avatar fall back to initials.
+ALTER TABLE support_messages
+  ADD COLUMN IF NOT EXISTS author_avatar TEXT NULL;
+
+-- Live presence: who is looking at a ticket right now, and who is typing. One
+-- row per (ticket, viewer), refreshed by a heartbeat from the open page; a
+-- viewer counts as "here" while their row is fresh and "typing" while their
+-- typing flag is fresh. Polled rather than socket-backed — a support thread has
+-- a handful of people in it, not a stadium.
+CREATE TABLE IF NOT EXISTS support_presence (
+  ticket_id   VARCHAR(32)  NOT NULL,
+  discord_id  VARCHAR(20)  NOT NULL,
+  name        VARCHAR(128) NOT NULL,
+  avatar      TEXT         NULL,
+  typing      BOOLEAN      NOT NULL DEFAULT FALSE,
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (ticket_id, discord_id),
+  CONSTRAINT fk_support_presence FOREIGN KEY (ticket_id)
+    REFERENCES support_tickets(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_support_presence_ticket ON support_presence (ticket_id, updated_at);
+
 -- Response flows: the branching trees agents walk to compose a reply. The whole
 -- tree is one JSONB document because it is edited as a whole by one person in a
 -- builder, the same reason department configs and applications are.

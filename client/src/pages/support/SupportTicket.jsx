@@ -49,7 +49,10 @@ export default function SupportTicket() {
   const [assigning, setAssigning] = useState(false);
   const [panel, setPanel] = useState(null); // "info" | "flow" | null
   const [copied, setCopied] = useState(false);
+  const [viewers, setViewers] = useState([]);
   const composerRef = useRef(null);
+  const typingUntilRef = useRef(0);
+  const beatRef = useRef(null);
 
   const load = useCallback(
     (signal) =>
@@ -97,6 +100,41 @@ export default function SupportTicket() {
       active = false;
     };
   }, [can.work]);
+
+  // Live presence: beat a heartbeat while the ticket is open, carrying the
+  // typing state, and take the returned roster as who is here now. Polled — no
+  // socket — so a closed tab ages out in half a minute rather than lingering.
+  const canPresence = state.key === id && !state.denied && Boolean(ticket);
+  useEffect(() => {
+    if (!canPresence) return undefined;
+    let active = true;
+    const beat = async () => {
+      const typing = Date.now() < typingUntilRef.current;
+      try {
+        const res = await api.supportPresence(id, { typing });
+        if (active && res?.viewers) setViewers(res.viewers);
+      } catch {
+        /* best-effort */
+      }
+    };
+    beatRef.current = beat;
+    beat();
+    const timer = setInterval(beat, 5_000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      beatRef.current = null;
+      api.supportPresence(id, { leaving: true }).catch(() => {});
+    };
+  }, [id, canPresence]);
+
+  // Announce typing right away the first time, then let the heartbeat carry it;
+  // the flag decays on its own after a few quiet seconds.
+  const markTyping = useCallback(() => {
+    const wasTyping = Date.now() < typingUntilRef.current;
+    typingUntilRef.current = Date.now() + 4_000;
+    if (!wasTyping) beatRef.current?.();
+  }, []);
 
   const { typeMap } = useSupportConfig();
   const type = useMemo(() => (ticket ? typeMap[ticket.type] : null), [ticket, typeMap]);
@@ -335,6 +373,8 @@ export default function SupportTicket() {
           meId={user?.id}
           canInternal={can.work}
           greetingName={ticket.openedByName}
+          viewers={viewers}
+          onTyping={markTyping}
           onSend={send}
           disabled={ticket.status === "closed" && !can.work}
           composerRef={composerRef}

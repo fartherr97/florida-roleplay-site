@@ -573,6 +573,10 @@ export const api = {
       message: "The API is unreachable, so that message was not posted.",
     })),
 
+  /** Heartbeat presence: check in (with typing state) and read who else is here. */
+  supportPresence: (id, payload = {}) =>
+    post(`/support/${encodeURIComponent(id)}/presence`, payload, () => ({ ok: true, viewers: [] })),
+
   supportFlows: () =>
     get("/support/flows/list", { flows: supportSeed.FLOWS, canEdit: false }),
 

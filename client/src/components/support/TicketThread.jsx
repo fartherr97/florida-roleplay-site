@@ -50,7 +50,8 @@ export default function TicketThread({
   meId,
   canInternal,
   greetingName,
-  viewing = 1,
+  viewers = [],
+  onTyping,
   onSend,
   disabled = false,
   composerRef,
@@ -68,6 +69,8 @@ export default function TicketThread({
   }, [messages.length]);
 
   const byId = Object.fromEntries(messages.map((m) => [m.id, m]));
+  const present = viewers.filter(Boolean);
+  const typers = present.filter((v) => v.typing && !v.self);
 
   async function send(event) {
     event?.preventDefault();
@@ -87,6 +90,21 @@ export default function TicketThread({
 
   return (
     <div>
+      {present.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 border-b border-white/[0.06] pb-3">
+          <div className="flex -space-x-2">
+            {present.slice(0, 5).map((v) => (
+              <Avatar key={v.discordId} name={v.name} avatar={v.avatar} className="ring-2 ring-[#0d1220]" />
+            ))}
+          </div>
+          <p className="text-xs text-slate-400">
+            {present.length === 1 && present[0].self
+              ? "Only you are here"
+              : `${present.length} viewing`}
+          </p>
+        </div>
+      )}
+
       <div className="space-y-4">
         {/* The system greeting opens every thread. */}
         <div className="rounded-2xl bg-white/[0.03] px-4 py-3.5 text-sm leading-relaxed text-slate-300 ring-1 ring-inset ring-white/[0.06]">
@@ -110,6 +128,18 @@ export default function TicketThread({
         ))}
         <div ref={endRef} />
       </div>
+
+      {typers.length > 0 && (
+        <div className="mt-3 flex items-center gap-2.5 text-xs text-slate-400">
+          <Avatar name={typers[0].name} avatar={typers[0].avatar} size="sm" />
+          <span>
+            {typers.length === 1
+              ? `${typers[0].name} is typing`
+              : `${typers.length} people are typing`}
+          </span>
+          <TypingDots />
+        </div>
+      )}
 
       {!disabled && (
         <form
@@ -139,7 +169,7 @@ export default function TicketThread({
               <span />
             )}
             <span className="ml-auto text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-slate-600">
-              {viewing} viewing
+              {present.length || 1} viewing
             </span>
           </div>
 
@@ -165,7 +195,10 @@ export default function TicketThread({
             rows={3}
             value={draft}
             disabled={sending}
-            onChange={(e) => onDraftChange(e.target.value)}
+            onChange={(e) => {
+              onDraftChange(e.target.value);
+              onTyping?.();
+            }}
             placeholder={internal ? "A note the member will not see…" : "Type a message…"}
             className="bg-transparent"
           />
@@ -188,14 +221,7 @@ function Message({ message, quoted, mine, onReply }) {
   const tone = message.internal ? "amber" : roleTone(message.authorRole);
   return (
     <article className="group flex gap-3">
-      <span
-        className={cn(
-          "mt-0.5 grid size-9 shrink-0 place-items-center rounded-full text-[0.7rem] font-bold ring-1 ring-inset",
-          toneTile(tone),
-        )}
-      >
-        {initials(message.authorName)}
-      </span>
+      <Avatar name={message.authorName} avatar={message.authorAvatar} tone={tone} className="mt-0.5" />
 
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 text-xs">
@@ -243,6 +269,47 @@ function Message({ message, quoted, mine, onReply }) {
         </div>
       </div>
     </article>
+  );
+}
+
+/** A member's real Discord avatar, or their initials on a toned tile. */
+function Avatar({ name, avatar, tone = "slate", size = "md", className }) {
+  const box = size === "sm" ? "size-6 text-[0.6rem]" : "size-9 text-[0.7rem]";
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt=""
+        className={cn("shrink-0 rounded-full object-cover ring-1 ring-inset ring-white/10", box, className)}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "grid shrink-0 place-items-center rounded-full font-bold ring-1 ring-inset",
+        box,
+        toneTile(tone),
+        className,
+      )}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+/** The three-dot "someone is typing" animation. */
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1" aria-hidden>
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          className="size-1.5 animate-bounce rounded-full bg-slate-400"
+          style={{ animationDelay: `${delay}ms` }}
+        />
+      ))}
+    </span>
   );
 }
 
