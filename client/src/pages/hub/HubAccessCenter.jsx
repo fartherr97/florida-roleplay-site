@@ -53,6 +53,7 @@ export default function HubAccessCenter() {
   const [savedGrants, setSavedGrants] = useState(DEFAULT_GRANTS);
   const [roleMap, setRoleMap] = useState({ roles: ROLE_MAP, special: [] });
   const [savedRoleMap, setSavedRoleMap] = useState({ roles: ROLE_MAP, special: [] });
+  const [guildRoles, setGuildRoles] = useState([]);
   const [depts, setDepts] = useState([]);
   const [deptAccess, setDeptAccess] = useState({});
   const [savedDeptAccess, setSavedDeptAccess] = useState({});
@@ -70,7 +71,8 @@ export default function HubAccessCenter() {
       api.permissionGrants(),
       api.discordRoleMap(),
       api.deptList(),
-    ]).then(([cat, g, map, list]) => {
+      api.guildRoles(),
+    ]).then(([cat, g, map, list, guild]) => {
       if (!active) return;
       if (cat?.groups) setCatalogue(cat);
       if (g && Object.keys(g).length) {
@@ -83,6 +85,7 @@ export default function HubAccessCenter() {
         setSavedRoleMap(next);
       }
       setDepts(Array.isArray(list) ? list : (list?.items ?? []));
+      setGuildRoles(guild?.configured ? (guild.roles ?? []) : []);
     });
     return () => {
       active = false;
@@ -126,7 +129,28 @@ export default function HubAccessCenter() {
       .filter((d) => d.division === "law")
       .map((d) => d.id);
 
+    // Live roles straight from the main Discord guild. Each is shown by its real name and
+    // id; one already in the role map reuses that entry (so its grants show), the rest are
+    // synthetic until a capability is ticked, which imports them.
+    const mappedByRoleId = new Map(roles.filter((r) => r.roleId).map((r) => [String(r.roleId), r]));
+    const guildGroup = {
+      id: "guild",
+      label: "Main guild roles",
+      roles: (guildRoles ?? []).map(
+        (gr) =>
+          mappedByRoleId.get(String(gr.id)) ?? {
+            key: `g_${gr.id}`,
+            rank: gr.name,
+            rankFull: gr.name,
+            department: null,
+            roleId: String(gr.id),
+            fromGuild: true,
+          },
+      ),
+    };
+
     return [
+      ...(guildGroup.roles.length ? [guildGroup] : []),
       { id: "staff", label: "Staff & command", roles: byDivision(staffIds) },
       { id: "law", label: "Law enforcement", roles: byDivision(lawIds) },
       { id: "civilian", label: "Civilian", roles: byDivision(civilianIds) },
@@ -143,7 +167,30 @@ export default function HubAccessCenter() {
         })),
       },
     ].filter((group) => group.roles.length > 0);
-  }, [roleMap, catalogue]);
+  }, [roleMap, catalogue, guildRoles]);
+
+  // A live guild role is synthetic until it is used. Ticking any capability imports it into
+  // the role map (name + Discord id) so it persists and the bot resolves it by that id.
+  const ensureImported = (role) => {
+    if (!role?.fromGuild) return;
+    setRoleMap((prev) => {
+      if (prev.roles.some((r) => r.key === role.key)) return prev;
+      return {
+        ...prev,
+        roles: [
+          ...prev.roles,
+          {
+            key: role.key,
+            rank: role.rank,
+            rankFull: role.rankFull,
+            department: null,
+            roleId: role.roleId,
+            order: 100,
+          },
+        ],
+      };
+    });
+  };
 
   const allRoles = useMemo(() => roleGroups.flatMap((g) => g.roles), [roleGroups]);
   const selected = useMemo(
@@ -175,6 +222,7 @@ export default function HubAccessCenter() {
 
   const toggleCap = (capKey) => {
     if (!selected) return;
+    ensureImported(selected);
     setGrants((prev) => {
       const current = new Set(prev[capKey] ?? []);
       if (current.has(selected.key)) current.delete(selected.key);
@@ -185,6 +233,7 @@ export default function HubAccessCenter() {
 
   const toggleDeptCap = (deptId, capKey) => {
     if (!selected) return;
+    ensureImported(selected);
     setDeptAccess((prev) => {
       const list = prev[deptId] ?? [];
       const existing = list.find((g) => g.roleKey === selected.key);

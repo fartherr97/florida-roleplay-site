@@ -17,6 +17,7 @@ import { requirePermission, loadGrants } from "../middleware/requirePermission.j
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { buildNickname, renderDisplayName, resolveRole } from "../lib/roster.js";
+import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
 const router = Router();
@@ -129,6 +130,24 @@ router.get("/role-map", async (_req, res) => {
     roles,
     special,
   });
+});
+
+/**
+ * The guild's live Discord roles, read straight from Discord with the bot token, so access
+ * can be assigned against the roles that actually exist. Read-only and configuration-grade,
+ * gated the same as editing the role map. Returns `configured:false` (not an error) when no
+ * bot token is set, so the page falls back to the seeded ladder cleanly.
+ */
+router.get("/guild-roles", requirePermission("discord.roles.manage"), async (_req, res) => {
+  try {
+    const roles = await fetchGuildRoles();
+    if (roles === null) return res.json({ configured: false, roles: [] });
+    return res.json({ configured: true, roles });
+  } catch (err) {
+    return res
+      .status(502)
+      .json({ configured: true, roles: [], error: err?.message ?? "Could not reach Discord." });
+  }
 });
 
 /**

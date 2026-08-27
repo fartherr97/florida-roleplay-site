@@ -375,6 +375,9 @@ export const api = {
         "Accepted, but not persisted — no database is configured, so this will reset on reload.",
     })),
 
+  /** The guild's live Discord roles, or configured:false when no bot token is set. */
+  guildRoles: () => get("/roster/guild-roles", { configured: false, roles: [] }),
+
   permissionGrants: () => get("/permissions/grants", DEFAULT_GRANTS),
   permissionCatalogue: () =>
     get("/permissions/catalogue", {

@@ -103,6 +103,37 @@ export async function fetchMemberRoles(userId) {
   };
 }
 
+/**
+ * Every role in our guild, read with the bot token — the real names and ids, so access can
+ * be set against the roles that actually exist rather than a seeded ladder.
+ *
+ * Returns `null` when the bot token or guild id is not configured, so callers can fall back
+ * to the seeded role map rather than error. `@everyone` (the role whose id is the guild id)
+ * and integration-managed roles are dropped: neither is something a human assigns by hand.
+ */
+export async function fetchGuildRoles() {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!token || !guildId) return null;
+
+  const res = await fetch(`${API_BASE}/guilds/${guildId}/roles`, {
+    headers: { Authorization: `Bot ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Discord role list failed (${res.status})`);
+  }
+  const roles = await res.json();
+  return (Array.isArray(roles) ? roles : [])
+    .filter((role) => role.id !== guildId && !role.managed)
+    .sort((a, b) => (b.position ?? 0) - (a.position ?? 0))
+    .map((role) => ({
+      id: String(role.id),
+      name: role.name,
+      color: role.color ? `#${role.color.toString(16).padStart(6, "0")}` : null,
+      position: role.position ?? 0,
+    }));
+}
+
 /** A CDN avatar URL, or null so the UI falls back to initials. */
 function avatarUrl(id, hash) {
   if (!hash) return null;
@@ -116,4 +147,5 @@ export default {
   exchangeCode,
   fetchIdentity,
   fetchMemberRoles,
+  fetchGuildRoles,
 };
