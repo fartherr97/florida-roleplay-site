@@ -3,17 +3,17 @@
  * records can reference an icon by string without importing React components.
  */
 import {
-  Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
-  ClipboardList, Crown, Flame, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy,
-  ListChecks, Mail, Newspaper, Radio, Scale, ScrollText, Shield, Siren,
-  SlidersHorizontal, Stethoscope, Store, Tag, Users, UserCog, Wrench,
+  Activity, Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
+  ClipboardList, Code, Crown, Flame, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy, Link,
+  ListChecks, Mail, MessageSquare, Newspaper, Radio, Scale, ScrollText, Shield, ShoppingCart, Siren, Star,
+  SlidersHorizontal, Stethoscope, Store, Tag, Ticket, Users, UserCog, Wrench,
 } from "lucide-react";
 
 const ICONS = {
-  Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
-  ClipboardList, Crown, Flame, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy,
-  ListChecks, Mail, Newspaper, Radio, Scale, ScrollText, Shield, Siren,
-  SlidersHorizontal, Stethoscope, Store, Tag, Users, UserCog, Wrench,
+  Activity, Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
+  ClipboardList, Code, Crown, Flame, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy, Link,
+  ListChecks, Mail, MessageSquare, Newspaper, Radio, Scale, ScrollText, Shield, ShoppingCart, Siren, Star,
+  SlidersHorizontal, Stethoscope, Store, Tag, Ticket, Users, UserCog, Wrench,
 };
 
 export function iconFor(name, fallback = Shield) {

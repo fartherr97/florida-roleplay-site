@@ -56,6 +56,11 @@ export const GUARDS = [
   { path: "/staff-hub/permissions", permission: "permissions.manage" },
   { path: "/staff-hub/discord-roles", permission: "discord.roles.manage" },
 
+  // Development Hub — the queue is the dev team's; the member-facing pages
+  // (hub, create, requests, library, help, feedback) need only a sign-in and
+  // gate themselves.
+  { path: "/development/queue", permission: "development.work" },
+
   // Civilian Hub
   { path: "/civilian-hub/home", permission: "civilian.view" },
   { path: "/civilian-hub/forms", permission: "forms.view" },

@@ -12,8 +12,10 @@ import * as formsMock from "../data/formsData";
 import * as promotionMock from "../data/promotionData";
 import * as disciplineSeed from "../data/disciplineSeed";
 import * as supportSeed from "../data/supportSeed";
+import * as devSeed from "../data/devHubData";
 import { gradeSubmission } from "./forms";
 import { DEFAULT_TICKET_TYPES } from "./support";
+import { DEFAULT_REQUEST_TYPES } from "./devhub";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { projectRoster } from "./deptRoster";
 import { BASE_ROLES, DEFAULT_GRANTS, PERMISSION_GROUPS } from "../data/permissions";
@@ -602,6 +604,64 @@ export const api = {
       types,
       message: NOT_PERSISTED,
     })),
+
+  /* --------------------------- Development Hub ---------------------------- */
+
+  /** Requests: reads fall back to seeds; writes do not. */
+  devRequests: (scope) =>
+    get(`/development${scope ? `?scope=${encodeURIComponent(scope)}` : ""}`, {
+      requests: devSeed.REQUESTS,
+      scope: scope ?? "mine",
+      team: false,
+    }),
+
+  devRequest: (id) =>
+    get(`/development/requests/${encodeURIComponent(id)}`, {
+      request: devSeed.REQUESTS.find((r) => r.id === id) ?? null,
+      can: { work: false, manage: false },
+    }),
+
+  openDevRequest: (payload) =>
+    post("/development", payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was submitted.",
+    })),
+
+  updateDevRequest: (id, patch) =>
+    patchJson(`/development/requests/${encodeURIComponent(id)}`, patch, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was changed.",
+    })),
+
+  devMessages: (id) =>
+    get(`/development/requests/${encodeURIComponent(id)}/messages`, {
+      messages: devSeed.MESSAGES.filter((m) => m.requestId === id && !m.internal),
+    }),
+
+  postDevMessage: (id, payload) =>
+    post(`/development/requests/${encodeURIComponent(id)}/messages`, payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so that message was not posted.",
+    })),
+
+  devVehicles: () => get("/development/vehicles", { vehicles: devSeed.VEHICLES, canManage: false }),
+
+  saveDevVehicle: (id, vehicle) =>
+    put(`/development/vehicles/${encodeURIComponent(id)}`, vehicle, () => ({ ok: true, vehicle, message: NOT_PERSISTED })),
+
+  deleteDevVehicle: (id) =>
+    del(`/development/vehicles/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
+
+  devFeedback: () => get("/development/feedback", { feedback: devSeed.DEV_FEEDBACK }),
+
+  submitDevFeedback: (payload) =>
+    post("/development/feedback", payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was submitted.",
+    })),
+
+  devRequestTypes: () =>
+    get("/development/config/request-types", { types: DEFAULT_REQUEST_TYPES, canManage: false }),
 
   /* ------------------------- Disciplinary actions ------------------------- */
 

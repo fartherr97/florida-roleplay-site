@@ -227,6 +227,27 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "development",
+    label: "Development Hub",
+    description:
+      "Requests members open for personal vehicles, department work and builds. Anyone signed in can open one — these decide who works them and who maintains the hub.",
+    permissions: [
+      {
+        key: "development.work",
+        label: "Work the dev queue",
+        detail:
+          "See every request, reply, write internal notes, change status and take one. The dev team's grant.",
+      },
+      {
+        key: "development.manage",
+        label: "Manage the hub",
+        detail:
+          "Maintain the vehicle library, triage suggestions and bug reports, and configure the request categories.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "site",
     label: "Public site",
     description: "Gated areas of the main community site.",
@@ -394,6 +415,12 @@ export const DEFAULT_GRANTS = {
   // Uploading to the image host — seeded to staff and department command, widen
   // it on this page for anyone else who should host images.
   "media.upload": [...staffFrom("mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+
+  // The dev team works development requests; department command see their own
+  // department's work. Managing the hub (vehicle library, request categories)
+  // sits higher. Opening a request needs nothing but a Discord account.
+  "development.work": [...staffFrom("admin"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "development.manage": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

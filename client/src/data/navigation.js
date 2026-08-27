@@ -15,8 +15,6 @@ export const primaryLinks = [
   { label: "Applications", href: SITE.applyUrl, external: true },
   { label: "Discord", href: SITE.discordInvite, external: true },
   { label: "Store", to: "/store" },
-  { label: "Knowledge Base", to: "/knowledge-base" },
-  { label: "Events", to: "/events" },
   { label: "Reports / Complaints", to: "/reports" },
   { label: "Support", to: "/support" },
 ];
@@ -52,6 +50,24 @@ export const navGroups = [
       { label: "Miami Police Department", to: "/departments/mpd", icon: "Building2" },
       { label: "Transfer Portal", to: "/transfers", icon: "ArrowLeftRight" },
       { label: "Image Hosting", to: "/image-host", icon: "Image" },
+    ],
+  },
+  {
+    id: "development",
+    label: "Development",
+    tone: {
+      text: "text-violet-400",
+      tile: "bg-violet-500/10 text-violet-400 ring-violet-400/20",
+      hover: "hover:bg-violet-500/10 hover:text-violet-300 focus-visible:bg-violet-500/10",
+    },
+    items: [
+      { label: "Development Hub", to: "/development", icon: "LayoutGrid" },
+      { label: "Create Request", to: "/development/new", icon: "Plus" },
+      { label: "My Requests", to: "/development/requests", icon: "Ticket" },
+      { label: "Vehicle Library", to: "/development/library", icon: "Car" },
+      { label: "Help Center", to: "/development/help", icon: "LifeBuoy" },
+      { label: "Suggestions & Bugs", to: "/development/feedback", icon: "MessageSquare" },
+      { label: "Dev Queue", to: "/development/queue", icon: "Wrench" },
     ],
   },
   {

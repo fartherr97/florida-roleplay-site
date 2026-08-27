@@ -33,6 +33,14 @@ import SupportFlows from "./pages/support/SupportFlows";
 import SupportTicket from "./pages/support/SupportTicket";
 import SupportTypes from "./pages/support/SupportTypes";
 import SupportLayout from "./pages/support/SupportLayout";
+import DevHome from "./pages/development/DevHome";
+import DevNew from "./pages/development/DevNew";
+import DevRequests from "./pages/development/DevRequests";
+import DevRequestDetail from "./pages/development/DevRequestDetail";
+import DevLibrary from "./pages/development/DevLibrary";
+import DevHelp from "./pages/development/DevHelp";
+import DevFeedback from "./pages/development/DevFeedback";
+import DevQueue from "./pages/development/DevQueue";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -120,6 +128,18 @@ export default function App() {
               <Route path="support/types" element={<SupportTypes />} />
               <Route path="support/:id" element={<SupportTicket />} />
             </Route>
+
+            {/* The Development Hub. Members open requests for vehicles, liveries
+                and builds; the dev team works them from the queue. Named routes
+                sit above /requests/:id so a reference can never shadow them. */}
+            <Route path="development" element={<DevHome />} />
+            <Route path="development/new" element={<DevNew />} />
+            <Route path="development/requests" element={<DevRequests />} />
+            <Route path="development/requests/:id" element={<DevRequestDetail />} />
+            <Route path="development/library" element={<DevLibrary />} />
+            <Route path="development/help" element={<DevHelp />} />
+            <Route path="development/feedback" element={<DevFeedback />} />
+            <Route path="development/queue" element={<DevQueue />} />
 
             <Route path="departments" element={<Departments />} />
             <Route path="departments/:id" element={<DepartmentDetail />} />

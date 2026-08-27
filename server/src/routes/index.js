@@ -18,6 +18,7 @@ import promotionsRouter from "./promotions.js";
 import transfersRouter from "./transfers.js";
 import disciplineRouter from "./discipline.js";
 import supportRouter from "./support.js";
+import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
 import authRouter from "./auth.js";
 import {
@@ -59,6 +60,10 @@ router.use("/transfers", transfersRouter);
 router.use("/discipline", disciplineRouter);
 // The support portal. Members open tickets here; the support team works them.
 router.use("/support", supportRouter);
+
+// The Development Hub. Members open requests for vehicles, liveries and builds;
+// the dev team works them. Also serves the vehicle library and feedback box.
+router.use("/development", devHubRouter);
 // The image host's write side (upload, list, delete). The public read side that
 // serves the bytes is mounted at /images in index.js, outside this /api prefix,
 // so a hosted image has a clean URL.
