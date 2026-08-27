@@ -55,11 +55,22 @@ function mergeMaps(seedList, savedList, matchKey = "key") {
   return merged;
 }
 
-function blankRole() {
+let newRoleSeq = 0;
+
+/**
+ * A fresh mapping row.
+ *
+ * The key is unique — rows render and update by key, so two blank rows sharing one key
+ * would collapse into a single React node and edit in lockstep, which reads as "the new
+ * row vanished". The department defaults to the division being edited so the row shows up
+ * in the current view rather than being filtered out of it.
+ */
+function blankRole(department = "staff") {
+  newRoleSeq += 1;
   return {
     roleId: "",
-    key: "",
-    department: "staff",
+    key: `new_${newRoleSeq}`,
+    department,
     rank: "",
     rankFull: "",
     order: 100,
@@ -441,7 +452,12 @@ export default function HubDiscordRoles() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setRoles((prev) => [...prev, blankRole()])}
+              onClick={() =>
+                setRoles((prev) => [
+                  ...prev,
+                  blankRole(departments.find((d) => d.division === scope)?.id ?? "staff"),
+                ])
+              }
             >
               <Plus className="size-4" />
               Add role
