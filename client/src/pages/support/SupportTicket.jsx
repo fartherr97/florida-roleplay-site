@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowLeft, Check, GitBranch, Info, Link2, MessageSquare, UserPlus } from "lucide-react";
 import Section from "../../components/layout/Section";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -15,6 +15,7 @@ import TicketThread from "../../components/support/TicketThread";
 import FlowRunner from "../../components/support/FlowRunner";
 import { api, ApiForbiddenError } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
+import { cn } from "../../lib/cn";
 import { formatDateTime, relativeTime } from "../../lib/format";
 import {
   PRIORITIES,
@@ -28,13 +29,15 @@ import {
 import { useSupportConfig } from "../../context/useSupportConfig";
 
 /**
- * One ticket: the conversation on the left, the controls on the right.
+ * One ticket, as a single focused column.
  *
- * The rail is staff-only and stays put while the thread scrolls, because status
- * and assignment are what an agent changes *while* reading — putting them at the
- * bottom of a long thread would mean scrolling back every time.
+ * The controls that an agent reaches for — the status, the hand-off, the flow —
+ * sit in a compact toolbar directly under the subject rather than in a rail off
+ * to the side, so on a phone they are the first thing under the header instead
+ * of buried beneath the whole conversation. The heavier tools (priority, the
+ * intake fields, the history) fold away behind Info until they are wanted.
  *
- * A member sees the same page without the rail: their status, and the thread.
+ * A member sees the same page without any of it: the status, and the thread.
  */
 export default function SupportTicket() {
   const { id } = useParams();
@@ -44,6 +47,8 @@ export default function SupportTicket() {
   const [flows, setFlows] = useState([]);
   const [draft, setDraft] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [panel, setPanel] = useState(null); // "info" | "flow" | null
+  const [copied, setCopied] = useState(false);
   const composerRef = useRef(null);
 
   const load = useCallback(
@@ -74,8 +79,6 @@ export default function SupportTicket() {
     const controller = new AbortController();
     load(controller.signal);
     loadMessages(controller.signal);
-    // Polled: a support conversation is a handful of messages over hours, so a
-    // socket would be a lot of moving parts for a thread that rarely changes.
     const timer = setInterval(() => loadMessages(controller.signal), 12_000);
     return () => {
       controller.abort();
@@ -100,7 +103,7 @@ export default function SupportTicket() {
 
   if (state.key !== id) {
     return (
-      <Section className="max-w-6xl">
+      <Section className="max-w-3xl">
         <div className="h-96 animate-pulse rounded-2xl bg-white/[0.03]" />
       </Section>
     );
@@ -128,89 +131,97 @@ export default function SupportTicket() {
     composerRef.current?.focus();
   }
 
+  function copyLink() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    navigator?.clipboard?.writeText(url).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      },
+      () => {},
+    );
+  }
+
+  const togglePanel = (name) => setPanel((prev) => (prev === name ? null : name));
+  const age = ticketAge(ticket);
+  const mine = ticket.assignedToDiscordId === user?.id;
+  const hasDetails = Object.keys(ticket.details ?? {}).length > 0;
+
   return (
-    <Section className="max-w-6xl">
+    <Section className="max-w-3xl">
       <Button as={Link} to={can.work ? "/support/queue" : "/support"} variant="ghost" size="sm" className="mb-4">
         <ArrowLeft className="size-4" />
         {can.work ? "Back to the queue" : "My tickets"}
       </Button>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="min-w-0">
-          <div className="mb-5">
-            <p className="flex flex-wrap items-center gap-2 text-xs">
-              <Badge tone={type?.tone ?? "slate"}>{type?.label ?? ticket.type}</Badge>
-              <Badge tone={statusTone(ticket.status)}>{statusLabel(ticket.status)}</Badge>
-              {isTicketOpen(ticket.status) &&
-                (() => {
-                  const age = ticketAge(ticket);
-                  return <Badge tone={age.tone}>{age.label}</Badge>;
-                })()}
-              {ticket.priority !== "normal" && (
-                <Badge tone={PRIORITY_MAP[ticket.priority]?.tone}>{PRIORITY_MAP[ticket.priority]?.label}</Badge>
-              )}
-              <code className="text-slate-600">#{ticket.id}</code>
-            </p>
-            <h1 className="mt-2 text-2xl font-black tracking-tight text-white">{ticket.subject}</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Opened by {ticket.openedByName} · {formatDateTime(ticket.createdAt)}
-              {ticket.lastMessageAt && ticket.lastMessageAt !== ticket.createdAt && (
-                <> · Updated {relativeTime(ticket.lastMessageAt)}</>
-              )}
-            </p>
+      {/* Header: the reference, the state, and what it is about. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-300 ring-1 ring-inset ring-white/[0.06]">
+          <MessageSquare className="size-3" />
+          Ticket #{ticket.id}
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={statusTone(ticket.status)} dot>
+            {statusLabel(ticket.status)}
+          </Badge>
+          {isTicketOpen(ticket.status) && <Badge tone={age.tone}>{age.label}</Badge>}
+          {ticket.priority !== "normal" && (
+            <Badge tone={PRIORITY_MAP[ticket.priority]?.tone}>{PRIORITY_MAP[ticket.priority]?.label}</Badge>
+          )}
+        </div>
+      </div>
+
+      <h1 className="text-2xl font-black tracking-tight text-white">{ticket.subject}</h1>
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-slate-500">
+        <Badge tone={type?.tone ?? "slate"}>{type?.label ?? ticket.type}</Badge>
+        <span>Opened by {ticket.openedByName}</span>
+        <span>·</span>
+        <span>{formatDateTime(ticket.createdAt)}</span>
+        {ticket.lastMessageAt && ticket.lastMessageAt !== ticket.createdAt && (
+          <>
+            <span>·</span>
+            <span>Updated {relativeTime(ticket.lastMessageAt)}</span>
+          </>
+        )}
+      </p>
+
+      {/* The staff toolbar — the controls, on top, where a phone can reach them. */}
+      {can.work ? (
+        <Card className="mt-5 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-[12rem] flex-1">
+              <Select
+                value={ticket.status}
+                options={TICKET_STATUSES.map((s) => ({ value: s.id, label: s.label }))}
+                onChange={(status) => patch({ status })}
+              />
+            </div>
+            {can.lead ? (
+              <Button variant="secondary" size="sm" onClick={() => setAssigning(true)}>
+                <UserPlus className="size-4" />
+                Reassign
+              </Button>
+            ) : mine ? (
+              <Button variant="ghost" size="sm" onClick={() => patch({ assign: "none" })}>
+                Release
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => patch({ assign: "me" })}>
+                <UserPlus className="size-4" />
+                Take it
+              </Button>
+            )}
           </div>
 
-          {Object.keys(ticket.details ?? {}).length > 0 && (
-            <Card className="mb-6 p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">On submission</p>
-              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                {(type?.fields ?? []).map((field) =>
-                  ticket.details[field.id] ? (
-                    <div key={field.id}>
-                      <dt className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-500">
-                        {field.label}
-                      </dt>
-                      <dd className="mt-0.5 break-words text-sm text-slate-200">{ticket.details[field.id]}</dd>
-                    </div>
-                  ) : null,
-                )}
-              </dl>
-            </Card>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-white/[0.06] pt-3">
+            <ToolButton icon={copied ? Check : Link2} label={copied ? "Copied" : "Link"} onClick={copyLink} active={copied} />
+            <ToolButton icon={Info} label="Info" onClick={() => togglePanel("info")} active={panel === "info"} />
+            <ToolButton icon={GitBranch} label="Response flowchart" onClick={() => togglePanel("flow")} active={panel === "flow"} />
+          </div>
 
-          <Card className="p-6">
-            <TicketThread
-              messages={messages}
-              meId={user?.id}
-              canInternal={can.work}
-              onSend={send}
-              disabled={ticket.status === "closed" && !can.work}
-              composerRef={composerRef}
-              draft={draft}
-              onDraftChange={setDraft}
-            />
-            {ticket.status === "closed" && !can.work && (
-              <p className="mt-4 rounded-xl bg-black/25 p-3.5 text-sm text-slate-400 ring-1 ring-inset ring-white/[0.06]">
-                This ticket is closed. Open a new one and quote{" "}
-                <code className="text-slate-300">{ticket.id}</code> if you need to
-                pick it back up.
-              </p>
-            )}
-          </Card>
-        </div>
-
-        {/* The rail. */}
-        <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-          {can.work ? (
-            <>
-              <Card className="space-y-4 p-5">
-                <Field label="Status">
-                  <Select
-                    value={ticket.status}
-                    options={TICKET_STATUSES.map((s) => ({ value: s.id, label: s.label }))}
-                    onChange={(status) => patch({ status })}
-                  />
-                </Field>
+          {panel === "info" && (
+            <div className="mt-3 space-y-5 border-t border-white/[0.06] pt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Priority">
                   <Select
                     value={ticket.priority}
@@ -218,19 +229,14 @@ export default function SupportTicket() {
                     onChange={(priority) => patch({ priority })}
                   />
                 </Field>
-
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Assigned to
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Assigned to</p>
+                  <p className={cn("text-sm", ticket.assignedToName ? "text-white" : "text-slate-500")}>
+                    {ticket.assignedToName ?? "Nobody yet"}
                   </p>
-                  {ticket.assignedToName ? (
-                    <p className="text-sm text-white">{ticket.assignedToName}</p>
-                  ) : (
-                    <p className="text-sm text-slate-500">Nobody yet</p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {ticket.assignedToDiscordId !== user?.id && (
-                      <Button size="sm" variant="secondary" onClick={() => patch({ assign: "me" })}>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {!mine && (
+                      <Button size="sm" variant="ghost" onClick={() => patch({ assign: "me" })}>
                         Take it
                       </Button>
                     )}
@@ -241,52 +247,107 @@ export default function SupportTicket() {
                     )}
                     {can.lead && (
                       <Button size="sm" variant="ghost" onClick={() => setAssigning(true)}>
-                        <UserPlus className="size-4" />
                         Hand over
                       </Button>
                     )}
                   </div>
                 </div>
-              </Card>
+              </div>
 
+              {hasDetails && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">On submission</p>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {(type?.fields ?? []).map((field) =>
+                      ticket.details[field.id] ? (
+                        <div key={field.id}>
+                          <dt className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-500">
+                            {field.label}
+                          </dt>
+                          <dd className="mt-0.5 break-words text-sm text-slate-200">{ticket.details[field.id]}</dd>
+                        </div>
+                      ) : null,
+                    )}
+                  </dl>
+                </div>
+              )}
+
+              {(ticket.history ?? []).length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History</p>
+                  <ol className="mt-3 space-y-2.5">
+                    {ticket.history.map((entry, index) => (
+                      <li key={index} className="text-xs">
+                        <p className="text-slate-300">
+                          <span className="font-semibold capitalize text-white">{entry.action}</span> {entry.details}
+                        </p>
+                        <p className="text-slate-600">
+                          {entry.actor} · {formatDateTime(entry.at)}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+
+          {panel === "flow" && (
+            <div className="mt-3 border-t border-white/[0.06] pt-4">
               <FlowRunner flows={flows} ticket={ticket} agent={user} onInsert={insertReply} />
-
-              <Card className="p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">History</p>
-                <ol className="mt-3 space-y-2.5">
-                  {(ticket.history ?? []).map((entry, index) => (
-                    <li key={index} className="text-xs">
-                      <p className="text-slate-300">
-                        <span className="font-semibold capitalize text-white">{entry.action}</span>{" "}
-                        {entry.details}
-                      </p>
-                      <p className="text-slate-600">
-                        {entry.actor} · {formatDateTime(entry.at)}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              </Card>
-            </>
-          ) : (
-            <Card className="p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Status</p>
-              <p className="mt-2">
-                <Badge tone={statusTone(ticket.status)}>{statusLabel(ticket.status)}</Badge>
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">
+            </div>
+          )}
+        </Card>
+      ) : (
+        <Card className="mt-5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm leading-relaxed text-slate-400">
                 {TICKET_STATUSES.find((s) => s.id === ticket.status)?.detail}
               </p>
               {ticket.assignedToName && (
-                <p className="mt-3 text-sm text-slate-400">
-                  Being handled by{" "}
-                  <span className="font-semibold text-white">{ticket.assignedToName}</span>
+                <p className="mt-1 text-sm text-slate-400">
+                  Being handled by <span className="font-semibold text-white">{ticket.assignedToName}</span>
                 </p>
               )}
-            </Card>
+            </div>
+            {hasDetails && <ToolButton icon={Info} label="Details" onClick={() => togglePanel("info")} active={panel === "info"} />}
+          </div>
+          {panel === "info" && hasDetails && (
+            <dl className="mt-4 grid gap-3 border-t border-white/[0.06] pt-4 sm:grid-cols-2">
+              {(type?.fields ?? []).map((field) =>
+                ticket.details[field.id] ? (
+                  <div key={field.id}>
+                    <dt className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-500">{field.label}</dt>
+                    <dd className="mt-0.5 break-words text-sm text-slate-200">{ticket.details[field.id]}</dd>
+                  </div>
+                ) : null,
+              )}
+            </dl>
           )}
-        </aside>
-      </div>
+        </Card>
+      )}
+
+      {/* The conversation. */}
+      <Card className="mt-5 p-5 sm:p-6">
+        <TicketThread
+          messages={messages}
+          meId={user?.id}
+          canInternal={can.work}
+          greetingName={ticket.openedByName}
+          onSend={send}
+          disabled={ticket.status === "closed" && !can.work}
+          composerRef={composerRef}
+          draft={draft}
+          onDraftChange={setDraft}
+        />
+        {ticket.status === "closed" && !can.work && (
+          <p className="mt-4 rounded-xl bg-black/25 p-3.5 text-sm text-slate-400 ring-1 ring-inset ring-white/[0.06]">
+            This ticket is closed. Open a new one and quote <code className="text-slate-300">{ticket.id}</code> if you
+            need to pick it back up.
+          </p>
+        )}
+      </Card>
 
       <HandOverModal
         open={assigning}
@@ -301,16 +362,32 @@ export default function SupportTicket() {
   );
 }
 
+function ToolButton({ icon: Icon, label, onClick, active }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition",
+        active ? "bg-white/[0.06] text-white" : "text-slate-400 hover:bg-white/[0.04] hover:text-white",
+      )}
+    >
+      <Icon className="size-4" />
+      {label}
+    </button>
+  );
+}
+
 function HandOverModal({ open, onClose, onConfirm }) {
   const [discordId, setDiscordId] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
 
   return (
-    <Modal open={open} onClose={onClose} title="Hand this ticket over">
+    <Modal open={open} onClose={onClose} title="Reassign this ticket">
       <p className="text-sm leading-relaxed text-slate-300">
-        It moves to their queue and the change is written into the ticket's
-        history with your name on it.
+        It moves to their queue and the change is written into the ticket's history with your name on it.
       </p>
       <Field label="Their Discord ID" className="mt-4">
         <TextInput
@@ -325,7 +402,9 @@ function HandOverModal({ open, onClose, onConfirm }) {
       </Field>
       {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
       <div className="mt-6 flex justify-end gap-3">
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
         <Button
           disabled={!/^\d{17,20}$/.test(discordId)}
           onClick={async () => {
@@ -333,7 +412,7 @@ function HandOverModal({ open, onClose, onConfirm }) {
             if (!result?.ok) setError(result?.message ?? "That did not go through.");
           }}
         >
-          Hand over
+          Reassign
         </Button>
       </div>
     </Modal>

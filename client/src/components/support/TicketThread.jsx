@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerUpLeft, Loader2, Lock, Send, X } from "lucide-react";
+import { CornerUpLeft, Loader2, Send, Sparkles, X } from "lucide-react";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import { TextArea } from "../ui/TextInput";
@@ -34,19 +34,23 @@ function roleTone(role) {
 /**
  * The conversation on a ticket.
  *
- * Internal notes sit inline, badged, rather than behind a tab — that is how the
- * team's existing portal shows them, and threading a staff note next to the
- * message it is about is most of its value. The safety is in the composer
- * instead: the note toggle recolours the whole box amber while it is on, so the
+ * A greeting opens every thread so a member who has just opened one sees an
+ * answer waiting rather than their own message alone. Bubbles hug their text
+ * the way a chat app does, names read by role, and internal notes sit inline,
+ * badged — that is how the team's portal shows them, and threading a staff note
+ * next to the message it is about is most of its value. The safety is in the
+ * composer: the note toggle recolours the whole box amber while it is on, so the
  * state you are typing in is impossible to miss.
  *
- * What is *not* a UI decision: an internal note never reaches a member's
- * browser at all. The server drops them from the query.
+ * What is *not* a UI decision: an internal note never reaches a member's browser
+ * at all. The server drops them from the query.
  */
 export default function TicketThread({
   messages,
   meId,
   canInternal,
+  greetingName,
+  viewing = 1,
   onSend,
   disabled = false,
   composerRef,
@@ -83,20 +87,27 @@ export default function TicketThread({
 
   return (
     <div>
-      <div className="space-y-5">
-        {messages.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500">Nothing here yet.</p>
-        ) : (
-          messages.map((message) => (
-            <Message
-              key={message.id}
-              message={message}
-              quoted={message.replyToId ? byId[message.replyToId] : null}
-              mine={message.authorId === meId}
-              onReply={() => setReplyTo(message)}
-            />
-          ))
-        )}
+      <div className="space-y-4">
+        {/* The system greeting opens every thread. */}
+        <div className="rounded-2xl bg-white/[0.03] px-4 py-3.5 text-sm leading-relaxed text-slate-300 ring-1 ring-inset ring-white/[0.06]">
+          <p className="mb-1 flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary-400">
+            <Sparkles className="size-3.5" />
+            Support
+          </p>
+          Hi <span className="font-semibold text-white">{greetingName || "there"}</span>, we&apos;ve
+          received your ticket. A staff member will review it and respond here as soon as possible. If
+          you have extra details, screenshots or clips, add them here anytime.
+        </div>
+
+        {messages.map((message) => (
+          <Message
+            key={message.id}
+            message={message}
+            quoted={message.replyToId ? byId[message.replyToId] : null}
+            mine={message.authorId === meId}
+            onReply={() => setReplyTo(message)}
+          />
+        ))}
         <div ref={endRef} />
       </div>
 
@@ -104,16 +115,39 @@ export default function TicketThread({
         <form
           onSubmit={send}
           className={cn(
-            "mt-6 rounded-2xl p-4 ring-1 ring-inset transition-colors",
+            "mt-5 rounded-2xl p-4 ring-1 ring-inset transition-colors",
             internal ? "bg-amber-500/[0.06] ring-amber-400/30" : "bg-black/20 ring-white/[0.06]",
           )}
         >
+          <div className="mb-2.5 flex items-center gap-3">
+            {canInternal ? (
+              <button
+                type="button"
+                onClick={() => setInternal((v) => !v)}
+                aria-pressed={internal}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] ring-1 ring-inset transition",
+                  internal
+                    ? "bg-amber-500/15 text-amber-200 ring-amber-400/40"
+                    : "bg-white/[0.03] text-slate-400 ring-white/10 hover:text-slate-200",
+                )}
+              >
+                <span className={cn("size-1.5 rounded-full", internal ? "bg-amber-400" : "bg-slate-600")} />
+                Internal reply {internal ? "on" : "off"}
+              </button>
+            ) : (
+              <span />
+            )}
+            <span className="ml-auto text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-slate-600">
+              {viewing} viewing
+            </span>
+          </div>
+
           {replyTo && (
             <div className="mb-3 flex items-start gap-2 rounded-xl bg-black/30 px-3 py-2 text-xs">
               <CornerUpLeft className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
               <p className="min-w-0 flex-1 truncate text-slate-400">
-                <span className="font-semibold text-slate-300">{replyTo.authorName}</span>{" "}
-                {replyTo.body}
+                <span className="font-semibold text-slate-300">{replyTo.authorName}</span> {replyTo.body}
               </p>
               <button
                 type="button"
@@ -132,26 +166,14 @@ export default function TicketThread({
             value={draft}
             disabled={sending}
             onChange={(e) => onDraftChange(e.target.value)}
-            placeholder={internal ? "A note the member will not see…" : "Write a reply…"}
+            placeholder={internal ? "A note the member will not see…" : "Type a message…"}
             className="bg-transparent"
           />
 
           {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
 
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            {canInternal && (
-              <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={internal}
-                  onChange={(e) => setInternal(e.target.checked)}
-                  className="size-4 accent-amber-500"
-                />
-                <Lock className="size-3.5 text-amber-400" />
-                Internal note
-              </label>
-            )}
-            <Button type="submit" size="sm" className="ml-auto" disabled={sending || !draft.trim()}>
+          <div className="mt-3 flex justify-end">
+            <Button type="submit" size="sm" disabled={sending || !draft.trim()}>
               {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               {internal ? "Add note" : "Send"}
             </Button>
@@ -207,12 +229,14 @@ function Message({ message, quoted, mine, onReply }) {
           </div>
         )}
 
+        {/* The bubble hugs its text rather than spanning the column, the way a
+            chat app reads — a one-word reply is a one-word bubble. */}
         <div
           className={cn(
-            "mt-2 whitespace-pre-line break-words rounded-2xl px-4 py-3 text-sm leading-relaxed ring-1 ring-inset",
+            "mt-1.5 w-fit max-w-full whitespace-pre-line break-words rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed ring-1 ring-inset",
             message.internal
               ? "bg-amber-500/[0.06] text-amber-100 ring-amber-400/20"
-              : "bg-white/[0.04] text-slate-200 ring-white/[0.06]",
+              : "bg-white/[0.05] text-slate-200 ring-white/[0.06]",
           )}
         >
           {message.body}
