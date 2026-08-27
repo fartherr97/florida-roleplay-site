@@ -337,7 +337,15 @@ export default function HubAccessCenter() {
                             : "text-slate-300 hover:bg-white/[0.04]",
                         )}
                       >
-                        <span className="min-w-0 flex-1 truncate">{role.rankFull || role.rank}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {role.rankFull || role.rank}
+                          {!role.base && role.department && (
+                            <span className="ml-1.5 text-[11px] font-normal text-slate-500">
+                              {DEPARTMENTS.find((d) => d.id === role.department)?.abbr ??
+                                role.department}
+                            </span>
+                          )}
+                        </span>
                         {capCount > 0 && (
                           <span className="shrink-0 text-[11px] text-slate-500">{capCount}</span>
                         )}
