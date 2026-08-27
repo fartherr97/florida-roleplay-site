@@ -103,7 +103,7 @@ export default function SupportHome() {
                 hover
                 className="group flex h-full flex-col gap-3 p-5"
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   {logo ? (
                     <img
                       src={logo}
