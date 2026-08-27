@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
+import Section from "../../components/layout/Section";
 import DataTable from "../../components/hub/DataTable";
 import SearchHero from "../../components/ui/SearchHero";
 import Select from "../../components/ui/Select";
@@ -234,7 +235,7 @@ export default function CivPenalCode() {
   const pills = [{ value: "all", label: "All" }, ...CLASSES.map((c) => ({ value: c, label: c === "Capital/Life" ? "Capital & Life" : `${c}s` }))];
 
   return (
-    <>
+    <Section>
       <HubPageHeader
         icon="Scale"
         eyebrow="Florida Roleplay"
@@ -312,7 +313,7 @@ export default function CivPenalCode() {
           }}
         />
       )}
-    </>
+    </Section>
   );
 }
 
