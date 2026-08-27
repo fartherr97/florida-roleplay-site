@@ -379,11 +379,22 @@ router.post("/settings", async (req, res) => {
         url,
       };
       delete cfg.hasUrl;
-      await query(`INSERT INTO transfer_webhooks (department_id, config, updated_by)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (department_id) DO UPDATE SET config = EXCLUDED.config, updated_by = EXCLUDED.updated_by`,
+      // Manual upsert rather than ON CONFLICT: the latter needs a unique/primary-key
+      // constraint on department_id, and a table carried over from the MariaDB→Postgres
+      // move can be missing it — in which case ON CONFLICT throws and every save is lost.
+      // Update first, insert only when no row was touched, so persistence never depends on
+      // the constraint being present.
+      const updated = await query(
+        `UPDATE transfer_webhooks SET config = $2, updated_by = $3
+         WHERE department_id = $1 RETURNING department_id`,
         [dept, JSON.stringify(cfg), session.id],
       );
+      if (updated.length === 0) {
+        await query(
+          `INSERT INTO transfer_webhooks (department_id, config, updated_by) VALUES ($1, $2, $3)`,
+          [dept, JSON.stringify(cfg), session.id],
+        );
+      }
     }
   } catch (err) {
     console.error("[transfers] settings save failed:", err?.message);
