@@ -298,7 +298,13 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
       .map(([category, list]) => [
         category,
         list.filter((cap) =>
-          [cap.description, cap.key, category, categoryLabel(category)]
+          [
+            cap.description,
+            cap.key,
+            category,
+            categoryLabel(category),
+            ...(cap.commands ?? []).flatMap((cmd) => [cmd.name, cmd.description]),
+          ]
             .filter(Boolean)
             .some((value) => String(value).toLowerCase().includes(needle)),
         ),
@@ -448,7 +454,7 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
                   type="search"
                   value={capSearch}
                   onChange={(e) => setCapSearch(e.target.value)}
-                  placeholder="Search abilities…"
+                  placeholder="Search abilities or commands…"
                   aria-label="Search abilities"
                   className="pl-10"
                 />
@@ -485,7 +491,20 @@ function TierEditorDialog({ tier, onClose, onSaved }) {
                               </Badge>
                             )}
                           </span>
-                          <span className="text-[11px] text-slate-500">{cap.key}</span>
+                          {cap.commands?.length ? (
+                            <span className="mt-1 block space-y-0.5">
+                              {cap.commands.map((cmd) => (
+                                <span key={cmd.name} className="flex flex-wrap items-baseline gap-1.5 text-[11px] leading-relaxed">
+                                  <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-brand-300">
+                                    {cmd.name}
+                                  </code>
+                                  <span className="text-slate-500">{cmd.description}</span>
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500">{cap.key}</span>
+                          )}
                         </span>
                       </label>
                     ))}
