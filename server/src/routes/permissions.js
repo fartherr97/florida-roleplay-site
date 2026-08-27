@@ -31,12 +31,36 @@ router.use(attachUser);
  * Every role a permission may be granted to: the base roles, every rostered
  * rank, and the tiers that are mapped to a Discord role without being rostered.
  * Tags like LOA are not grantable — they describe a state, not a standing.
+ *
+ * The rank and tier keys are read from the *live* role map, not the seed, so a
+ * Discord role imported on the Access page (keys like `g_<id>`) or any rank
+ * added through the role-mapping editor is grantable the moment it is saved.
+ * The seed is only the fallback for an install with no database. Base roles are
+ * always included because they are structural, not part of the editable map.
  */
-const GRANTABLE = new Set([
-  ...BASE_ROLES.map((role) => role.key),
-  ...ROLE_MAP.map((role) => role.key),
-  ...SPECIAL_ROLES.filter((role) => role.kind === "tier").map((role) => role.key),
-]);
+async function grantableRoles() {
+  const keys = new Set(BASE_ROLES.map((role) => role.key));
+  try {
+    const rows = await query(
+      "SELECT role_key, kind FROM roster_role_map",
+    );
+    if (rows.length) {
+      for (const row of rows) {
+        // Ranks are grantable; among the non-rank rows only tiers are (tags
+        // like LOA describe a state, not a standing).
+        if (row.kind === "rank" || row.kind === "tier") keys.add(row.role_key);
+      }
+      return keys;
+    }
+  } catch {
+    // No database configured — fall back to the seeded ladder below.
+  }
+  for (const role of ROLE_MAP) keys.add(role.key);
+  for (const role of SPECIAL_ROLES) {
+    if (role.kind === "tier") keys.add(role.key);
+  }
+  return keys;
+}
 
 router.get("/catalogue", (_req, res) =>
   res.json({
@@ -69,6 +93,7 @@ router.post("/grants", requirePermission("permissions.manage"), async (req, res)
 
   const errors = [];
   const clean = {};
+  const grantable = await grantableRoles();
 
   for (const [permission, roles] of Object.entries(grants)) {
     if (!PERMISSIONS[permission]) {
@@ -79,7 +104,7 @@ router.post("/grants", requirePermission("permissions.manage"), async (req, res)
       errors.push(`${permission}: roles must be an array.`);
       continue;
     }
-    const unknown = roles.filter((role) => !GRANTABLE.has(role));
+    const unknown = roles.filter((role) => !grantable.has(role));
     if (unknown.length) {
       errors.push(`${permission}: unknown roles ${unknown.join(", ")}`);
       continue;
