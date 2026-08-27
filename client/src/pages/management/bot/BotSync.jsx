@@ -111,6 +111,17 @@ export default function BotSync() {
                   <Badge tone={severityTone(issue.severity)}>{issue.severity}</Badge>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-slate-200">{issue.message}</p>
+                    {(issue.guild || issue.user || issue.mapping) && (
+                      <p className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-300">
+                        {issue.guild?.name && (
+                          <span>
+                            Server: <span className="font-semibold text-white">{issue.guild.name}</span>
+                          </span>
+                        )}
+                        {issue.user?.displayName && <span>· Member: {issue.user.displayName}</span>}
+                        {issue.mapping?.name && <span>· Mapping: {issue.mapping.name}</span>}
+                      </p>
+                    )}
                     <p className="mt-1.5 text-xs text-slate-500">
                       {issue.type}
                       {issue.createdAt && ` · ${formatDateTime(issue.createdAt)}`}
