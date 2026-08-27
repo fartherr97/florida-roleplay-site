@@ -83,7 +83,7 @@ function WebhookRow({ category, fallbackConfigured, onError, onChanged }) {
   const save = () =>
     run(async () => {
       await api(`/log-webhooks/${encodeURIComponent(category.key)}`, {
-        method: "PUT",
+        method: "POST",
         body: { url: url.trim() },
       });
       setUrl("");
@@ -94,7 +94,7 @@ function WebhookRow({ category, fallbackConfigured, onError, onChanged }) {
   const clear = () =>
     run(async () => {
       await api(`/log-webhooks/${encodeURIComponent(category.key)}`, {
-        method: "PUT",
+        method: "POST",
         body: { url: "" },
       });
       onChanged();
