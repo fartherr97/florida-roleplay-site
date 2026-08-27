@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users } from "lucide-react";
+import { BarChart3, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import DeptBrandMark from "../../components/dept/DeptBrandMark";
 import RosterFilters from "../../components/roster/RosterFilters";
 import RosterHeader from "../../components/roster/RosterHeader";
-import RosterStats from "../../components/roster/RosterStats";
 import RosterTable from "../../components/roster/RosterTable";
 import StatusEditor, { StatusPill } from "../../components/hub/StatusEditor";
 import { useAuth } from "../../context/useAuth";
@@ -14,7 +13,7 @@ import { useDeptConfig } from "../../context/useDeptConfig";
 import { statValue } from "../../lib/deptRoster";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { ACTIVITY_STATUSES, statusColor } from "../../data/rosterData";
+import { ACTIVITY_STATUSES } from "../../data/rosterData";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -166,16 +165,20 @@ export default function DeptRoster({ page, config }) {
       <RosterHeader
         mark={<DeptBrandMark config={config} className="size-10" />}
         title={`${config.branding.shortName} · ${page.label}`}
-        subtitle={
-          active?.banner?.subtitle ||
-          "Personnel follow Discord roles — promote someone there and they move here."
-        }
+        subtitle="Personnel follow Discord roles — promote someone there and they move here."
         views={subdivisions.map((sub) => ({ id: sub.id, label: sub.name }))}
         activeView={active?.id}
         onView={setActiveId}
         onRefresh={() => setReloadKey((key) => key + 1)}
         total={everyone.length}
         counts={counts}
+      />
+
+      {active && <SubdivisionBanner config={config} sub={active} />}
+
+      <StatsBar
+        title={stats?.title || `${active?.name ?? config.branding.shortName} statistics`}
+        totals={totals}
       />
 
       <RosterFilters
@@ -209,48 +212,11 @@ export default function DeptRoster({ page, config }) {
           </p>
         </Card>
       ) : (
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_19rem]">
-          <RosterTable
-            columns={columns}
-            groups={groups}
-            empty={`Nobody in ${config.branding.shortName} matches that search.`}
-          />
-
-          <aside className="space-y-5">
-            {totals.length > 0 && (
-              <Card className="p-5">
-                <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                  {active?.name ?? config.branding.shortName}
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {totals.map((item) => (
-                    <div
-                      key={item.id}
-                      className="hub-card-hover rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
-                    >
-                      <div className="dept-accent-text text-xl font-extrabold tracking-tight">
-                        {item.value}
-                      </div>
-                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                        {item.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            <RosterStats
-              title="By status"
-              rows={ACTIVITY_STATUSES.map((entry) => ({
-                label: entry.label,
-                value: everyone.filter((member) => member.status === entry.id).length,
-                color: statusColor(entry.id),
-              })).filter((row) => row.value > 0)}
-              total={everyone.length}
-            />
-          </aside>
-        </div>
+        <RosterTable
+          columns={columns}
+          groups={groups}
+          empty={`Nobody in ${config.branding.shortName} matches that search.`}
+        />
       )}
 
       {editing && (
@@ -264,6 +230,101 @@ export default function DeptRoster({ page, config }) {
         />
       )}
     </>
+  );
+}
+
+/**
+ * The banner across the top of the active subdivision — the reference hub's
+ * centrepiece. Uses the subdivision's own banner artwork when it has any, and
+ * otherwise an accent-tinted gradient with the department mark, so every roster
+ * gets the same strong header whether or not one has been uploaded.
+ */
+function SubdivisionBanner({ config, sub }) {
+  const banner = sub?.banner ?? {};
+  const title = banner.title || sub?.name || config.branding.shortName;
+  const subtitle = banner.subtitle || config.branding.tagline;
+
+  return (
+    <div className="relative mb-5 overflow-hidden rounded-2xl border border-white/10">
+      {banner.imageUrl && (
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${banner.imageUrl})` }}
+        />
+      )}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: banner.imageUrl
+            ? "linear-gradient(90deg, rgba(6,12,24,0.92) 0%, rgba(6,12,24,0.7) 55%, color-mix(in srgb, var(--dept-accent) 24%, rgba(6,12,24,0.5)) 100%)"
+            : "linear-gradient(120deg, color-mix(in srgb, var(--dept-accent) 22%, #0b1424) 0%, #0b1424 62%)",
+        }}
+      />
+      <div className="relative flex items-center gap-4 px-5 py-6 sm:px-8">
+        {banner.logoUrl ? (
+          <img src={banner.logoUrl} alt="" className="size-14 shrink-0 object-contain sm:size-16" />
+        ) : (
+          <DeptBrandMark config={config} className="size-14 text-base sm:size-16" />
+        )}
+        <div className="min-w-0 flex-1 text-center">
+          <h2 className="dept-accent-text truncate text-xl font-extrabold tracking-tight sm:text-3xl">
+            {title}
+          </h2>
+          {subtitle && (
+            <div className="mt-0.5 truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-300 sm:text-sm">
+              {subtitle}
+            </div>
+          )}
+        </div>
+        {/* A mirror slot on the right keeps the title optically centred. */}
+        {banner.logoUrl2 ? (
+          <img src={banner.logoUrl2} alt="" className="size-14 shrink-0 object-contain sm:size-16" />
+        ) : (
+          <span className="hidden size-14 shrink-0 sm:block sm:size-16" aria-hidden="true" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The full-width statistics bar — a titled header and a row of accent-edged
+ * tiles, exactly where the reference hub puts it, rather than tucked into a
+ * side rail.
+ */
+function StatsBar({ title, totals }) {
+  if (totals.length === 0) return null;
+  return (
+    <Card className="mb-4 overflow-hidden p-0">
+      <div
+        className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5"
+        style={{ borderLeft: "3px solid var(--dept-accent)" }}
+      >
+        <BarChart3 className="dept-accent-text size-4" />
+        <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-200">
+          {title}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-5">
+        {totals.map((item) => (
+          <div
+            key={item.id}
+            className="hub-card-hover rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2.5"
+            style={{ borderLeft: `3px solid ${item.color || "var(--dept-accent)"}` }}
+          >
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+              {item.label}
+            </div>
+            <div
+              className="dept-accent-text mt-0.5 text-2xl font-black tabular-nums"
+              style={item.color ? { color: item.color } : undefined}
+            >
+              {item.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
