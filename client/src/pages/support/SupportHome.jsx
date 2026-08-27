@@ -11,7 +11,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { iconFor } from "../../lib/icons";
 import { toneTile } from "../../lib/tones";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTimeLocal } from "../../lib/format";
 import { cn } from "../../lib/cn";
 import { PRIORITY_MAP, statusLabel, statusTone } from "../../lib/support";
 import { useSupportConfig } from "../../context/useSupportConfig";
@@ -193,7 +193,7 @@ export function TicketRow({ ticket, showOpener = false }) {
             </>
           )}
           <span>·</span>
-          <span>{formatDateTime(ticket.lastMessageAt ?? ticket.createdAt)}</span>
+          <span>{formatDateTimeLocal(ticket.lastMessageAt ?? ticket.createdAt)}</span>
           {ticket.assignedToName && (
             <>
               <span>·</span>

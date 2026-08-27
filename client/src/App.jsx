@@ -37,6 +37,7 @@ import DevHome from "./pages/development/DevHome";
 import DevNew from "./pages/development/DevNew";
 import DevRequests from "./pages/development/DevRequests";
 import DevRequestDetail from "./pages/development/DevRequestDetail";
+import DevRoster from "./pages/development/DevRoster";
 import DevLibrary from "./pages/development/DevLibrary";
 import DevHelp from "./pages/development/DevHelp";
 import DevFeedback from "./pages/development/DevFeedback";
@@ -136,6 +137,7 @@ export default function App() {
             <Route path="development/new" element={<DevNew />} />
             <Route path="development/requests" element={<DevRequests />} />
             <Route path="development/requests/:id" element={<DevRequestDetail />} />
+            <Route path="development/roster" element={<DevRoster />} />
             <Route path="development/library" element={<DevLibrary />} />
             <Route path="development/help" element={<DevHelp />} />
             <Route path="development/feedback" element={<DevFeedback />} />

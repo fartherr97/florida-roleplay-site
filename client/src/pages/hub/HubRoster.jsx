@@ -96,7 +96,19 @@ function rowsForRank(rank) {
   return rows;
 }
 
-export default function HubRoster() {
+/**
+ * Reused for the dev-team roster too — same projection, different roster and
+ * accent. The props default to the staff roster so the Staff Hub route needs no
+ * change.
+ */
+export default function HubRoster({
+  slugs = ["staff"],
+  nameMatch = null,
+  fallbackToFirst = true,
+  title = `${SITE.name} · Staff Roster`,
+  label = "staff roster",
+  accent = { callsign: "text-primary-400", position: "text-brand-300" },
+} = {}) {
   const { hasPermission } = useAuth();
   const canEditStatus = hasPermission("roster.edit_status");
 
@@ -134,9 +146,14 @@ export default function HubRoster() {
       .then((result) => {
         if (!active) return;
         const rosters = result?.rosters ?? [];
-        // The staff roster if the bot has one under that slug, otherwise the
-        // first published roster — a single-roster community should just work.
-        const picked = rosters.find((r) => r.slug === "staff") ?? rosters[0] ?? null;
+        // The roster whose slug (or name) this page asks for; for the staff
+        // roster we fall back to the first published one so a single-roster
+        // community just works, but a specific ask (the dev team) does not fall
+        // back to somebody else's roster.
+        const picked =
+          rosters.find((r) => slugs.includes(r.slug) || (nameMatch && nameMatch.test(r.name ?? ""))) ??
+          (fallbackToFirst ? rosters[0] : null) ??
+          null;
         setRoster(picked);
         setState(picked ? "ready" : "empty");
       })
@@ -145,6 +162,9 @@ export default function HubRoster() {
     return () => {
       active = false;
     };
+    // The pick criteria are fixed for a page's lifetime; adding the inline
+    // slugs/nameMatch props would refetch on every render for no gain.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
 
   const ranks = useMemo(() => roster?.ranks ?? [], [roster]);
@@ -221,7 +241,7 @@ export default function HubRoster() {
       label: "Callsign",
       width: "w-24",
       render: (row) => (
-        <span className={row.vacant ? "text-slate-500" : "font-bold text-primary-400"}>
+        <span className={row.vacant ? "text-slate-500" : cn("font-bold", accent.callsign)}>
           {row.callsign || "—"}
         </span>
       ),
@@ -242,7 +262,7 @@ export default function HubRoster() {
       hideBelow: "md",
       render: (row) => (
         <div className="min-w-0">
-          <p className={cn("truncate text-sm font-semibold", row.vacant ? "text-slate-500" : "text-brand-300")}>
+          <p className={cn("truncate text-sm font-semibold", row.vacant ? "text-slate-500" : accent.position)}>
             {row.position}
           </p>
           {row.positionNote && <p className="truncate text-xs text-slate-500">{row.positionNote}</p>}
@@ -328,7 +348,7 @@ export default function HubRoster() {
     <>
       <RosterHeader
         mark={<Logo size="size-10" />}
-        title={`${SITE.name} · Staff Roster`}
+        title={title}
         subtitle={
           state === "ready"
             ? `${filled} of ${seats} seats filled — projected live from Discord.`
@@ -358,7 +378,7 @@ export default function HubRoster() {
         <Card className="mb-5 flex items-start gap-3 p-5">
           <Info className="mt-0.5 size-5 shrink-0 text-amber-400" />
           <p className="text-sm leading-relaxed text-slate-300">
-            The staff roster is served by the bot, and its connection is not configured
+            The {label} is served by the bot, and its connection is not configured
             here yet. Once the bot dashboard is reachable, whoever holds a rank in Discord
             appears on this page automatically.
           </p>
@@ -369,8 +389,8 @@ export default function HubRoster() {
         <Card className="mb-5 flex items-start gap-3 p-5">
           <Info className="mt-0.5 size-5 shrink-0 text-slate-500" />
           <p className="text-sm leading-relaxed text-slate-300">
-            No roster is published from the bot yet. Bind a rank to a Discord role in the
-            bot dashboard and its holders show up here after the next sync.
+            No {label} is published from the bot yet. Create it in the bot dashboard and
+            bind each rank to a Discord role — its holders show up here after the next sync.
           </p>
         </Card>
       )}
