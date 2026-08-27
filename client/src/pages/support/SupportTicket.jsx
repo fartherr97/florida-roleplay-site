@@ -15,13 +15,15 @@ import TicketThread from "../../components/support/TicketThread";
 import FlowRunner from "../../components/support/FlowRunner";
 import { api, ApiForbiddenError } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTime, relativeTime } from "../../lib/format";
 import {
   PRIORITIES,
   PRIORITY_MAP,
   TICKET_STATUSES,
+  isTicketOpen,
   statusLabel,
   statusTone,
+  ticketAge,
 } from "../../lib/support";
 import { useSupportConfig } from "../../context/useSupportConfig";
 
@@ -139,14 +141,22 @@ export default function SupportTicket() {
             <p className="flex flex-wrap items-center gap-2 text-xs">
               <Badge tone={type?.tone ?? "slate"}>{type?.label ?? ticket.type}</Badge>
               <Badge tone={statusTone(ticket.status)}>{statusLabel(ticket.status)}</Badge>
+              {isTicketOpen(ticket.status) &&
+                (() => {
+                  const age = ticketAge(ticket);
+                  return <Badge tone={age.tone}>{age.label}</Badge>;
+                })()}
               {ticket.priority !== "normal" && (
                 <Badge tone={PRIORITY_MAP[ticket.priority]?.tone}>{PRIORITY_MAP[ticket.priority]?.label}</Badge>
               )}
-              <code className="text-slate-600">{ticket.id}</code>
+              <code className="text-slate-600">#{ticket.id}</code>
             </p>
             <h1 className="mt-2 text-2xl font-black tracking-tight text-white">{ticket.subject}</h1>
             <p className="mt-1 text-sm text-slate-500">
               Opened by {ticket.openedByName} · {formatDateTime(ticket.createdAt)}
+              {ticket.lastMessageAt && ticket.lastMessageAt !== ticket.createdAt && (
+                <> · Updated {relativeTime(ticket.lastMessageAt)}</>
+              )}
             </p>
           </div>
 

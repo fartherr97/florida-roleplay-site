@@ -1,5 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   Bell,
@@ -54,6 +54,17 @@ const ACCENT = {
 
 const PRIORITY_ORDER = Object.fromEntries(PRIORITIES.map((p, i) => [p.id, PRIORITIES.length - i]));
 
+const TABS = [
+  { id: "all", label: "All" },
+  { id: "stale", label: "Stale" },
+  { id: "aging", label: "Aging" },
+  { id: "recent", label: "Recent" },
+  { id: "fresh", label: "Fresh" },
+  { id: "mine", label: "My assigned" },
+  { id: "archived", label: "Archived" },
+];
+const TAB_IDS = new Set(TABS.map((t) => t.id));
+
 /** How recently a ticket has to have moved to count as "new activity". */
 const NEW_ACTIVITY_MS = 60 * 60 * 1000;
 
@@ -70,7 +81,20 @@ export default function SupportQueue() {
   const { types } = useSupportConfig();
 
   const [data, setData] = useState(null);
-  const [tab, setTab] = useState("all");
+  // The tab lives in the URL so the portal drawer can deep-link straight to "My
+  // assigned" or "Archived", and a shared link lands on the same view.
+  const [params, setParams] = useSearchParams();
+  const tab = TAB_IDS.has(params.get("tab")) ? params.get("tab") : "all";
+  const setTab = (id) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (id === "all") next.delete("tab");
+        else next.set("tab", id);
+        return next;
+      },
+      { replace: true },
+    );
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [reassigning, setReassigning] = useState(null);
@@ -196,16 +220,6 @@ export default function SupportQueue() {
       else next.add(id);
       return next;
     });
-
-  const TABS = [
-    { id: "all", label: "All" },
-    { id: "stale", label: "Stale" },
-    { id: "aging", label: "Aging" },
-    { id: "recent", label: "Recent" },
-    { id: "fresh", label: "Fresh" },
-    { id: "mine", label: "My assigned" },
-    { id: "archived", label: "Archived" },
-  ];
 
   return (
     <Section className="max-w-6xl">

@@ -39,7 +39,7 @@ export default function FlowRunner({ flows, ticket, agent, onInsert }) {
       <Card className="p-5">
         <p className="flex items-center gap-2 text-sm font-bold text-white">
           <Workflow className="size-4 text-slate-400" />
-          Response flows
+          Response flowchart
         </p>
         <p className="mt-2 text-sm text-slate-500">
           None set up for this ticket type yet.
@@ -52,7 +52,7 @@ export default function FlowRunner({ flows, ticket, agent, onInsert }) {
     <Card className="p-5">
       <p className="flex items-center gap-2 text-sm font-bold text-white">
         <Workflow className="size-4 text-slate-400" />
-        Response flows
+        Response flowchart
       </p>
       <p className="mt-1 text-xs leading-relaxed text-slate-500">
         Answer the questions and it drops the reply into the box. Nothing sends

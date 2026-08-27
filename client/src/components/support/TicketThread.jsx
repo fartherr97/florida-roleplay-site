@@ -4,7 +4,32 @@ import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import { TextArea } from "../ui/TextInput";
 import { cn } from "../../lib/cn";
+import { toneTile } from "../../lib/tones";
 import { formatDateTime } from "../../lib/format";
+
+/**
+ * A staff name reads by its role, the way the team's Discord does — so an owner
+ * answering and a trial mod answering are told apart at a glance. The colour is
+ * derived from the role string, so a newly named rank gets a stable colour with
+ * nothing to wire up. Members (no role) stay neutral.
+ */
+const ROLE_TONES = ["brand", "green", "violet", "primary", "amber", "rose"];
+const NAME_TEXT = {
+  brand: "text-brand-300",
+  green: "text-emerald-300",
+  violet: "text-violet-300",
+  primary: "text-primary-300",
+  amber: "text-amber-300",
+  rose: "text-rose-300",
+  slate: "text-white",
+};
+
+function roleTone(role) {
+  if (!role) return "slate";
+  let hash = 0;
+  for (const char of String(role)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return ROLE_TONES[hash % ROLE_TONES.length];
+}
 
 /**
  * The conversation on a ticket.
@@ -138,14 +163,13 @@ export default function TicketThread({
 }
 
 function Message({ message, quoted, mine, onReply }) {
+  const tone = message.internal ? "amber" : roleTone(message.authorRole);
   return (
     <article className="group flex gap-3">
       <span
         className={cn(
           "mt-0.5 grid size-9 shrink-0 place-items-center rounded-full text-[0.7rem] font-bold ring-1 ring-inset",
-          message.internal
-            ? "bg-amber-500/10 text-amber-300 ring-amber-400/25"
-            : "bg-white/[0.06] text-slate-300 ring-white/10",
+          toneTile(tone),
         )}
       >
         {initials(message.authorName)}
@@ -153,9 +177,16 @@ function Message({ message, quoted, mine, onReply }) {
 
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-bold text-white">{message.authorName}</span>
+          <span className={cn("font-bold", NAME_TEXT[tone] ?? "text-white")}>{message.authorName}</span>
           {message.authorRole && (
-            <span className="text-slate-500">{message.authorRole}</span>
+            <span
+              className={cn(
+                "rounded-md px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide ring-1 ring-inset",
+                toneTile(tone),
+              )}
+            >
+              {message.authorRole}
+            </span>
           )}
           {message.internal && <Badge tone="amber">Internal</Badge>}
           {mine && <Badge tone="slate">You</Badge>}
