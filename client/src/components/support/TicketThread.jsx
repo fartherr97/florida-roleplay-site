@@ -192,7 +192,7 @@ export default function TicketThread({
 
           <TextArea
             ref={composerRef}
-            rows={3}
+            rows={4}
             value={draft}
             disabled={sending}
             onChange={(e) => {
@@ -200,7 +200,9 @@ export default function TicketThread({
               onTyping?.();
             }}
             placeholder={internal ? "A note the member will not see…" : "Type a message…"}
-            className="bg-transparent"
+            // Taller everywhere, and a touch taller with 16px text on phones —
+            // small enough to zoom on focus and cramped to type in otherwise.
+            className="min-h-40 bg-transparent max-sm:text-base sm:min-h-32"
           />
 
           {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}

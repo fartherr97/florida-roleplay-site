@@ -79,31 +79,27 @@ async function loadTypes() {
 }
 
 /**
- * The name a member speaks under in a thread, in the community's own format —
- * "100 | Owner | Mike". The callsign and rank come from the synced roster, the
- * name from their profile. Staff with a rank but no callsign read "Owner | Mike";
- * a plain member is just their name. Best-effort: with no roster row (or no
- * database) it falls back to the plain name, so nothing ever renders blank.
+ * The name a member speaks under in a thread: their Discord display name in the
+ * main guild — "100 | Owner | Mike" — which the bot already keeps in the format
+ * the community uses. It is mirrored into the synced roster as display_name, so
+ * that is the one source of truth here. Best-effort: with no roster row (or no
+ * database) it falls back to the member's profile name, so nothing renders blank.
  */
 async function rosterNameFor(user) {
-  const name = user?.displayName ?? user?.username ?? "Unknown";
-  const rank = user?.rank ?? null;
+  const fallback = user?.displayName ?? user?.username ?? "Unknown";
   try {
     const rows = await query(
-      `SELECT callsign, rank_label AS "rankLabel"
+      `SELECT display_name AS "displayName"
          FROM roster_members
-        WHERE discord_id = $1 AND callsign IS NOT NULL AND callsign <> ''
+        WHERE discord_id = $1 AND display_name IS NOT NULL AND display_name <> ''
         ORDER BY synced_at DESC LIMIT 1`,
       [user.id],
     );
-    const row = rows[0];
-    if (row?.callsign) {
-      return [row.callsign, row.rankLabel ?? rank, name].filter(Boolean).join(" | ");
-    }
+    if (rows[0]?.displayName) return rows[0].displayName;
   } catch {
-    // No database — the plain name (or rank + name) stands.
+    // No database — the profile name stands.
   }
-  return rank ? `${rank} | ${name}` : name;
+  return fallback;
 }
 
 function requireSignIn(ctx, res) {
@@ -497,12 +493,9 @@ router.get("/staff/list", async (req, res) => {
     const rows = await query(
       `SELECT u.id AS "discordId", u.display_name AS "displayName", u.username, u.avatar,
               ARRAY(SELECT role FROM user_roles WHERE user_id = u.id) AS roles,
-              (SELECT callsign FROM roster_members
-                 WHERE discord_id = u.id AND callsign IS NOT NULL AND callsign <> ''
-                 ORDER BY synced_at DESC LIMIT 1) AS callsign,
-              (SELECT rank_label FROM roster_members
-                 WHERE discord_id = u.id AND callsign IS NOT NULL AND callsign <> ''
-                 ORDER BY synced_at DESC LIMIT 1) AS "rosterRank"
+              (SELECT display_name FROM roster_members
+                 WHERE discord_id = u.id AND display_name IS NOT NULL AND display_name <> ''
+                 ORDER BY synced_at DESC LIMIT 1) AS "rosterName"
          FROM users u
         WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ANY($1))`,
       [ASSIGNABLE_ROLES],
@@ -511,17 +504,17 @@ router.get("/staff/list", async (req, res) => {
     const staff = rows
       .map((row) => {
         const roles = row.roles ?? [];
-        const rank = rankFor(roles) ?? row.rosterRank ?? null;
+        const rank = rankFor(roles) ?? null;
         const name = row.displayName ?? row.username ?? "Unknown";
         const seniority = Math.max(0, ...roles.map((r) => ASSIGNABLE_SENIORITY[r] ?? 0));
         return {
           discordId: row.discordId,
           name,
           rank,
-          callsign: row.callsign ?? null,
           avatar: row.avatar ?? null,
-          // The full roster label, which is also what we store as the assignee.
-          label: [row.callsign, rank, name].filter(Boolean).join(" | "),
+          // Their guild display name — the "100 | Owner | Mike" the bot keeps —
+          // which is also what the ticket records as the assignee.
+          label: row.rosterName || (rank ? `${rank} | ${name}` : name),
           seniority,
         };
       })
