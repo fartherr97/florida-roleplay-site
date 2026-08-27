@@ -78,6 +78,34 @@ async function loadTypes() {
   return DEFAULT_TICKET_TYPES;
 }
 
+/**
+ * The name a member speaks under in a thread, in the community's own format —
+ * "100 | Owner | Mike". The callsign and rank come from the synced roster, the
+ * name from their profile. Staff with a rank but no callsign read "Owner | Mike";
+ * a plain member is just their name. Best-effort: with no roster row (or no
+ * database) it falls back to the plain name, so nothing ever renders blank.
+ */
+async function rosterNameFor(user) {
+  const name = user?.displayName ?? user?.username ?? "Unknown";
+  const rank = user?.rank ?? null;
+  try {
+    const rows = await query(
+      `SELECT callsign, rank_label AS "rankLabel"
+         FROM roster_members
+        WHERE discord_id = $1 AND callsign IS NOT NULL AND callsign <> ''
+        ORDER BY synced_at DESC LIMIT 1`,
+      [user.id],
+    );
+    const row = rows[0];
+    if (row?.callsign) {
+      return [row.callsign, row.rankLabel ?? rank, name].filter(Boolean).join(" | ");
+    }
+  } catch {
+    // No database — the plain name (or rank + name) stands.
+  }
+  return rank ? `${rank} | ${name}` : name;
+}
+
 function requireSignIn(ctx, res) {
   if (ctx.user) return false;
   res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in with Discord to use support." });
@@ -198,6 +226,10 @@ router.post("/", async (req, res) => {
 
   const id = makeTicketId();
   const name = ctx.user.displayName ?? ctx.user.username ?? "Unknown";
+  // The opener speaks in the thread under their roster name; the ticket itself
+  // records their plain name, so the queue and the greeting read "Mike" rather
+  // than "100 | Owner | Mike".
+  const speakerName = await rosterNameFor(ctx.user);
   const details = cleanDetails(draft.type, draft.details, ctx.types);
   const history = [{ action: "opened", actor: name, details: type.label, at: new Date().toISOString() }];
 
@@ -209,9 +241,9 @@ router.post("/", async (req, res) => {
     );
     // The opening message is the first post in the thread, so the conversation
     // reads as one rather than starting with a reply to something invisible.
-    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_avatar, body)
-       VALUES ($1, $2, false, $3, $4, $5, $6)`,
-      [`sm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, id, ctx.user.id, name, ctx.user.avatar ?? null, draft.body],
+    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, author_avatar, body)
+       VALUES ($1, $2, false, $3, $4, $5, $6, $7)`,
+      [`sm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, id, ctx.user.id, speakerName, ctx.user.rank ?? null, ctx.user.avatar ?? null, draft.body],
     );
   } catch {
     return noStore(res);
@@ -346,7 +378,7 @@ router.post("/:id/messages", async (req, res) => {
     ticketId: ticket.id,
     internal: wantsInternal,
     authorId: ctx.user.id,
-    authorName: ctx.user.displayName ?? ctx.user.username ?? "Unknown",
+    authorName: await rosterNameFor(ctx.user),
     authorRole: ctx.user.rank ?? null,
     authorAvatar: ctx.user.avatar ?? null,
     body,
@@ -398,7 +430,7 @@ router.post("/:id/presence", async (req, res) => {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That ticket is not yours." });
   }
 
-  const name = ctx.user.displayName ?? ctx.user.username ?? "Someone";
+  const name = await rosterNameFor(ctx.user);
   const typing = req.body?.typing === true;
   const leaving = req.body?.leaving === true;
 

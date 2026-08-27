@@ -226,7 +226,10 @@ function Message({ message, quoted, mine, onReply }) {
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 text-xs">
           <span className={cn("font-bold", NAME_TEXT[tone] ?? "text-white")}>{message.authorName}</span>
-          {message.authorRole && (
+          {/* Legacy rows stored a bare name and a separate rank; the chip fills
+              that in. New names already read "100 | Owner | Mike", so it is
+              dropped to avoid saying the rank twice. */}
+          {message.authorRole && !String(message.authorName).includes("|") && (
             <span
               className={cn(
                 "rounded-md px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide ring-1 ring-inset",
