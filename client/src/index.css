@@ -353,3 +353,21 @@ button:disabled { cursor: not-allowed; }
   .dept-hub .lift:hover,
   .dept-hub .hub-card-hover:hover { transform: none; }
 }
+
+/* ─── Welcome page: announcement ticker + Ken-Burns gallery ─── */
+@keyframes dhubTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.dept-hub .ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: dhubTicker var(--ticker-duration, 40s) linear infinite;
+}
+.dept-hub .ticker-half { display: inline-flex; flex-shrink: 0; }
+.dept-hub .ticker-mask:hover .ticker-track { animation-play-state: paused; }
+
+@keyframes dhubKenBurns { from { transform: scale(1.02); } to { transform: scale(1.12); } }
+.dept-hub .ken-burns { animation: dhubKenBurns 12s ease-out both; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dept-hub .ticker-track { animation: none; }
+  .dept-hub .ken-burns { animation: none; }
+}

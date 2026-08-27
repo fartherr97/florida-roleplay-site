@@ -8,6 +8,7 @@ import Field from "../../../components/ui/Field";
 import Select from "../../../components/ui/Select";
 import { TextInput } from "../../../components/ui/TextInput";
 import BlockEditor from "./BlockEditor";
+import WelcomeEditor from "./WelcomeEditor";
 import TabIntro from "./TabIntro";
 import { useDeptConfig } from "../../../context/useDeptConfig";
 import { PAGE_TYPES, PAGE_TYPE_MAP } from "../../../lib/departmentConfig";
@@ -26,6 +27,7 @@ export default function PagesTab({ config }) {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [blocksFor, setBlocksFor] = useState(null);
+  const [welcomeFor, setWelcomeFor] = useState(null);
   const [confirming, setConfirming] = useState(null);
 
   const pages = config.pages;
@@ -42,6 +44,7 @@ export default function PagesTab({ config }) {
   };
 
   const blockPage = blocksFor ? pages.find((page) => page.id === blocksFor) : null;
+  const welcomePage = welcomeFor ? pages.find((page) => page.id === welcomeFor) : null;
 
   return (
     <>
@@ -62,7 +65,8 @@ export default function PagesTab({ config }) {
         {pages.map((page, index) => {
           const type = PAGE_TYPE_MAP[page.type];
           const group = groups.find((g) => g.id === page.navGroup);
-          const hasBlocks = page.type === "home" || page.type === "content";
+          const hasBlocks =
+            page.type === "home" || page.type === "content" || page.type === "welcome";
 
           return (
             <Card key={page.id} className="flex flex-wrap items-center gap-3 p-4">
@@ -105,6 +109,11 @@ export default function PagesTab({ config }) {
                 >
                   <ChevronDown className="size-4" />
                 </button>
+                {page.type === "welcome" && (
+                  <Button variant="ghost" size="sm" onClick={() => setWelcomeFor(page.id)}>
+                    Welcome
+                  </Button>
+                )}
                 {hasBlocks && (
                   <Button variant="ghost" size="sm" onClick={() => setBlocksFor(page.id)}>
                     Content
@@ -166,6 +175,14 @@ export default function PagesTab({ config }) {
           page={blockPage}
           config={config}
           onClose={() => setBlocksFor(null)}
+        />
+      )}
+
+      {welcomePage && (
+        <WelcomeEditor
+          key={welcomePage.id}
+          page={welcomePage}
+          onClose={() => setWelcomeFor(null)}
         />
       )}
 

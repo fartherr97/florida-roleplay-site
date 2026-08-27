@@ -140,6 +140,7 @@ export function accessLevelFor(config, roleKeys = [], permissions = new Set()) {
  */
 export const PAGE_TYPES = [
   { type: "home", label: "Home", icon: "Home", detail: "Hero banner plus content blocks." },
+  { type: "welcome", label: "Welcome", icon: "Star", detail: "A public landing: hero over a rotating photo gallery, an announcements ticker and content blocks." },
   { type: "content", label: "Content", icon: "BookOpen", detail: "A page of content blocks — SOPs, resources, guides." },
   { type: "roster", label: "Roster", icon: "Users", detail: "Personnel grouped into categories, projected from the community roster.", edit: "editRoster" },
   { type: "fleet", label: "Fleet", icon: "Car", detail: "The vehicle roster.", edit: "editStructure" },

@@ -12,6 +12,7 @@ import { useAuth } from "../../context/useAuth";
 import { canOpenPage, navFor, resolvePage, themeVars } from "../../lib/departmentConfig";
 
 import DeptHome from "../../pages/dept/DeptHome";
+import DeptWelcome from "../../pages/dept/DeptWelcome";
 import DeptContent from "../../pages/dept/DeptContent";
 import DeptRoster from "../../pages/dept/DeptRoster";
 import DeptFleet from "../../pages/dept/DeptFleet";
@@ -38,6 +39,7 @@ const DeptBuilder = lazy(() => import("../../pages/dept/builder/DeptBuilder"));
  */
 const PAGE_COMPONENTS = {
   home: DeptHome,
+  welcome: DeptWelcome,
   content: DeptContent,
   roster: DeptRoster,
   fleet: DeptFleet,
