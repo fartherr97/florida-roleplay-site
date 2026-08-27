@@ -84,7 +84,11 @@ export default function DeptBuilder({ page, config }) {
         ))}
       </div>
 
-      <Component config={config} />
+      {/* Keyed so switching tabs glides the new panel in, matching the
+          reference hub's tab feel. */}
+      <div key={tab.id} className="anim-tab-in">
+        <Component config={config} />
+      </div>
     </>
   );
 }
