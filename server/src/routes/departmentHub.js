@@ -26,6 +26,7 @@ import { requirePermission, loadGrants } from "../middleware/requirePermission.j
 import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { projectRoster } from "../lib/deptRoster.js";
+import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
 import { resolveDepartmentId } from "../lib/tenant.js";
 import { collect, str } from "../validate.js";
 import {
@@ -308,8 +309,14 @@ router.get(
 const NOT_PERSISTED =
   "Accepted, but not persisted — no database is configured, so this will reset on reload.";
 
-/** Persist a config, versioning the copy it replaces first. */
-async function saveConfig(req, res, config, action, summary) {
+/**
+ * Persist a config, versioning the copy it replaces first. `onCommitted` runs
+ * only after the write actually lands (never on the no-database path), for side
+ * effects that must not happen on a rejected or unpersisted save — firing the
+ * admin-log webhook, say. It is fire-and-forget: its failure never fails the
+ * save that already succeeded.
+ */
+async function saveConfig(req, res, config, action, summary, onCommitted) {
   const errors = validateConfig(config);
   if (errors.length > 0) return res.status(400).json({ ok: false, errors });
 
@@ -324,6 +331,7 @@ async function saveConfig(req, res, config, action, summary) {
     return res.json({ ok: true, config, message: NOT_PERSISTED });
   }
   await audit(req.departmentId, req, action, summary);
+  if (onCommitted) Promise.resolve().then(onCommitted).catch(() => {});
   return res.json({ ok: true, config });
 }
 
@@ -374,7 +382,21 @@ router.put(
         p.id === page.id ? { ...p, config: req.body.config } : p,
       ),
     };
-    await saveConfig(req, res, next_, "page.save", `Edited the "${page.label}" page.`);
+
+    // The Emergency-Services admin log posts each newly-filed entry to Discord.
+    // The diff is taken here, against the stored page, so re-saving never
+    // re-posts; the webhook fires only after the entry actually persists.
+    const onCommitted =
+      page.type === "adminlog"
+        ? () =>
+            fireAdminLogWebhook(
+              req.deptConfig,
+              page.config?.entries,
+              req.body.config?.entries,
+            )
+        : undefined;
+
+    await saveConfig(req, res, next_, "page.save", `Edited the "${page.label}" page.`, onCommitted);
   },
 );
 

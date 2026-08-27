@@ -8,6 +8,7 @@ import StartHereTab from "./StartHereTab";
 import BrandingTab from "./BrandingTab";
 import PagesTab from "./PagesTab";
 import RosterTab from "./RosterTab";
+import WebhooksTab from "./WebhooksTab";
 import AdvancedTab from "./AdvancedTab";
 import { cn } from "../../../lib/cn";
 
@@ -24,6 +25,7 @@ const TABS = [
   { id: "branding", label: "Branding", Component: BrandingTab },
   { id: "pages", label: "Pages", Component: PagesTab },
   { id: "roster", label: "Roster", Component: RosterTab },
+  { id: "webhooks", label: "Webhooks", Component: WebhooksTab },
   { id: "advanced", label: "Advanced", Component: AdvancedTab },
 ];
 

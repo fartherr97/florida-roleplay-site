@@ -46,6 +46,14 @@ export default function DeptAdminLog({ page, config }) {
         <p className="text-xs leading-relaxed text-slate-400">
           Entries here are the department's own record. They do not change anyone's Discord
           roles — a promotion takes effect when the role is granted, and the roster follows it.
+          {config.webhooks?.adminlog?.enabled && (
+            <>
+              {" "}
+              <span className="dept-accent-text font-semibold">
+                Each new entry is posted to the department's Discord admin-log channel.
+              </span>
+            </>
+          )}
         </p>
       </Card>
       <RecordTable
