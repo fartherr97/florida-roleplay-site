@@ -8,10 +8,10 @@ import { useDeptConfig } from "../../context/useDeptConfig";
  * being copied verbatim.
  */
 const FIELDS = [
-  { id: "name", label: "Kit", type: "text" },
+  { id: "name", label: "Kit", type: "text", title: true },
+  { id: "imageUrl", label: "Reference image", type: "url", image: true, hint: "A link to a screenshot." },
   { id: "rank", label: "Worn by", type: "text", hint: "Which ranks or assignments wear this." },
-  { id: "code", label: "Clothing code", type: "text" },
-  { id: "imageUrl", label: "Reference image", type: "url", hint: "A link to a screenshot." },
+  { id: "code", label: "Clothing code", type: "text", copyable: true },
   { id: "notes", label: "Notes", type: "textarea" },
 ];
 
@@ -31,6 +31,7 @@ export default function DeptUniforms({ page, config }) {
         fields={FIELDS}
         canEdit={can("editStructure")}
         singular="kit"
+        layout="cards"
         empty="No uniform kits recorded yet."
       />
     </>
