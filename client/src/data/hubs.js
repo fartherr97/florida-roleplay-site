@@ -118,9 +118,7 @@ export const STAFF_HUB = {
       id: "access",
       label: "Access control",
       items: [
-        { to: "/staff-hub/access", label: "Access", icon: "KeyRound", permission: "permissions.manage", detail: "One place: pick a Discord role, set its ID, and tick what it can do site-wide." },
-        { to: "/staff-hub/permissions", label: "Permissions matrix", icon: "Grid3x3", permission: "permissions.manage", detail: "The full capability × role grid, for power edits." },
-        { to: "/staff-hub/discord-roles", label: "Discord Role Mapping", icon: "Key", permission: "discord.roles.manage", detail: "Which Discord role is each rank, tier and tag." },
+        { to: "/staff-hub/access", label: "Access & Roles", icon: "KeyRound", permission: "permissions.manage", detail: "One place: pick a Discord role, set its ID, and tick what it can do site-wide and per department." },
       ],
     },
     {
