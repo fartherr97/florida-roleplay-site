@@ -23,6 +23,8 @@ export default function DevLibrary() {
   const [data, setData] = useState(null);
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null); // vehicle | "new" | null
+  const [deleting, setDeleting] = useState(null); // vehicle | null
+  const [removing, setRemoving] = useState(false);
 
   const reload = () => api.devVehicles().then(setData).catch(() => setData({ vehicles: [], canManage: false }));
   useEffect(() => {
@@ -89,11 +91,7 @@ export default function DevLibrary() {
               vehicle={vehicle}
               canManage={canManage}
               onEdit={() => setEditing(vehicle)}
-              onDelete={async () => {
-                if (!window.confirm(`Remove ${vehicle.name}?`)) return;
-                const result = await api.deleteDevVehicle(vehicle.id);
-                if (result?.ok) reload();
-              }}
+              onDelete={() => setDeleting(vehicle)}
             />
           ))}
         </div>
@@ -109,6 +107,31 @@ export default function DevLibrary() {
           }}
         />
       )}
+
+      <Modal open={Boolean(deleting)} onClose={() => setDeleting(null)} title="Remove vehicle">
+        <p className="text-sm leading-relaxed text-slate-300">
+          Remove <span className="font-semibold text-white">{deleting?.name}</span> from the library? This can&apos;t be undone.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="ghost" onClick={() => setDeleting(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={removing}
+            onClick={async () => {
+              setRemoving(true);
+              const result = await api.deleteDevVehicle(deleting.id);
+              setRemoving(false);
+              setDeleting(null);
+              if (result?.ok) reload();
+            }}
+          >
+            <Trash2 className="size-4" />
+            Remove
+          </Button>
+        </div>
+      </Modal>
     </Section>
   );
 }
