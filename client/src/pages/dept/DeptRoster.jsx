@@ -350,7 +350,23 @@ function MemberCell({ field, member, editable, onEdit }) {
     return value ? <Badge tone="green">Certified</Badge> : <Badge tone="slate">N/A</Badge>;
   }
   if (field.type === "select" && field.pill) {
-    return value ? <Badge tone="slate">{value}</Badge> : <span className="text-slate-600">—</span>;
+    if (!value) return <span className="text-slate-600">—</span>;
+    const color = field.optionColors?.[value];
+    if (color) {
+      return (
+        <span
+          className="inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-bold"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
+            borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
+            color,
+          }}
+        >
+          {value}
+        </span>
+      );
+    }
+    return <Badge tone="slate">{value}</Badge>;
   }
   return value ? <span className="text-slate-400">{value}</span> : <span className="text-slate-600">—</span>;
 }

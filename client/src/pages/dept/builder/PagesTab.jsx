@@ -196,34 +196,89 @@ export default function PagesTab({ config }) {
   );
 }
 
-/** Rename the nav groups the pages are sorted into. */
+/** Add, rename, reorder and remove the nav groups the pages are sorted into. */
 function NavGroups({ config }) {
   const { mutate } = useDeptConfig();
+  const groups = config.navGroups;
+
+  const setGroups = (next) => mutate((current) => ({ ...current, navGroups: next }));
 
   const rename = (id, label) =>
-    mutate((current) => ({
-      ...current,
-      navGroups: current.navGroups.map((group) =>
-        group.id === id ? { ...group, label } : group,
-      ),
-    }));
+    setGroups(groups.map((group) => (group.id === id ? { ...group, label } : group)));
+
+  const move = (index, delta) => {
+    const next = [...groups];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    setGroups(next);
+  };
+
+  const add = () =>
+    setGroups([...groups, { id: `group-${Date.now()}`, label: "New group" }]);
+
+  // Removing a group leaves its pages without a home; the config normaliser
+  // reparents any orphaned page to the first group, so the pages survive — they
+  // just move. The last group can't be removed, since every page needs one.
+  const remove = (id) => setGroups(groups.filter((group) => group.id !== id));
 
   return (
     <Card className="mt-6 p-5">
-      <h3 className="mb-1 text-sm font-bold uppercase tracking-[0.14em] text-white">Nav groups</h3>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Nav groups</h3>
+        <Button variant="ghost" size="sm" onClick={add}>
+          <Plus className="size-4" />
+          Add group
+        </Button>
+      </div>
       <p className="mb-4 text-sm text-slate-400">
-        Each group is one dropdown in the top bar. A group with no pages the viewer can open is
-        hidden rather than shown empty.
+        Each group is one dropdown in the top bar, in this order. A group with no pages the viewer
+        can open is hidden rather than shown empty. Removing a group moves its pages to the first
+        group.
       </p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {config.navGroups.map((group) => (
-          <Field key={group.id} label={group.id} htmlFor={`group-${group.id}`}>
-            <TextInput
-              id={`group-${group.id}`}
-              value={group.label}
-              onChange={(e) => rename(group.id, e.target.value)}
-            />
-          </Field>
+      <div className="space-y-2">
+        {groups.map((group, index) => (
+          <div
+            key={group.id}
+            className="flex flex-wrap items-end gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
+          >
+            <Field label="Label" htmlFor={`group-${group.id}`} className="min-w-40 flex-1">
+              <TextInput
+                id={`group-${group.id}`}
+                value={group.label}
+                onChange={(e) => rename(group.id, e.target.value)}
+              />
+            </Field>
+            <div className="mb-1 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => move(index, -1)}
+                disabled={index === 0}
+                aria-label="Move group up"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+              >
+                <ChevronUp className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(index, 1)}
+                disabled={index === groups.length - 1}
+                aria-label="Move group down"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+              >
+                <ChevronDown className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => remove(group.id)}
+                disabled={groups.length <= 1}
+                aria-label={`Remove ${group.label}`}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-30"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          </div>
         ))}
       </div>
     </Card>

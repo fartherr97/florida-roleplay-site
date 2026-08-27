@@ -242,38 +242,39 @@ function MemberFields({ config, onChange }) {
         {fields.map((field) => (
           <div
             key={field.id}
-            className="flex flex-wrap items-end gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
+            className="rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
           >
-            <Field label="Label" htmlFor={`f-${field.id}`} className="min-w-40 flex-1">
-              <TextInput
-                id={`f-${field.id}`}
-                value={field.label}
-                onChange={(e) => update(field.id, { label: e.target.value })}
-              />
-            </Field>
-            <Field label="Type" htmlFor={`ft-${field.id}`} className="w-40">
-              <Select
-                id={`ft-${field.id}`}
-                value={field.type}
-                onChange={(e) => update(field.id, { type: e.target.value })}
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Label" htmlFor={`f-${field.id}`} className="min-w-40 flex-1">
+                <TextInput
+                  id={`f-${field.id}`}
+                  value={field.label}
+                  onChange={(e) => update(field.id, { label: e.target.value })}
+                />
+              </Field>
+              <Field label="Type" htmlFor={`ft-${field.id}`} className="w-40">
+                <Select
+                  id={`ft-${field.id}`}
+                  value={field.type}
+                  onChange={(next) => update(field.id, { type: next })}
+                  options={["text", "date", "checkbox", "cert", "select"]}
+                />
+              </Field>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({ memberFields: fields.filter((entry) => entry.id !== field.id) })
+                }
+                aria-label={`Remove ${field.label}`}
+                className="mb-2 rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
               >
-                {["text", "date", "checkbox", "cert", "select"].map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <button
-              type="button"
-              onClick={() =>
-                onChange({ memberFields: fields.filter((entry) => entry.id !== field.id) })
-              }
-              aria-label={`Remove ${field.label}`}
-              className="mb-2 rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
-            >
-              <X className="size-4" />
-            </button>
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {field.type === "select" && (
+              <SelectOptions field={field} onChange={(changes) => update(field.id, changes)} />
+            )}
           </div>
         ))}
       </div>
@@ -295,6 +296,92 @@ function MemberFields({ config, onChange }) {
         Add a column
       </Button>
     </Card>
+  );
+}
+
+/** The values (and, for a pill, their colours) a select column can take. */
+function SelectOptions({ field, onChange }) {
+  const options = Array.isArray(field.options) ? field.options : [];
+  const colors = field.optionColors ?? {};
+
+  const setOption = (index, value) => {
+    const prev = options[index];
+    const next = options.slice();
+    next[index] = value;
+    // Carry the colour with the renamed value so recolouring survives an edit.
+    const nextColors = { ...colors };
+    if (prev in nextColors) {
+      nextColors[value] = nextColors[prev];
+      if (prev !== value) delete nextColors[prev];
+    }
+    onChange({ options: next, optionColors: nextColors });
+  };
+
+  const remove = (index) => {
+    const value = options[index];
+    const nextColors = { ...colors };
+    delete nextColors[value];
+    onChange({ options: options.filter((_, i) => i !== index), optionColors: nextColors });
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/[0.06] bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+          Options
+        </span>
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          <input
+            type="checkbox"
+            checked={!!field.pill}
+            onChange={(e) => onChange({ pill: e.target.checked })}
+            className="size-3.5"
+          />
+          Show as a coloured pill
+        </label>
+      </div>
+      <div className="space-y-1.5">
+        {options.map((option, index) => (
+          <div key={index} className="flex items-center gap-2">
+            {field.pill && (
+              <input
+                type="color"
+                value={colors[option] || "#64748b"}
+                onChange={(e) => onChange({ optionColors: { ...colors, [option]: e.target.value } })}
+                aria-label={`Colour for ${option || "option"}`}
+                className="size-7 shrink-0 cursor-pointer rounded bg-transparent"
+              />
+            )}
+            <TextInput
+              value={option}
+              onChange={(e) => setOption(index, e.target.value)}
+              placeholder="Option value"
+              className="flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => remove(index)}
+              aria-label="Remove option"
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        ))}
+        {options.length === 0 && (
+          <p className="text-xs text-slate-500">No options yet — add the values this column can hold.</p>
+        )}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mt-2"
+        onClick={() => onChange({ options: [...options, ""] })}
+      >
+        <Plus className="size-4" />
+        Add option
+      </Button>
+    </div>
   );
 }
 
