@@ -34,7 +34,7 @@ const DEPT_LOGOS = {
 export default function SupportNew() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, loading } = useAuth();
   const { types: catalogue } = useSupportConfig();
 
   // The categories this member may open: enabled, and either open to everyone or
@@ -66,6 +66,7 @@ export default function SupportNew() {
     setFailure(null);
   };
 
+  if (loading) return null;
   if (!user) return <AccessDenied reason="signed-out" />;
 
   async function submit(event) {

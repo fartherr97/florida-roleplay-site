@@ -32,7 +32,7 @@ const DEPT_LOGOS = {
  * "where did mine get to" without a detour.
  */
 export default function SupportHome() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, loading } = useAuth();
   const { types: catalogue, canConfigure } = useSupportConfig();
   const [data, setData] = useState(null);
 
@@ -57,6 +57,9 @@ export default function SupportHome() {
     [catalogue, hasPermission],
   );
 
+  // Wait for auth to resolve before deciding — otherwise a refresh flashes the
+  // signed-out screen for a frame while GET /api/me is still in flight.
+  if (loading) return null;
   if (!user) return <AccessDenied reason="signed-out" />;
 
   const tickets = data?.tickets ?? [];
