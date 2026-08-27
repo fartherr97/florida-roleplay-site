@@ -63,7 +63,7 @@ export default function SupportHome() {
   const open = tickets.filter((t) => t.status !== "closed" && t.status !== "resolved");
 
   return (
-    <Section className="max-w-5xl">
+    <Section className="max-w-6xl">
       <PageHeader
         eyebrow="Support"
         title="How can we help?"
@@ -92,7 +92,7 @@ export default function SupportHome() {
           <p className="text-sm text-slate-400">There are no ticket categories open to you right now.</p>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           {types.map((type) => {
             const logo = DEPT_LOGOS[type.id];
             return (
