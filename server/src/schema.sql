@@ -1020,6 +1020,17 @@ CREATE TABLE IF NOT EXISTS dev_feedback (
   PRIMARY KEY (id)
 );
 
+-- The request-category catalogue in one JSONB document (singleton 'default'),
+-- edited as a whole on the category page; absent, the built-in defaults stand.
+CREATE TABLE IF NOT EXISTS dev_type_config (
+  id          VARCHAR(32) NOT NULL DEFAULT 'default',
+  document    JSONB        NOT NULL,
+  updated_by  VARCHAR(20) NULL,
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
 -- ------------------------------------------------------------------ --
 -- Indexes
 --
@@ -1210,6 +1221,9 @@ CREATE TRIGGER touch_dev_requests BEFORE UPDATE ON dev_requests
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 DROP TRIGGER IF EXISTS touch_dev_vehicles ON dev_vehicles;
 CREATE TRIGGER touch_dev_vehicles BEFORE UPDATE ON dev_vehicles
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_dev_type_config ON dev_type_config;
+CREATE TRIGGER touch_dev_type_config BEFORE UPDATE ON dev_type_config
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 DROP TRIGGER IF EXISTS touch_support_type_config ON support_type_config;
 CREATE TRIGGER touch_support_type_config BEFORE UPDATE ON support_type_config

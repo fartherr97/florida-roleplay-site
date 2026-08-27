@@ -663,6 +663,9 @@ export const api = {
   devRequestTypes: () =>
     get("/development/config/request-types", { types: DEFAULT_REQUEST_TYPES, canManage: false }),
 
+  saveDevRequestTypes: (types) =>
+    put("/development/config/request-types", { types }, () => ({ ok: true, types, message: NOT_PERSISTED })),
+
   /* ------------------------- Disciplinary actions ------------------------- */
 
   /**

@@ -69,6 +69,7 @@ export const navGroups = [
       { label: "Help Center", to: "/development/help", icon: "LifeBuoy" },
       { label: "Suggestions & Bugs", to: "/development/feedback", icon: "MessageSquare" },
       { label: "Dev Queue", to: "/development/queue", icon: "Wrench" },
+      { label: "Request Categories", to: "/development/types", icon: "SlidersHorizontal" },
     ],
   },
   {

@@ -42,6 +42,7 @@ import DevLibrary from "./pages/development/DevLibrary";
 import DevHelp from "./pages/development/DevHelp";
 import DevFeedback from "./pages/development/DevFeedback";
 import DevQueue from "./pages/development/DevQueue";
+import DevTypes from "./pages/development/DevTypes";
 import HubLanding from "./pages/hub/HubLanding";
 import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
@@ -142,6 +143,7 @@ export default function App() {
             <Route path="development/help" element={<DevHelp />} />
             <Route path="development/feedback" element={<DevFeedback />} />
             <Route path="development/queue" element={<DevQueue />} />
+            <Route path="development/types" element={<DevTypes />} />
 
             <Route path="departments" element={<Departments />} />
             <Route path="departments/:id" element={<DepartmentDetail />} />

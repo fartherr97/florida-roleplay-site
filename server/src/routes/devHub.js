@@ -29,9 +29,11 @@ import {
   cleanRequestDetails,
   isDevTeam,
   makeRequestId,
+  normalizeRequestTypes,
   requestTypeMapOf,
   validateFeedback,
   validateRequest,
+  validateRequestType,
 } from "../lib/devhub.js";
 
 const router = Router();
@@ -87,8 +89,19 @@ async function rosterNameFor(user) {
   return fallback;
 }
 
-/** The live request-type catalogue — currently the built-in defaults. */
-function loadTypes() {
+/**
+ * The live request-type catalogue: the stored document if the manager has edited
+ * it, otherwise the built-in defaults. One singleton row holds the whole ordered
+ * catalogue.
+ */
+async function loadTypes() {
+  try {
+    const rows = await query("SELECT document FROM dev_type_config WHERE id = 'default' LIMIT 1");
+    const stored = rows[0] ? normalizeRequestTypes(parseJson(rows[0].document, null)) : [];
+    if (stored.length) return stored;
+  } catch {
+    // No database — the defaults stand.
+  }
   return DEFAULT_REQUEST_TYPES;
 }
 
@@ -165,7 +178,7 @@ router.post("/", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
 
-  const types = loadTypes();
+  const types = await loadTypes();
   const body = req.body ?? {};
   const draft = {
     type: str(body.type, 48),
@@ -478,7 +491,38 @@ router.post("/feedback", async (req, res) => {
 router.get("/config/request-types", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
-  res.json({ types: loadTypes(), canManage: canManageDev(ctx) });
+  res.json({ types: await loadTypes(), canManage: canManageDev(ctx) });
+});
+
+router.put("/config/request-types", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!canManageDev(ctx)) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Configuring request categories needs development.manage." });
+  }
+
+  const types = normalizeRequestTypes(req.body?.types);
+  if (types.length === 0) {
+    return res.status(400).json({ ok: false, code: "DEV_TYPES_EMPTY", message: "Keep at least one request category." });
+  }
+  const problems = types.flatMap((type) =>
+    type.enabled ? validateRequestType(type).map((p) => `${type.label || type.id}: ${p}`) : [],
+  );
+  if (problems.length) {
+    return res.status(400).json({ ok: false, code: "DEV_TYPES_INVALID", problems });
+  }
+
+  try {
+    await query(
+      `INSERT INTO dev_type_config (id, document, updated_by)
+       VALUES ('default', $1, $2)
+       ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document, updated_by = EXCLUDED.updated_by`,
+      [JSON.stringify(types), ctx.user.id],
+    );
+  } catch {
+    return noStore(res);
+  }
+  res.json({ ok: true, types });
 });
 
 export default router;

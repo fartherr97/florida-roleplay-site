@@ -1,6 +1,6 @@
 import { createElement, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Inbox, Search, UserPlus, Wrench } from "lucide-react";
+import { ArrowRight, Inbox, MessageSquare, Search, UserPlus, Wrench } from "lucide-react";
 import Section from "../../components/layout/Section";
 import PageHeader from "../../components/layout/PageHeader";
 import Card from "../../components/ui/Card";
@@ -13,10 +13,11 @@ import { useAuth } from "../../context/useAuth";
 import { iconFor } from "../../lib/icons";
 import { toneTile } from "../../lib/tones";
 import { cn } from "../../lib/cn";
-import { relativeTime } from "../../lib/format";
+import { formatDateTimeLocal, relativeTime } from "../../lib/format";
 import {
   DEFAULT_REQUEST_TYPES,
   DEV_PRIORITY_MAP,
+  FEEDBACK_TYPE_MAP,
   OPEN_DEV_STATUSES,
   devStatusLabel,
   devStatusTone,
@@ -29,12 +30,14 @@ const TABS = [
   { id: "in_progress", label: "In progress" },
   { id: "mine", label: "Mine" },
   { id: "all", label: "All" },
+  { id: "feedback", label: "Feedback" },
 ];
 
 /** The dev team's queue — every request, filtered and claimable. */
 export default function DevQueue() {
   const { user, hasPermission } = useAuth();
   const [data, setData] = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const [tab, setTab] = useState("open");
   const [query, setQuery] = useState("");
   const [types, setTypes] = useState(DEFAULT_REQUEST_TYPES);
@@ -47,6 +50,16 @@ export default function DevQueue() {
       active = false;
     };
   }, []);
+
+  // The feedback inbox loads the first time it is opened, not on mount.
+  useEffect(() => {
+    if (tab !== "feedback" || feedback !== null) return undefined;
+    let active = true;
+    api.devFeedback().then((r) => active && setFeedback(r?.feedback ?? [])).catch(() => active && setFeedback([]));
+    return () => {
+      active = false;
+    };
+  }, [tab, feedback]);
 
   const typeMap = useMemo(() => requestTypeMapOf(types), [types]);
   const requests = useMemo(() => data?.requests ?? [], [data]);
@@ -70,9 +83,17 @@ export default function DevQueue() {
       in_progress: requests.filter((r) => r.status === "in_progress").length,
       mine: requests.filter((r) => r.assignedToDiscordId === user?.id).length,
       all: requests.length,
+      feedback: feedback?.length ?? 0,
     }),
-    [requests, user],
+    [requests, user, feedback],
   );
+
+  const shownFeedback = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const list = feedback ?? [];
+    if (!needle) return list;
+    return list.filter((f) => `${f.title} ${f.body} ${f.openedByName ?? ""}`.toLowerCase().includes(needle));
+  }, [feedback, query]);
 
   if (!hasPermission("development.work")) return <AccessDenied reason="role" />;
 
@@ -125,7 +146,34 @@ export default function DevQueue() {
         />
       </div>
 
-      {data === null ? (
+      {tab === "feedback" ? (
+        feedback === null ? (
+          <div className="space-y-3">{[0, 1, 2].map((n) => <div key={n} className="h-20 animate-pulse rounded-2xl bg-white/[0.03]" />)}</div>
+        ) : shownFeedback.length === 0 ? (
+          <Card className="p-12 text-center">
+            <MessageSquare className="mx-auto size-6 text-slate-500" />
+            <p className="mt-2 text-sm font-semibold text-white">No feedback yet.</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">Suggestions and bug reports members send appear here.</p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {shownFeedback.map((item) => {
+              const ft = FEEDBACK_TYPE_MAP[item.type];
+              return (
+                <Card key={item.id} className="p-5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={ft?.tone ?? "slate"}>{ft?.label ?? item.type}</Badge>
+                    <p className="text-sm font-bold text-white">{item.title}</p>
+                    <span className="ml-auto text-xs text-slate-500">{formatDateTimeLocal(item.createdAt)}</span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-300">{item.body}</p>
+                  {item.openedByName && <p className="mt-2 text-xs text-slate-500">— {item.openedByName}</p>}
+                </Card>
+              );
+            })}
+          </div>
+        )
+      ) : data === null ? (
         <div className="space-y-3">{[0, 1, 2].map((n) => <div key={n} className="h-20 animate-pulse rounded-2xl bg-white/[0.03]" />)}</div>
       ) : shown.length === 0 ? (
         <Card className="p-12 text-center">

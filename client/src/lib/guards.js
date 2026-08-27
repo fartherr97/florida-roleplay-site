@@ -60,6 +60,7 @@ export const GUARDS = [
   // (hub, create, requests, library, help, feedback) need only a sign-in and
   // gate themselves.
   { path: "/development/queue", permission: "development.work" },
+  { path: "/development/types", permission: "development.manage" },
 
   // Civilian Hub
   { path: "/civilian-hub/home", permission: "civilian.view" },

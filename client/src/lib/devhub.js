@@ -223,6 +223,126 @@ export function cleanRequestDetails(typeId, raw = {}, types = DEFAULT_REQUEST_TY
 }
 
 /* ------------------------------------------------------------------ *
+ * Category configuration
+ * ------------------------------------------------------------------ *
+ *
+ * The request-category page edits the catalogue above. Everything here keeps a
+ * stored or user-edited category safe to trust: display fields clamped, intake
+ * fields re-shaped, ids slugged.
+ */
+
+/** Icons offered in the editor. All resolve in the icon registry. */
+export const REQUEST_ICON_CHOICES = [
+  "Car", "Wrench", "Building2", "Code", "Star", "Siren", "Shield", "Users",
+  "Store", "Image", "Radio", "ClipboardList", "Ticket", "LifeBuoy",
+];
+
+/** Tones offered in the editor. */
+export const REQUEST_TONE_CHOICES = ["violet", "brand", "sky", "green", "amber", "rose", "primary", "slate"];
+
+/** Intake-field input types. */
+export const FIELD_TYPES = [
+  { id: "short", label: "Short text" },
+  { id: "paragraph", label: "Paragraph" },
+  { id: "select", label: "Dropdown" },
+  { id: "date", label: "Date" },
+];
+const FIELD_TYPE_IDS = FIELD_TYPES.map((f) => f.id);
+
+let sequence = 0;
+function localId(prefix) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+  }
+  sequence += 1;
+  return `${prefix}_${sequence.toString(36)}${Date.now().toString(36)}`;
+}
+
+function slugId(value, fallback) {
+  const slug = String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return slug || fallback;
+}
+
+export function blankRequestType(overrides = {}) {
+  return {
+    id: overrides.id ?? localId("type"),
+    label: "",
+    icon: "Wrench",
+    tone: "violet",
+    blurb: "",
+    enabled: true,
+    openPermission: null,
+    fields: [],
+    ...overrides,
+  };
+}
+
+export function blankRequestField(overrides = {}) {
+  return { id: localId("f"), label: "", type: "short", required: false, options: [], help: "", ...overrides };
+}
+
+function normalizeField(raw, index) {
+  const type = FIELD_TYPE_IDS.includes(raw?.type) ? raw.type : "short";
+  const field = {
+    id: slugId(raw?.id, `field_${index + 1}`),
+    label: str(raw?.label, 120),
+    type,
+    required: raw?.required === true,
+    help: str(raw?.help, 200),
+  };
+  if (type === "select") {
+    field.options = (Array.isArray(raw?.options) ? raw.options : [])
+      .slice(0, 25)
+      .map((option) => str(option, 100).trim())
+      .filter(Boolean);
+  }
+  return field;
+}
+
+export function normalizeRequestType(raw, index = 0) {
+  const tone = REQUEST_TONE_CHOICES.includes(raw?.tone) ? raw.tone : "violet";
+  const icon = REQUEST_ICON_CHOICES.includes(raw?.icon) ? raw.icon : "Wrench";
+  const open = str(raw?.openPermission, 64).trim();
+  return {
+    id: slugId(raw?.id, `type_${index + 1}`),
+    label: str(raw?.label, 80),
+    icon,
+    tone,
+    blurb: str(raw?.blurb, 240),
+    enabled: raw?.enabled !== false,
+    openPermission: open || null,
+    fields: (Array.isArray(raw?.fields) ? raw.fields : []).slice(0, 25).map(normalizeField),
+  };
+}
+
+export function normalizeRequestTypes(list) {
+  const types = (Array.isArray(list) ? list : []).slice(0, 60).map(normalizeRequestType);
+  const byId = new Map();
+  for (const type of types) {
+    if (type.id) byId.set(type.id, type);
+  }
+  return [...byId.values()];
+}
+
+/** Problems with a category, for the editor to render beside its save button. */
+export function validateRequestType(type) {
+  const problems = [];
+  if (!type.label?.trim()) problems.push("The category needs a name.");
+  if (!type.id?.trim()) problems.push("The category needs an id.");
+  for (const field of type.fields ?? []) {
+    if (!field.label?.trim()) problems.push("An intake field has no label.");
+    if (field.type === "select" && (!field.options || field.options.length === 0)) {
+      problems.push(`"${field.label || "A dropdown"}" has no options.`);
+    }
+  }
+  return problems;
+}
+
+/* ------------------------------------------------------------------ *
  * Feedback
  * ------------------------------------------------------------------ */
 
