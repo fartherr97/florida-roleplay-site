@@ -49,6 +49,29 @@ export function isTicketOpen(status) {
   return OPEN_STATUSES.includes(status);
 }
 
+/**
+ * How long a ticket has been sitting since anyone last touched it, bucketed so
+ * the queue can lead with the ones going cold. The thresholds are what turn a
+ * flat list into a triage board: a ticket nobody has answered in three days is
+ * a different problem from one opened a minute ago, and the colour says so at a
+ * glance. Ordered longest-first, so the first tier a ticket clears is its age.
+ */
+export const TICKET_AGE_TIERS = [
+  { key: "stale", label: "Stale", tone: "rose", hours: 72 },
+  { key: "aging", label: "Aging", tone: "amber", hours: 24 },
+  { key: "recent", label: "Recent", tone: "brand", hours: 4 },
+  { key: "fresh", label: "Fresh", tone: "green", hours: 0 },
+];
+
+/** The age tier of a ticket, from when it was last touched. */
+export function ticketAge(ticket, now = Date.now()) {
+  const stamp = ticket?.lastMessageAt ?? ticket?.createdAt;
+  const then = stamp ? new Date(stamp).getTime() : now;
+  const hours = Number.isNaN(then) ? 0 : Math.max(0, (now - then) / 3_600_000);
+  const tier = TICKET_AGE_TIERS.find((t) => hours >= t.hours) ?? TICKET_AGE_TIERS.at(-1);
+  return { ...tier, hours };
+}
+
 export const PRIORITIES = [
   { id: "low", label: "Low", tone: "slate" },
   { id: "normal", label: "Normal", tone: "brand" },
