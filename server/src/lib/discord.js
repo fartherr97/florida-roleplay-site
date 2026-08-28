@@ -134,6 +134,49 @@ export async function fetchGuildRoles() {
     }));
 }
 
+/**
+ * Every member of our guild, read with the bot token, paginated 1000 at a time.
+ *
+ * This is how the roster fills itself without an external bot: the site reads
+ * who holds which roles and resolves each against the role map. It needs the
+ * bot's **Server Members Intent** enabled in the Discord developer portal —
+ * without it Discord answers 403, which the caller treats as "not available"
+ * rather than an error. Returns `null` when no token or guild is configured.
+ */
+export async function fetchGuildMembers() {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!token || !guildId) return null;
+
+  const members = [];
+  let after = "0";
+  // Discord caps a page at 1000 and pages by ascending user id via `after`.
+  for (let page = 0; page < 60; page += 1) {
+    const res = await fetch(
+      `${API_BASE}/guilds/${guildId}/members?limit=1000&after=${after}`,
+      { headers: { Authorization: `Bot ${token}` } },
+    );
+    if (res.status === 403) {
+      const err = new Error("Discord refused the member list (enable the Server Members Intent).");
+      err.code = "MEMBERS_INTENT";
+      throw err;
+    }
+    if (!res.ok) throw new Error(`Discord member list failed (${res.status})`);
+    const batch = await res.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    members.push(...batch);
+    after = batch[batch.length - 1]?.user?.id ?? after;
+    if (batch.length < 1000) break;
+  }
+  return members.map((m) => ({
+    id: String(m.user?.id ?? ""),
+    username: m.user?.username ?? "",
+    displayName: m.user?.global_name || m.user?.username || "Member",
+    nick: m.nick ?? null,
+    roles: Array.isArray(m.roles) ? m.roles.map(String) : [],
+  }));
+}
+
 /** A CDN avatar URL, or null so the UI falls back to initials. */
 function avatarUrl(id, hash) {
   if (!hash) return null;
@@ -148,4 +191,5 @@ export default {
   fetchIdentity,
   fetchMemberRoles,
   fetchGuildRoles,
+  fetchGuildMembers,
 };

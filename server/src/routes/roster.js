@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { buildNickname, renderDisplayName, resolveRole } from "../lib/roster.js";
+import { resolveMember, applyUpsert, maybeSyncRoster } from "../lib/rosterSync.js";
 import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
@@ -114,6 +114,9 @@ async function loaRoleId() {
 /* -------------------------------------------------------------- reads */
 
 router.get("/", requirePermission("roster.view"), async (_req, res) => {
+  // Viewing the roster nudges a background refresh from Discord if one hasn't
+  // run recently, so it fills in on its own shortly after roles are mapped.
+  maybeSyncRoster();
   res.json(await loadRoster());
 });
 
@@ -602,42 +605,6 @@ router.post("/loa/end", requireBot, async (req, res) => {
 
 /* ---------------------------------------------------------- bot sync */
 
-/**
- * Resolves one member against the role map and returns what the roster should
- * look like for them. Pure, so both the single and bulk endpoints share it and
- * the dry-run path costs nothing.
- */
-function resolveMember(payload, roleMap, departments) {
-  const matched = resolveRole(payload.roles, roleMap);
-
-  if (!matched) {
-    return { action: "remove", reason: "no mapped roles" };
-  }
-
-  const department = departments.find((d) => d.id === matched.department) ?? null;
-  const entry = {
-    discordId: payload.discordId,
-    characterName: payload.characterName,
-    department: matched.department,
-    rank: matched.rank,
-    callsign: payload.callsign ?? "",
-  };
-
-  return {
-    action: "upsert",
-    entry: {
-      ...entry,
-      // The site shows the full name; Discord gets the version that fits its
-      // 32-character nickname limit. Returning both means the bot never has to
-      // decide how to shorten anything.
-      displayName: renderDisplayName(matched.displayTemplate, entry, department),
-      nickname: buildNickname(entry, department, matched.displayTemplate),
-      status: payload.status ?? "Active",
-    },
-    matchedRole: matched.key,
-  };
-}
-
 function validateSyncMember(body) {
   const discordId = str(body.discordId);
   const characterName = str(body.characterName);
@@ -680,35 +647,6 @@ async function logSync(entry) {
     // The sync itself already succeeded or failed on its own terms; losing the
     // log line is not worth failing the request the bot is waiting on.
   }
-}
-
-async function applyUpsert(resolved, joinedAt) {
-  const e = resolved.entry;
-  await query(`INSERT INTO roster_members
-       (id, discord_id, character_name, display_name, department, rank_label,
-        callsign, status, joined_at, synced_at, source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync')
-     ON CONFLICT (discord_id) DO UPDATE SET
-       character_name = EXCLUDED.character_name,
-       display_name   = EXCLUDED.display_name,
-       department     = EXCLUDED.department,
-       rank_label     = EXCLUDED.rank_label,
-       callsign       = EXCLUDED.callsign,
-       status         = EXCLUDED.status,
-       synced_at      = CURRENT_TIMESTAMP,
-       source         = 'discord-sync'`,
-    [
-      `rm-${e.discordId}`,
-      e.discordId,
-      e.characterName,
-      e.displayName,
-      e.department,
-      e.rank,
-      e.callsign,
-      e.status,
-      joinedAt || null,
-    ],
-  );
 }
 
 /**

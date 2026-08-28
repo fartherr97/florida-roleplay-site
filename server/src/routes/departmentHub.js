@@ -26,6 +26,7 @@ import { requirePermission, loadGrants } from "../middleware/requirePermission.j
 import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { projectRoster } from "../lib/deptRoster.js";
+import { maybeSyncRoster } from "../lib/rosterSync.js";
 import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
 import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
 import { resolveDepartmentId } from "../lib/tenant.js";
@@ -251,6 +252,9 @@ router.get(
   requirePermission("departments.view"),
   withDepartment,
   async (req, res) => {
+    // Opening a department roster nudges a throttled Discord refresh, so it
+    // populates on its own once the department's roles are mapped.
+    maybeSyncRoster();
     const { roster, roleMap } = await loadRosterAndMap(req.departmentId);
     res.json({ subdivisions: projectRoster(req.deptConfig, roster, roleMap) });
   },

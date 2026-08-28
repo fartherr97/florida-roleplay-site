@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import router from "./routes/index.js";
 import { serve as mediaServe } from "./routes/media.js";
+import { startRosterSync } from "./lib/rosterSync.js";
 import { close, ping } from "./db.js";
 
 /**
@@ -85,6 +86,9 @@ const server = app.listen(port, "0.0.0.0", () => {
       ? `serving client from ${clientDist}`
       : "client/dist not built — API only",
   );
+  // Keep the roster in step with Discord on its own: a sync shortly after boot,
+  // then on an interval. No-op unless a bot token and guild are configured.
+  startRosterSync();
 });
 
 /**
