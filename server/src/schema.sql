@@ -1245,3 +1245,16 @@ CREATE TABLE IF NOT EXISTS media_images (
 );
 CREATE INDEX IF NOT EXISTS media_images_created_idx ON media_images (created_at DESC);
 CREATE INDEX IF NOT EXISTS media_images_uploader_idx ON media_images (uploaded_by_id);
+
+-- Who has said they will attend a department calendar event. Kept out of the
+-- department config so a member RSVPing needs no edit rights and does not spawn
+-- a config version on every click; keyed by (department, event, member).
+CREATE TABLE IF NOT EXISTS event_attendance (
+  dept_id     TEXT NOT NULL,
+  event_id    TEXT NOT NULL,
+  discord_id  TEXT NOT NULL,
+  name        TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (dept_id, event_id, discord_id)
+);
+CREATE INDEX IF NOT EXISTS event_attendance_dept_idx ON event_attendance (dept_id);

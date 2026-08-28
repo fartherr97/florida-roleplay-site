@@ -492,6 +492,16 @@ export const api = {
       message: NOT_PERSISTED,
     })),
 
+  // Calendar attendance: all RSVPs for a department, and toggling the caller's.
+  deptEventAttendance: (id) =>
+    get(`/dept/${encodeURIComponent(id)}/events/attendance`, { attendance: {} }),
+  attendEvent: (id, eventId, attend) =>
+    post(
+      `/dept/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}/attend`,
+      { attend },
+      () => ({ ok: false, message: NOT_PERSISTED, attendees: [] }),
+    ),
+
   restoreDeptVersion: (id, versionId) =>
     post(
       `/dept/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/restore`,

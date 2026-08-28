@@ -61,13 +61,31 @@ function parseConfig(value) {
 }
 
 /** The stored config for a department, or its seed, or null. */
+/**
+ * The Discord guild a department's seed ships with. Used to backfill configs
+ * that were stored before the field existed: without it a department saved from
+ * the Builder loses the guild the roster importer and split screen read, and its
+ * server never shows up in the role-map guild selector.
+ */
+function seedGuildId(id) {
+  const seed = DEPARTMENT_CONFIGS[id];
+  return seed && /^\d{17,20}$/.test(String(seed.guildId ?? "")) ? String(seed.guildId) : "";
+}
+
+/** A stored config, normalised, with its guild backfilled from the seed when blank. */
+function fromStored(parsed, id) {
+  const config = normalizeConfig(parsed, id);
+  if (!config.guildId) config.guildId = seedGuildId(id);
+  return config;
+}
+
 async function loadConfig(id) {
   try {
     const rows = await query("SELECT config FROM department_configs WHERE id = $1 LIMIT 1",
       [id],
     );
     const stored = rows.length ? parseConfig(rows[0].config) : null;
-    if (stored) return normalizeConfig(stored, id);
+    if (stored) return fromStored(stored, id);
   } catch {
     // No database — the seed below stands.
   }
@@ -83,7 +101,7 @@ async function loadAll() {
     const rows = await query("SELECT id, config FROM department_configs");
     rows.forEach((row) => {
       const parsed = parseConfig(row.config);
-      if (parsed) configs.set(row.id, normalizeConfig(parsed, row.id));
+      if (parsed) configs.set(row.id, fromStored(parsed, row.id));
     });
   } catch {
     // No database — the seeds stand on their own.
@@ -257,6 +275,83 @@ router.get(
     maybeSyncRoster();
     const { roster, roleMap } = await loadRosterAndMap(req.departmentId);
     res.json({ subdivisions: projectRoster(req.deptConfig, roster, roleMap) });
+  },
+);
+
+/**
+ * Calendar attendance. Any member who can see the department may RSVP, so it
+ * lives in its own table rather than the config: a click needs no edit rights
+ * and never spawns a config version.
+ */
+router.get(
+  "/:deptId/events/attendance",
+  requirePermission("departments.view"),
+  withDepartment,
+  async (req, res) => {
+    try {
+      const rows = await query(
+        `SELECT event_id, discord_id, name, created_at
+           FROM event_attendance WHERE dept_id = $1 ORDER BY created_at`,
+        [req.departmentId],
+      );
+      const attendance = {};
+      for (const row of rows) {
+        (attendance[row.event_id] ??= []).push({
+          discordId: row.discord_id,
+          name: row.name,
+          at: row.created_at,
+        });
+      }
+      return res.json({ attendance });
+    } catch {
+      return res.json({ attendance: {} });
+    }
+  },
+);
+
+router.post(
+  "/:deptId/events/:eventId/attend",
+  requirePermission("departments.view"),
+  withDepartment,
+  async (req, res) => {
+    const user = req.user;
+    if (!user?.id) return res.status(403).json({ ok: false, message: "Sign in to attend." });
+
+    const eventId = str(req.params.eventId);
+    const exists = req.deptConfig.pages.some(
+      (p) => p.type === "calendar" && (p.config?.events ?? []).some((e) => e.id === eventId),
+    );
+    if (!eventId || !exists) return res.status(404).json({ ok: false, message: "No such event." });
+
+    const attend = req.body?.attend !== false; // default to attending
+    const name = user.displayName ?? user.username ?? "Member";
+    try {
+      if (attend) {
+        await query(
+          `INSERT INTO event_attendance (dept_id, event_id, discord_id, name)
+             VALUES ($1, $2, $3, $4)
+           ON CONFLICT (dept_id, event_id, discord_id) DO UPDATE SET name = EXCLUDED.name`,
+          [req.departmentId, eventId, user.id, name],
+        );
+      } else {
+        await query(
+          "DELETE FROM event_attendance WHERE dept_id = $1 AND event_id = $2 AND discord_id = $3",
+          [req.departmentId, eventId, user.id],
+        );
+      }
+      const rows = await query(
+        `SELECT discord_id, name, created_at FROM event_attendance
+           WHERE dept_id = $1 AND event_id = $2 ORDER BY created_at`,
+        [req.departmentId, eventId],
+      );
+      return res.json({
+        ok: true,
+        attending: attend,
+        attendees: rows.map((r) => ({ discordId: r.discord_id, name: r.name, at: r.created_at })),
+      });
+    } catch {
+      return res.status(503).json({ ok: false, message: "Attendance needs a database to record." });
+    }
   },
 );
 
