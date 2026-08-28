@@ -19,6 +19,7 @@ export default function RosterHeader({
   activeView,
   onView,
   onRefresh,
+  refreshing = false,
   total,
   counts = [],
   live,
@@ -56,9 +57,9 @@ export default function RosterHeader({
       )}
 
       {onRefresh && (
-        <Button variant="ghost" size="sm" onClick={onRefresh}>
-          <RefreshCw className="size-4" />
-          Refresh
+        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={refreshing}>
+          <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
+          {refreshing ? "Syncing…" : "Refresh"}
         </Button>
       )}
 

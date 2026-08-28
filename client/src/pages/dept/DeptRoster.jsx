@@ -44,6 +44,10 @@ export default function DeptRoster({ page, config }) {
   const [editing, setEditing] = useState(null);
   const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [guildNames, setGuildNames] = useState({});
+
+  const canSync = hasPermission("discord.roles.manage");
 
   useEffect(() => {
     let active = true;
@@ -54,6 +58,45 @@ export default function DeptRoster({ page, config }) {
       active = false;
     };
   }, [id, reloadKey]);
+
+  // Names for the guilds a manual pull reports on, so the diagnostic reads
+  // "FHP server" rather than a bare snowflake.
+  useEffect(() => {
+    if (!canSync) return undefined;
+    let active = true;
+    api.deptList().then((list) => {
+      if (!active) return;
+      const map = {};
+      (list ?? []).forEach((d) => {
+        if (d.guildId) map[d.guildId] = `${d.shortName || d.name} server`;
+      });
+      setGuildNames(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [canSync]);
+
+  // Refresh re-reads the roster. For anyone who can manage the role map it first
+  // pulls from Discord and reports the per-guild outcome, so an empty roster
+  // after mapping roles explains itself instead of staying blank.
+  const refresh = async () => {
+    if (!canSync) {
+      setReloadKey((key) => key + 1);
+      return;
+    }
+    setSyncing(true);
+    setNotice("");
+    try {
+      const result = await api.pullRoster();
+      setNotice(describeSync(result, guildNames));
+    } catch (err) {
+      setNotice(err?.message || "Could not pull the roster from Discord.");
+    } finally {
+      setSyncing(false);
+      setReloadKey((key) => key + 1);
+    }
+  };
 
   const subdivisions = loaded.id === id ? loaded.subdivisions : [];
   // Derived rather than reset in an effect, so switching department renders the
@@ -170,7 +213,8 @@ export default function DeptRoster({ page, config }) {
         views={subdivisions.map((sub) => ({ id: sub.id, label: sub.name }))}
         activeView={active?.id}
         onView={setActiveId}
-        onRefresh={() => setReloadKey((key) => key + 1)}
+        onRefresh={refresh}
+        refreshing={syncing}
         total={everyone.length}
         counts={counts}
       />
@@ -232,6 +276,52 @@ export default function DeptRoster({ page, config }) {
       )}
     </>
   );
+}
+
+/** Turn one guild's failure code into a sentence that names the fix. */
+function syncErrorLabel(code) {
+  const c = String(code || "");
+  if (c === "MEMBERS_INTENT" || c.includes("403")) {
+    return "the bot's Server Members Intent is off — turn it on in the Discord Developer Portal (Bot → Privileged Gateway Intents)";
+  }
+  if (c.includes("404")) return "the bot isn't a member of that server";
+  if (c === "not-configured") return "no bot token or server ID is set";
+  return c;
+}
+
+/**
+ * A plain-language summary of a manual pull, so an empty roster explains itself:
+ * how many servers were read and members matched, and for any server that
+ * failed, exactly why and what to change.
+ */
+function describeSync(result, names) {
+  if (!result || result.configured === false) {
+    return "No Discord bot token is configured on the server, so the roster can't sync from Discord.";
+  }
+  if (result.error === "no-guilds") {
+    return "No Discord servers are configured to sync from. Set each department's server ID in the Builder.";
+  }
+  const label = (gid) => names[gid] || "Main server";
+  const perGuild = result.perGuild ?? [];
+  const failed = perGuild.filter((g) => !g.ok);
+  const okGuilds = perGuild.filter((g) => g.ok);
+  const parts = [];
+
+  if (typeof result.matched === "number") {
+    parts.push(
+      `Read ${okGuilds.length} server${okGuilds.length === 1 ? "" : "s"}, matched ${result.matched} member${result.matched === 1 ? "" : "s"} to a mapped rank.`,
+    );
+    if (result.matched === 0 && failed.length === 0) {
+      parts.push(
+        "Nobody in those servers holds a role that's mapped to a rank — check the Discord role IDs on the role mapping page.",
+      );
+    }
+  } else if (result.error === "unreadable") {
+    parts.push("Couldn't read any of the configured Discord servers.");
+  }
+
+  failed.forEach((g) => parts.push(`${label(g.guildId)}: ${syncErrorLabel(g.error)}.`));
+  return parts.join(" ");
 }
 
 /**

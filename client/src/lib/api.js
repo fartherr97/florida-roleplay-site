@@ -375,6 +375,10 @@ export const api = {
         "Accepted, but not persisted — no database is configured, so this will reset on reload.",
     })),
 
+  /** Pull the roster from Discord now, returning the per-guild sync outcome. */
+  pullRoster: () =>
+    post("/roster/pull", {}, () => ({ configured: false, perGuild: [] })),
+
   /** The guild's live Discord roles, or configured:false when no bot token is set. */
   guildRoles: (guildId) =>
     get(

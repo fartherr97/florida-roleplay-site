@@ -150,6 +150,7 @@ export async function syncRosterFromGuild() {
 
     // Merge each member's roles across every guild they're in with the bot.
     const byId = new Map(); // discordId -> { roles:Set, name }
+    const perGuild = []; // { guildId, ok, count, error } — surfaced to a manual pull
     let errors = 0;
     let ok = 0;
     for (const gid of guildIds) {
@@ -158,12 +159,19 @@ export async function syncRosterFromGuild() {
         members = await fetchGuildMembers(gid);
       } catch (err) {
         errors += 1;
+        const error = err?.code || err?.message || "failed";
+        perGuild.push({ guildId: gid, ok: false, count: 0, error });
         // eslint-disable-next-line no-console
-        console.warn("[roster-sync] guild", gid, err?.code || err?.message || err);
+        console.warn("[roster-sync] guild", gid, error);
         continue;
       }
-      if (!members) continue;
+      if (!members) {
+        // Null means the bot has no token or the id is blank — not an outage.
+        perGuild.push({ guildId: gid, ok: false, count: 0, error: "not-configured" });
+        continue;
+      }
       ok += 1;
+      perGuild.push({ guildId: gid, ok: true, count: members.length, error: null });
       for (const m of members) {
         const cur = byId.get(m.id) ?? { roles: new Set(), name: "" };
         for (const r of m.roles) cur.roles.add(r);
@@ -172,7 +180,7 @@ export async function syncRosterFromGuild() {
       }
     }
 
-    if (ok === 0) return { configured: true, error: errors ? "unreadable" : "no-guilds" };
+    if (ok === 0) return { configured: true, error: errors ? "unreadable" : "no-guilds", perGuild };
 
     const roleMap = await loadRankMap();
     const keep = [];
@@ -207,7 +215,7 @@ export async function syncRosterFromGuild() {
     }
 
     lastSyncAt = Date.now();
-    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, errors };
+    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, errors, perGuild };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[roster-sync]", err?.code || err?.message || err);

@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { resolveMember, applyUpsert, maybeSyncRoster } from "../lib/rosterSync.js";
+import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild } from "../lib/rosterSync.js";
 import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
@@ -270,6 +270,21 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
         "Accepted, but not persisted — no database is configured, so this will reset on reload.",
     });
   }
+});
+
+/**
+ * Pull the roster from Discord on demand and report what happened per guild.
+ *
+ * The automatic sync runs on a timer and swallows failures to the log, so a
+ * roster that stays empty after mapping roles gives no clue why. This runs the
+ * same reconciliation synchronously and hands back the per-guild outcome — which
+ * server was read, how many members it held, or the exact reason it could not be
+ * read (a missing bot, the Server Members Intent, a bad token) — so the person
+ * who just mapped the roles can see and fix the cause.
+ */
+router.post("/pull", requirePermission("discord.roles.manage"), async (_req, res) => {
+  const result = await syncRosterFromGuild();
+  return res.json(result);
 });
 
 router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>
