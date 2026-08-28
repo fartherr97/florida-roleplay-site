@@ -46,13 +46,37 @@ export function resolveMember(payload, roleMap, departments) {
   };
 }
 
-/** Insert or update one resolved member. */
-export async function applyUpsert(resolved, joinedAt) {
+/**
+ * Insert or update one resolved member.
+ *
+ * `roleIds` is every mapped role the member holds, stored so a department roster
+ * can show them under their rank in *that* department even when their highest
+ * rank sits elsewhere. It is optional: the bot's push endpoint sends one member
+ * without it, so a null leaves whatever was last stored in place rather than
+ * wiping it.
+ *
+ * A change of rank or department stamps the staff activity overlay's `last_move`
+ * with today, so a promotion or transfer shows when it happened with nothing to
+ * update by hand. The first time a member is seen is not a move.
+ */
+export async function applyUpsert(resolved, joinedAt, roleIds = null) {
   const e = resolved.entry;
+
+  let prior = null;
+  try {
+    const rows = await query(
+      "SELECT rank_label, department FROM roster_members WHERE discord_id = $1 LIMIT 1",
+      [e.discordId],
+    );
+    prior = rows.length ? rows[0] : null;
+  } catch {
+    // No database — nothing to compare against; the upsert below is a no-op too.
+  }
+
   await query(`INSERT INTO roster_members
        (id, discord_id, character_name, display_name, department, rank_label,
-        callsign, status, joined_at, synced_at, source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync')
+        callsign, status, joined_at, synced_at, source, role_ids)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync', $10::text[])
      ON CONFLICT (discord_id) DO UPDATE SET
        character_name = EXCLUDED.character_name,
        display_name   = EXCLUDED.display_name,
@@ -61,7 +85,8 @@ export async function applyUpsert(resolved, joinedAt) {
        callsign       = EXCLUDED.callsign,
        status         = EXCLUDED.status,
        synced_at      = CURRENT_TIMESTAMP,
-       source         = 'discord-sync'`,
+       source         = 'discord-sync',
+       role_ids       = COALESCE(EXCLUDED.role_ids, roster_members.role_ids)`,
     [
       `rm-${e.discordId}`,
       e.discordId,
@@ -72,8 +97,23 @@ export async function applyUpsert(resolved, joinedAt) {
       e.callsign,
       e.status,
       joinedAt || null,
+      roleIds && roleIds.length ? roleIds : null,
     ],
   );
+
+  if (prior && (prior.rank_label !== e.rank || prior.department !== e.department)) {
+    try {
+      await query(
+        `INSERT INTO staff_activity (discord_id, last_move, updated_at)
+           VALUES ($1, CURRENT_DATE, CURRENT_TIMESTAMP)
+         ON CONFLICT (discord_id)
+           DO UPDATE SET last_move = CURRENT_DATE, updated_at = CURRENT_TIMESTAMP`,
+        [e.discordId],
+      );
+    } catch {
+      // The activity overlay is best-effort; a missed stamp is not worth failing a sync.
+    }
+  }
 }
 
 /** The rank role map, live from the database, falling back to the seed. */
@@ -183,16 +223,28 @@ export async function syncRosterFromGuild() {
     if (ok === 0) return { configured: true, error: errors ? "unreadable" : "no-guilds", perGuild };
 
     const roleMap = await loadRankMap();
+    // Which held roles to persist per member: only the ones the map knows, so a
+    // department roster can bucket a member by any of their mapped ranks.
+    const mappedRoleIds = new Set(roleMap.map((r) => String(r.roleId)));
+    const byDept = {}; // department -> matched count, for the pull diagnostic
     const keep = [];
     for (const [discordId, data] of byId) {
+      const held = [...data.roles].map(String);
       const resolved = resolveMember(
-        { discordId, characterName: data.name || "Member", roles: [...data.roles], callsign: "" },
+        { discordId, characterName: data.name || "Member", roles: held, callsign: "" },
         roleMap,
         seed.DEPARTMENTS,
       );
       if (resolved.action === "upsert") {
-        await applyUpsert(resolved, null);
+        const roleIds = held.filter((id) => mappedRoleIds.has(id));
+        await applyUpsert(resolved, null, roleIds);
         keep.push(discordId);
+        // A member counts toward every department they hold a mapped role in —
+        // the same way they now appear on each of those department rosters.
+        const depts = new Set(
+          roleIds.map((id) => roleMap.find((r) => String(r.roleId) === id)?.department).filter(Boolean),
+        );
+        for (const d of depts) byDept[d] = (byDept[d] ?? 0) + 1;
       }
     }
 
@@ -215,7 +267,7 @@ export async function syncRosterFromGuild() {
     }
 
     lastSyncAt = Date.now();
-    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, errors, perGuild };
+    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, byDept, errors, perGuild };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[roster-sync]", err?.code || err?.message || err);

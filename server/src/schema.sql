@@ -530,6 +530,14 @@ ALTER TABLE roster_members
   ADD COLUMN IF NOT EXISTS loa_until  DATE NULL,
   ADD COLUMN IF NOT EXISTS loa_reason TEXT NULL;
 
+-- Every mapped Discord role the member currently holds, so a department roster
+-- can show anyone who holds one of *its* roles even when the member's highest
+-- rank (the one that decides their primary department above) is in another
+-- department. Without it a trooper who is also staff would show only on the
+-- staff roster, never on their department's.
+ALTER TABLE roster_members
+  ADD COLUMN IF NOT EXISTS role_ids TEXT[] NULL;
+
 -- Staff activity overlay. The bot owns who is on the roster and at what rank;
 -- this holds the human-managed activity a Discord role cannot express — status,
 -- leave, probation and when they last moved rank — keyed by Discord id so it

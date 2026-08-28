@@ -224,43 +224,77 @@ router.get(
  * the seeds when there is no database. Shared by the authenticated roster route
  * and the public recruitment endpoint.
  */
+/** One roster_members row, shaped for the projection. */
+function mapMemberRow(row) {
+  return {
+    id: String(row.id),
+    discordId: row.discord_id,
+    characterName: row.character_name,
+    displayName: row.display_name,
+    department: row.department,
+    rank: row.rank_label,
+    rankFull: row.rank_full,
+    callsign: row.callsign,
+    status: row.status,
+    loaUntil:
+      row.loa_until instanceof Date ? row.loa_until.toISOString().slice(0, 10) : row.loa_until,
+    joinedAt:
+      row.joined_at instanceof Date ? row.joined_at.toISOString().slice(0, 10) : row.joined_at,
+  };
+}
+
+/**
+ * A department's roster and rank map.
+ *
+ * A member belongs on this roster if they hold *any* role mapped to this
+ * department — shown under their highest rank here — even when their overall
+ * highest rank (which sets their primary department on the community roster)
+ * sits in another department. So a trooper who is also a server admin appears on
+ * the FHP roster under Trooper and on the staff roster under Admin, from the one
+ * set of Discord roles the sync records for them.
+ *
+ * Rows synced before the roles were recorded fall back to their stored primary
+ * department, so nobody vanishes between a schema upgrade and the next sync.
+ */
 async function loadRosterAndMap(deptId) {
-  let roster = rosterSeed;
-  let roleMap = ROLE_MAP;
+  let roster = rosterSeed.filter((entry) => entry.department === deptId);
+  let roleMap = ROLE_MAP.filter((role) => role.department === deptId);
   try {
-    const rows = await query("SELECT * FROM roster_members WHERE department = $1 ORDER BY sort_order, callsign",
-      [deptId],
-    );
-    if (rows.length) {
-      roster = rows.map((row) => ({
-        id: String(row.id),
-        discordId: row.discord_id,
-        characterName: row.character_name,
-        displayName: row.display_name,
-        department: row.department,
-        rank: row.rank_label,
-        rankFull: row.rank_full,
-        callsign: row.callsign,
-        status: row.status,
-        loaUntil:
-          row.loa_until instanceof Date ? row.loa_until.toISOString().slice(0, 10) : row.loa_until,
-        joinedAt:
-          row.joined_at instanceof Date ? row.joined_at.toISOString().slice(0, 10) : row.joined_at,
-      }));
-    }
-    const roleRows = await query("SELECT * FROM roster_role_map WHERE department = $1", [deptId]);
-    if (roleRows.length) {
-      roleMap = roleRows.map((row) => ({
-        roleId: row.role_id,
-        key: row.role_key,
-        department: row.department,
-        rank: row.rank_label,
-        rankFull: row.rank_full,
-        order: row.sort_order,
-      }));
+    const mapRows = await query("SELECT * FROM roster_role_map WHERE kind = 'rank'");
+    const fullMap = mapRows.length
+      ? mapRows.map((row) => ({
+          roleId: row.role_id,
+          key: row.role_key,
+          department: row.department,
+          rank: row.rank_label,
+          rankFull: row.rank_full,
+          order: row.sort_order,
+        }))
+      : ROLE_MAP;
+    roleMap = fullMap.filter((role) => role.department === deptId);
+
+    const memberRows = await query("SELECT * FROM roster_members");
+    if (memberRows.length) {
+      const byRoleId = new Map(fullMap.map((role) => [String(role.roleId), role]));
+      const built = [];
+      for (const row of memberRows) {
+        const base = mapMemberRow(row);
+        const held = Array.isArray(row.role_ids) ? row.role_ids.map(String) : null;
+        const deptRoles = (held ?? [])
+          .map((rid) => byRoleId.get(rid))
+          .filter((role) => role && role.department === deptId);
+        if (deptRoles.length) {
+          const top = deptRoles.sort((a, b) => (b.order ?? 0) - (a.order ?? 0))[0];
+          built.push({ ...base, department: deptId, rank: top.rank, rankFull: top.rankFull });
+        } else if (held === null && base.department === deptId) {
+          // Legacy row with no recorded roles yet — keep it under its stored rank.
+          built.push(base);
+        }
+      }
+      roster = built;
     }
   } catch {
-    // No database — the seeds already loaded above.
+    // No database — the seed slices above stand.
   }
   return { roster, roleMap };
 }

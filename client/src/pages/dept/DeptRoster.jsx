@@ -89,7 +89,7 @@ export default function DeptRoster({ page, config }) {
     setNotice("");
     try {
       const result = await api.pullRoster();
-      setNotice(describeSync(result, guildNames));
+      setNotice(describeSync(result, guildNames, id, config.branding.shortName));
     } catch (err) {
       setNotice(err?.message || "Could not pull the roster from Discord.");
     } finally {
@@ -294,7 +294,7 @@ function syncErrorLabel(code) {
  * how many servers were read and members matched, and for any server that
  * failed, exactly why and what to change.
  */
-function describeSync(result, names) {
+function describeSync(result, names, deptId, deptShort) {
   if (!result || result.configured === false) {
     return "No Discord bot token is configured on the server, so the roster can't sync from Discord.";
   }
@@ -305,15 +305,16 @@ function describeSync(result, names) {
   const perGuild = result.perGuild ?? [];
   const failed = perGuild.filter((g) => !g.ok);
   const okGuilds = perGuild.filter((g) => g.ok);
+  const here = result.byDept?.[deptId] ?? 0;
   const parts = [];
 
   if (typeof result.matched === "number") {
     parts.push(
-      `Read ${okGuilds.length} server${okGuilds.length === 1 ? "" : "s"}, matched ${result.matched} member${result.matched === 1 ? "" : "s"} to a mapped rank.`,
+      `Read ${okGuilds.length} server${okGuilds.length === 1 ? "" : "s"}, matched ${result.matched} member${result.matched === 1 ? "" : "s"} to a mapped rank — ${here} in ${deptShort || "this department"}.`,
     );
-    if (result.matched === 0 && failed.length === 0) {
+    if (here === 0 && failed.length === 0) {
       parts.push(
-        "Nobody in those servers holds a role that's mapped to a rank — check the Discord role IDs on the role mapping page.",
+        `Nobody the bot can see holds a ${deptShort || "department"} role. Import that server's roles and set their department to ${deptShort || "this one"} on the role mapping page, then Save.`,
       );
     }
   } else if (result.error === "unreadable") {

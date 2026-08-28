@@ -139,6 +139,7 @@ export function chainFor(subdivision) {
       id: category.id,
       name: category.name,
       color: category.color,
+      insigniaUrl: category.insigniaUrl,
       members: category.members,
     }));
 }
