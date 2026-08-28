@@ -81,6 +81,7 @@ async function loadRoleMap({ withSpecial = false } = {}) {
           rank: row.rank_label,
           rankFull: row.rank_full,
           order: row.sort_order,
+          color: row.color || "",
           displayTemplate: row.display_template,
         }));
       if (!withSpecial) return roles;
@@ -226,6 +227,8 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
       rank: str(entry.rank),
       rankFull: str(entry.rankFull) || str(entry.rank),
       order,
+      // A #rgb/#rrggbb hex, or "" to fall back to the roster's default colour.
+      color: /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(str(entry.color)) ? str(entry.color) : "",
       displayTemplate: str(entry.displayTemplate) || "{callsign} | {rank} | {surname}",
     });
   });
@@ -248,9 +251,9 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
     await query("DELETE FROM roster_role_map");
     for (const role of cleanRoles) {
       await query(`INSERT INTO roster_role_map
-           (role_id, role_key, kind, department, rank_label, rank_full, sort_order, display_template)
-         VALUES ($1, $2, 'rank', $3, $4, $5, $6, $7)`,
-        [role.roleId, role.key, role.department, role.rank, role.rankFull, role.order, role.displayTemplate],
+           (role_id, role_key, kind, department, rank_label, rank_full, sort_order, display_template, color)
+         VALUES ($1, $2, 'rank', $3, $4, $5, $6, $7, $8)`,
+        [role.roleId, role.key, role.department, role.rank, role.rankFull, role.order, role.displayTemplate, role.color || null],
       );
     }
     for (const role of cleanSpecial) {

@@ -75,6 +75,7 @@ function blankRole(department = "staff") {
     rank: "",
     rankFull: "",
     order: 100,
+    color: "",
     displayTemplate: "{callsign} | {rank} | {surname}",
     isNew: true,
   };
@@ -262,6 +263,8 @@ export default function HubDiscordRoles() {
         rankFull: pick.name,
         // Discord's own ordering: a higher role sits higher on the roster.
         order: Math.max(0, Math.min(100000, Number(pick.position) || 100)),
+        // The role's Discord colour, so the rank shows in the same colour.
+        color: pick.color || "",
         displayTemplate: "{callsign} | {rank} | {surname}",
         isNew: true,
       };
@@ -435,6 +438,7 @@ export default function HubDiscordRoles() {
                 <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.16em] text-slate-500">
                   <th className="px-5 py-3 font-bold">Rank</th>
                   <th className="px-3 py-3 font-bold">Department</th>
+                  <th className="px-3 py-3 font-bold">Colour</th>
                   <th className="px-3 py-3 font-bold">Discord role ID</th>
                   <th className="px-3 py-3 text-right font-bold">Order</th>
                   <th className="px-3 py-3 font-bold">Nickname preview</th>
@@ -469,6 +473,13 @@ export default function HubDiscordRoles() {
                           onChange={(value) => updateRole(role.key, "department", value)}
                           options={DEPARTMENT_OPTIONS}
                           className="w-48"
+                        />
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <ColorField
+                          value={role.color}
+                          onChange={(value) => updateRole(role.key, "color", value)}
+                          label={`Colour for ${role.key}`}
                         />
                       </td>
                       <td className="px-3 py-3.5">
@@ -514,7 +525,7 @@ export default function HubDiscordRoles() {
                 })}
                 {visibleRoles.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400">
                       No roles here yet.
                     </td>
                   </tr>
@@ -653,6 +664,7 @@ function ImportModal({ guildOptions, departments, departmentOptions, mappedIds, 
           id: role.id,
           name: role.name,
           position: role.position,
+          color: role.color || "",
           department: rows[role.id]?.department || "",
         })),
     );
@@ -744,6 +756,54 @@ function ImportModal({ guildOptions, departments, departmentOptions, mappedIds, 
         </>
       )}
     </Modal>
+  );
+}
+
+/**
+ * A rank's roster colour: a swatch that opens the browser's colour wheel/slider,
+ * a hex field to type or paste one, and a clear button that falls the rank back
+ * to the roster's default. Empty means "no colour set".
+ */
+function ColorField({ value, onChange, label }) {
+  const hex = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(value ?? "")) ? value : "";
+  return (
+    <div className="flex items-center gap-1.5">
+      <label
+        className="relative size-8 shrink-0 cursor-pointer overflow-hidden rounded-lg ring-1 ring-inset ring-white/15"
+        style={{ backgroundColor: hex || "transparent" }}
+        title={label}
+      >
+        {!hex && (
+          <span className="absolute inset-0 grid place-items-center text-[9px] font-bold text-slate-500">
+            —
+          </span>
+        )}
+        <input
+          type="color"
+          value={hex || "#64748b"}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
+          className="absolute inset-0 cursor-pointer opacity-0"
+        />
+      </label>
+      <TextInput
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={`${label} hex`}
+        placeholder="#a855f7"
+        className="h-9 w-24 font-mono text-xs"
+      />
+      {hex && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          aria-label={`Clear ${label}`}
+          className="text-[10px] font-bold uppercase tracking-wide text-slate-500 hover:text-slate-300"
+        >
+          Clear
+        </button>
+      )}
+    </div>
   );
 }
 

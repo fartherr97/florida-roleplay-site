@@ -498,6 +498,11 @@ CREATE TABLE IF NOT EXISTS roster_role_map (
   PRIMARY KEY (role_id)
 );
 
+-- A rank's colour on the roster, seeded from its Discord role colour on import
+-- and overridable by hand. The rank name renders in this colour.
+ALTER TABLE roster_role_map
+  ADD COLUMN IF NOT EXISTS color VARCHAR(9) NULL;
+
 -- Callsigns the hub hands out automatically, one per member per department, from
 -- that department's configured number range. Stored so a member keeps the same
 -- number across syncs; a member who carries a callsign in their Discord nickname

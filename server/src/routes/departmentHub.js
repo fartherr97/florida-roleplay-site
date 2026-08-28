@@ -269,6 +269,7 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
           rank: row.rank_label,
           rankFull: row.rank_full,
           order: row.sort_order,
+          color: row.color || "",
         }))
       : ROLE_MAP;
     roleMap = fullMap.filter((role) => role.department === deptId);
@@ -312,7 +313,7 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
           .filter((role) => role && role.department === deptId);
         if (deptRoles.length) {
           const top = deptRoles.sort((a, b) => (b.order ?? 0) - (a.order ?? 0))[0];
-          built.push({ ...base, department: deptId, rank: top.rank, rankFull: top.rankFull });
+          built.push({ ...base, department: deptId, rank: top.rank, rankFull: top.rankFull, rankColor: top.color || "" });
         } else if (held === null && base.department === deptId) {
           // Legacy row with no recorded roles yet — keep it under its stored rank.
           built.push(base);

@@ -176,7 +176,10 @@ export default function DeptRoster({ page, config }) {
       key: "rank",
       label: "Rank",
       render: (member) => (
-        <span className="text-sm font-semibold text-slate-300">
+        <span
+          className="text-sm font-semibold text-slate-300"
+          style={member.rankColor ? { color: member.rankColor } : undefined}
+        >
           {member.rankFull || member.rank}
         </span>
       ),

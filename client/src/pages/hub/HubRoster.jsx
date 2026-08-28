@@ -195,16 +195,18 @@ export default function HubRoster({
     const needle = query.trim().toLowerCase();
     return ranks
       .map((rank, index) => {
+        // The bound Discord role's colour, falling back to a cycled palette only
+        // when the role has none set — used for the band and the rank name.
+        const color = rank.color || RANK_COLORS[index % RANK_COLORS.length];
         // Each row carries the rank it sits under, so the Position column reads the
         // same for a filled seat and a vacant one, plus the site's activity overlay
         // for a filled seat (Active until somebody says otherwise).
-        const positionNote = rank.shortName && rank.shortName !== rank.name ? rank.shortName : null;
         let rows = rowsForRank(rank).map((row) => {
           const a = row.vacant ? {} : activity[row.discordId] ?? {};
           return {
             ...row,
             position: rank.name,
-            positionNote,
+            positionColor: color,
             status: row.vacant ? null : a.status ?? "Active",
             loaUntil: a.loaUntil ?? null,
             loaReason: a.loaReason ?? null,
@@ -225,10 +227,9 @@ export default function HubRoster({
         }
         return {
           id: rank.discordRoleId ?? rank.name,
-          label: rank.shortName && rank.shortName !== rank.name ? `${rank.name} · ${rank.shortName}` : rank.name,
-          // The bound Discord role's colour, falling back to a cycled palette only when
-          // the role has none set.
-          color: rank.color || RANK_COLORS[index % RANK_COLORS.length],
+          // Just the rank name — the short name is redundant on the roster.
+          label: rank.name,
+          color,
           rows,
         };
       })
@@ -262,10 +263,12 @@ export default function HubRoster({
       hideBelow: "md",
       render: (row) => (
         <div className="min-w-0">
-          <p className={cn("truncate text-sm font-semibold", row.vacant ? "text-slate-500" : accent.position)}>
+          <p
+            className="truncate text-sm font-semibold"
+            style={{ color: row.vacant ? "#64748b" : row.positionColor || undefined }}
+          >
             {row.position}
           </p>
-          {row.positionNote && <p className="truncate text-xs text-slate-500">{row.positionNote}</p>}
         </div>
       ),
     },
