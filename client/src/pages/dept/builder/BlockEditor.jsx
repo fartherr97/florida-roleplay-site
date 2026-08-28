@@ -1,4 +1,4 @@
-import { createElement, useState } from "react";
+import { createElement, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
@@ -29,17 +29,46 @@ export default function BlockEditor({ page, config, onClose }) {
 
   const base = `/departments/${config.id}/hub`;
 
-  const commit = (nextBlocks, nextHero = hero) => {
-    setBlocks(nextBlocks);
-    setHero(nextHero);
+  // The live preview reads local state, so typing stays snappy. Pushing to the shared
+  // config runs a full normalize + re-render + undo-history entry, so it is debounced —
+  // doing it per keystroke is what made the editor lag and made Undo step per character.
+  const pending = useRef(null);
+  const timer = useRef(null);
+  const flushRef = useRef(null);
+
+  const flush = () => {
+    clearTimeout(timer.current);
+    const next = pending.current;
+    if (!next) return;
+    pending.current = null;
     mutate((current) => ({
       ...current,
       pages: current.pages.map((entry) =>
         entry.id === page.id
-          ? { ...entry, config: { ...entry.config, ...nextHero, blocks: nextBlocks } }
+          ? { ...entry, config: { ...entry.config, ...next.hero, blocks: next.blocks } }
           : entry,
       ),
     }));
+  };
+
+  // Keep a ref to the latest flush, and use it to flush any pending edit when the editor
+  // unmounts — so the last change is never lost to the debounce.
+  useEffect(() => {
+    flushRef.current = flush;
+  });
+  useEffect(() => () => flushRef.current?.(), []);
+
+  const commit = (nextBlocks, nextHero = hero) => {
+    setBlocks(nextBlocks);
+    setHero(nextHero);
+    pending.current = { blocks: nextBlocks, hero: nextHero };
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, 300);
+  };
+
+  const done = () => {
+    flush();
+    onClose();
   };
 
   const update = (id, changes) =>
@@ -56,7 +85,7 @@ export default function BlockEditor({ page, config, onClose }) {
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={done}
       title={`Content — ${page.label}`}
       className="max-w-6xl"
     >
@@ -167,7 +196,7 @@ export default function BlockEditor({ page, config, onClose }) {
       </div>
 
       <div className="mt-5 flex justify-end">
-        <Button size="sm" onClick={onClose}>
+        <Button size="sm" onClick={done}>
           Done
         </Button>
       </div>
