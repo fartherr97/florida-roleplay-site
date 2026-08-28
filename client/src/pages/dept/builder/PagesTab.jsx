@@ -313,22 +313,20 @@ function PageSettings({ page, groups, onClose, onSave }) {
           <TextInput id="p-label" value={values.label} onChange={(e) => set({ label: e.target.value })} />
         </Field>
         <Field label="Nav group" htmlFor="p-group">
-          <Select id="p-group" value={values.navGroup} onChange={(e) => set({ navGroup: e.target.value })}>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.label}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="p-group"
+            value={values.navGroup}
+            onChange={(next) => set({ navGroup: next })}
+            options={groups.map((group) => ({ value: group.id, label: group.label }))}
+          />
         </Field>
         <Field label="Icon" htmlFor="p-icon">
-          <Select id="p-icon" value={values.icon} onChange={(e) => set({ icon: e.target.value })}>
-            {ICON_NAMES.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="p-icon"
+            value={values.icon}
+            onChange={(next) => set({ icon: next })}
+            options={ICON_NAMES}
+          />
         </Field>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -360,13 +358,12 @@ function AddPage({ groups, existing, onClose, onAdd }) {
     <Modal open onClose={onClose} title="Add a page">
       <div className="space-y-4">
         <Field label="Type" htmlFor="new-type">
-          <Select id="new-type" value={type} onChange={(e) => setType(e.target.value)}>
-            {PAGE_TYPES.map((entry) => (
-              <option key={entry.type} value={entry.type}>
-                {entry.label}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="new-type"
+            value={type}
+            onChange={setType}
+            options={PAGE_TYPES.map((entry) => ({ value: entry.type, label: entry.label }))}
+          />
         </Field>
         <p className="text-xs leading-relaxed text-slate-500">{definition.detail}</p>
 
@@ -379,13 +376,12 @@ function AddPage({ groups, existing, onClose, onAdd }) {
           />
         </Field>
         <Field label="Nav group" htmlFor="new-group">
-          <Select id="new-group" value={navGroup} onChange={(e) => setNavGroup(e.target.value)}>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.label}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="new-group"
+            value={navGroup}
+            onChange={setNavGroup}
+            options={groups.map((group) => ({ value: group.id, label: group.label }))}
+          />
         </Field>
 
         {taken && (

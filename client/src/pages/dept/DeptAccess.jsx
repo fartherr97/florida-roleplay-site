@@ -233,23 +233,24 @@ function AddGrant({ options, onCancel, onAdd, maxLevel }) {
     <Card className="mb-5 p-5">
       <div className="grid gap-4 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
         <Field label="Discord role" htmlFor="grant-role">
-          <Select id="grant-role" value={roleKey} onChange={(e) => setRoleKey(e.target.value)}>
-            <option value="">Choose a role…</option>
-            {options.map((role) => (
-              <option key={role.key} value={role.key}>
-                {role.rankFull || role.rank} — {role.department}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="grant-role"
+            value={roleKey}
+            onChange={setRoleKey}
+            placeholder="Choose a role…"
+            options={options.map((role) => ({
+              value: role.key,
+              label: `${role.rankFull || role.rank} — ${role.department}`,
+            }))}
+          />
         </Field>
         <Field label="Level" htmlFor="grant-level" hint="Higher levels administer lower ones.">
-          <Select id="grant-level" value={level} onChange={(e) => setLevel(e.target.value)}>
-            {levels.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </Select>
+          <Select
+            id="grant-level"
+            value={level}
+            onChange={setLevel}
+            options={levels.map((value) => ({ value, label: String(value) }))}
+          />
         </Field>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}>

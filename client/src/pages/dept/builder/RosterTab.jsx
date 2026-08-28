@@ -430,26 +430,22 @@ function RosterStats({ config, onChange }) {
               <Select
                 id={`sm-${item.id}`}
                 value={item.mode}
-                onChange={(e) => update(item.id, { mode: e.target.value })}
-              >
-                <option value="total">Everyone</option>
-                <option value="status">One status</option>
-                <option value="category">One band</option>
-              </Select>
+                onChange={(next) => update(item.id, { mode: next })}
+                options={[
+                  { value: "total", label: "Everyone" },
+                  { value: "status", label: "One status" },
+                  { value: "category", label: "One band" },
+                ]}
+              />
             </Field>
             {item.mode === "status" && (
               <Field label="Status" htmlFor={`sv-${item.id}`} className="w-40">
                 <Select
                   id={`sv-${item.id}`}
                   value={item.statusValue ?? ""}
-                  onChange={(e) => update(item.id, { statusValue: e.target.value })}
-                >
-                  {["Active", "Semi-Active", "LOA", "Inactive", "Suspended"].map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(next) => update(item.id, { statusValue: next })}
+                  options={["Active", "Semi-Active", "LOA", "Inactive", "Suspended"]}
+                />
               </Field>
             )}
             {item.mode === "category" && (
@@ -457,14 +453,12 @@ function RosterStats({ config, onChange }) {
                 <Select
                   id={`sc-${item.id}`}
                   value={item.categoryId ?? ""}
-                  onChange={(e) => update(item.id, { categoryId: e.target.value })}
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(next) => update(item.id, { categoryId: next })}
+                  options={categories.map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                  }))}
+                />
               </Field>
             )}
             <button

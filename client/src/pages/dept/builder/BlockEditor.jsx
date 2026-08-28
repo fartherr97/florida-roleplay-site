@@ -233,14 +233,9 @@ function BlockFields({ block, pages, onChange }) {
             <Select
               id={`${block.id}-cols`}
               value={String(block.columns ?? 4)}
-              onChange={(e) => set({ columns: Number(e.target.value) })}
-            >
-              {[2, 3, 4].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </Select>
+              onChange={(next) => set({ columns: Number(next) })}
+              options={[2, 3, 4].map((value) => ({ value: String(value), label: String(value) }))}
+            />
           </Field>
         )}
         <ItemList block={block} pages={pages} onChange={set} />
@@ -314,26 +309,16 @@ function ItemList({ block, pages, onChange }) {
             <div className="mt-2 grid gap-2 sm:grid-cols-3">
               <Select
                 value={item.icon ?? ""}
-                onChange={(e) => update(item.id, { icon: e.target.value })}
-              >
-                <option value="">Icon…</option>
-                {ICON_NAMES.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </Select>
+                onChange={(next) => update(item.id, { icon: next })}
+                placeholder="Icon…"
+                options={ICON_NAMES}
+              />
               <Select
                 value={item.page ?? ""}
-                onChange={(e) => update(item.id, { page: e.target.value, url: "" })}
-              >
-                <option value="">Link to a page…</option>
-                {pages.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.label}
-                  </option>
-                ))}
-              </Select>
+                onChange={(next) => update(item.id, { page: next, url: "" })}
+                placeholder="Link to a page…"
+                options={pages.map((entry) => ({ value: entry.id, label: entry.label }))}
+              />
               <TextInput
                 value={item.url ?? ""}
                 placeholder="…or an external URL"
