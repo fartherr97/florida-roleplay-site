@@ -110,6 +110,7 @@ function access(headRoleKey, headLabel, supervisorKeys) {
  */
 function department({
   id,
+  guildId = "",
   name,
   shortName,
   accent,
@@ -123,6 +124,7 @@ function department({
   return {
     version: CONFIG_VERSION,
     id,
+    guildId,
     branding: { name, shortName, tagline, description, accent, logoUrl: "", bannerUrl: "" },
     navGroups: NAV_GROUPS,
     pages: [...corePages(hero), ...extraPages],
