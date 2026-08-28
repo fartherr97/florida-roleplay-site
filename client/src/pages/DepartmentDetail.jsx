@@ -7,6 +7,7 @@ import Button from "../components/ui/Button";
 import NotFound from "../components/auth/NotFound";
 import { api } from "../lib/api";
 import { useAuth } from "../context/useAuth";
+import { accentOf } from "../lib/departmentConfig";
 import { iconFor } from "../lib/icons";
 import { toneTile } from "../lib/tones";
 import { SITE, departments as seedDepartments } from "../data/mockData";
@@ -87,6 +88,7 @@ export default function DepartmentDetail() {
     : (department.fleet ?? []).map((v) => ({ name: v, imageUrl: "" }));
   const memberCount = live?.memberCount ?? department.roster;
   const fleetCount = live?.fleetCount ?? fleet.length;
+  const accent = accentOf({ accent: live?.accent ?? department.tone });
 
   return (
     <Section>
@@ -120,14 +122,12 @@ export default function DepartmentDetail() {
           <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-400">
             Emergency Services · {department.abbr}
           </p>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+          <h1
+            className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl"
+            style={{ color: accent.soft }}
+          >
             {department.name}
           </h1>
-          {department.tagline && (
-            <p className="mt-2 text-lg font-bold tracking-tight text-brand-400">
-              {department.tagline}
-            </p>
-          )}
           <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-slate-400">
             {department.mission}
           </p>

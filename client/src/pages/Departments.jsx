@@ -139,12 +139,8 @@ function DepartmentPanel({ panel, first, canEnter }) {
         >
           {panel.abbr}
         </h2>
-        <p className="mt-1 text-sm font-semibold text-slate-200">{panel.name}</p>
-        <p
-          className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.18em]"
-          style={{ color: panel.soft }}
-        >
-          {panel.tagline}
+        <p className="mt-1.5 text-sm font-bold" style={{ color: panel.soft }}>
+          {panel.name}
         </p>
 
         <div className="mt-3 flex items-center justify-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">

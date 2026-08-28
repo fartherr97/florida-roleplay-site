@@ -179,12 +179,12 @@ const FHP = department({
   name: "Florida Highway Patrol",
   shortName: "FHP",
   accent: "#d2b48c",
-  tagline: "Troop C — South Florida",
+  tagline: "",
   description:
     "State troopers covering the interstates and state routes across the South Florida region — traffic enforcement, crash investigation and pursuit.",
   hero: {
     heroKicker: "Florida Highway Patrol",
-    heroTitle: "Troop C Operations",
+    heroTitle: "Florida Highway Patrol Operations",
     heroSubtitle:
       "Everything a trooper needs on shift — the roster, the fleet, current SOPs and the training calendar.",
     blocks: [
@@ -241,7 +241,7 @@ const BCSO = department({
   name: "Broward County Sheriff's Office",
   shortName: "BCSO",
   accent: "green",
-  tagline: "Serving Broward County",
+  tagline: "",
   description:
     "The county's primary law enforcement agency — patrol, criminal investigation, court services and the county jail.",
   hero: {
@@ -280,8 +280,8 @@ const MPD = department({
   id: "mpd",
   name: "Miami Police Department",
   shortName: "MPD",
-  accent: "violet",
-  tagline: "City of Miami",
+  accent: "brand",
+  tagline: "",
   description:
     "City policing across downtown, Ybor and the waterfront — patrol districts, community response and criminal investigation.",
   hero: {
