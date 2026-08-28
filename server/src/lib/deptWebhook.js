@@ -8,22 +8,26 @@
  * redacted from every non-manager read (see redactSensitive), so only someone
  * who could set it ever sees it.
  *
- * Each hook is `{ enabled, url, botName?, avatarUrl? }`. `adminlog` is the only
- * one wired today; the shape is generic so more can follow.
+ * Each hook is `{ enabled, url, botName?, avatarUrl?, roleIds?, color?, footer? }`.
+ * `adminlog` is the only one wired today; the shape is generic so more can follow.
  */
 import { accentOf } from "./departmentConfig.js";
 
 const WEBHOOK_RE = /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//;
 
-/** Colours the admin-log embed by the weight of the action. */
-const ACTION_COLORS = {
-  Promotion: 0x1eb854,
-  Commendation: 0x3d82f0,
-  Demotion: 0xf59e0b,
-  "Written warning": 0xf59e0b,
-  Suspension: 0xef4444,
-  Removal: 0xef4444,
-};
+/** Meaning-aware colour for an entry's type, matching the page's own palette. */
+function typeColor(type = "") {
+  const t = String(type).toLowerCase();
+  if (/pass|hire|accept|approved|commend/.test(t)) return 0x22c55e;
+  if (/fail|resign|strike|terminat|remov/.test(t)) return 0xef4444;
+  if (/transfer in/.test(t)) return 0x3b82f6;
+  if (/transfer out/.test(t)) return 0xf97316;
+  if (/\bda\b|coach|warn|probation|suspen|demot/.test(t)) return 0xf59e0b;
+  if (/booth/.test(t)) return 0x14b8a6;
+  if (/interview/.test(t)) return 0xa855f7;
+  if (/academy|training|eval/.test(t)) return 0x3b82f6;
+  return null;
+}
 
 function accentInt(config) {
   const hex = accentOf(config?.branding).color.replace("#", "");
@@ -31,28 +35,56 @@ function accentInt(config) {
   return Number.isFinite(n) ? n : 0x3d82f0;
 }
 
-/** The Discord payload for one admin-log entry. */
+/** The Discord payload for one snapshot admin-log entry. */
 export function buildAdminLogPayload(config, hook, entry) {
+  const fmt = (v) => (v?.type === "checkbox" ? (v.value ? "Yes" : "No") : String(v?.value ?? ""));
   const fields = [];
-  if (entry.member) fields.push({ name: "Member", value: String(entry.member).slice(0, 1024), inline: true });
-  if (entry.action) fields.push({ name: "Action", value: String(entry.action).slice(0, 1024), inline: true });
-  if (entry.issuedBy) fields.push({ name: "Issued by", value: String(entry.issuedBy).slice(0, 1024), inline: true });
-  if (entry.detail) fields.push({ name: "Detail", value: String(entry.detail).slice(0, 1024) });
 
+  // Subject, with a mention when we have the id.
+  if (entry.subject?.name || entry.subject?.discordId) {
+    const value =
+      [entry.subject?.name, entry.subject?.discordId && `<@${entry.subject.discordId}>`]
+        .filter(Boolean)
+        .join(" ") || "—";
+    fields.push({ name: "Subject", value: value.slice(0, 1024), inline: true });
+  }
+  // Every filled custom field.
+  for (const v of Array.isArray(entry.values) ? entry.values : []) {
+    const val = fmt(v);
+    if (val === "" || val === "No") continue;
+    fields.push({ name: v.label || "Field", value: val.slice(0, 1024) });
+  }
+
+  const hookColor = parseInt(String(hook.color || "").replace("#", ""), 16);
   const embed = {
-    title: entry.action ? `Admin Log · ${entry.action}` : "Admin Log entry",
-    color: ACTION_COLORS[entry.action] ?? accentInt(config),
-    ...(fields.length ? { fields } : {}),
-    footer: { text: config?.branding?.shortName || config?.branding?.name || "Department" },
-    timestamp: new Date(entry.date || Date.now()).toISOString(),
+    ...(entry.bookName ? { author: { name: String(entry.bookName).slice(0, 256) } } : {}),
+    title: entry.type ? String(entry.type).slice(0, 256) : "Admin Log entry",
+    color: Number.isFinite(hookColor) ? hookColor : typeColor(entry.type) ?? accentInt(config),
+    ...(fields.length ? { fields: fields.slice(0, 25) } : {}),
+    footer: {
+      text: [
+        entry.by?.name && `Logged by ${entry.by.name}`,
+        hook.footer || config?.branding?.shortName || config?.branding?.name || "Department",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+        .slice(0, 2048),
+    },
+    timestamp: new Date(entry.at || entry.date || Date.now()).toISOString(),
   };
 
+  // Optional role pings above the embed.
+  const content = (Array.isArray(hook.roleIds) ? hook.roleIds : [])
+    .map((id) => `<@&${String(id).trim()}>`)
+    .filter((s) => s.length > 5)
+    .join(" ");
+
   return {
+    ...(content ? { content } : {}),
     ...(hook.botName ? { username: String(hook.botName).slice(0, 80) } : {}),
     ...(hook.avatarUrl ? { avatar_url: hook.avatarUrl } : {}),
     embeds: [embed],
-    // A record post never pings anyone.
-    allowed_mentions: { parse: [] },
+    allowed_mentions: { parse: content ? ["roles"] : [] },
   };
 }
 

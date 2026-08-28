@@ -26,6 +26,45 @@ const NAV_GROUPS = [
   { id: "admin", label: "Administration" },
 ];
 
+/**
+ * The logbooks a department's Admin Log starts with. Each has its own entry
+ * types and custom fields; entries snapshot them at submission, so editing a
+ * book later never rewrites an old record. Ids are stable so a seed reload is
+ * idempotent.
+ */
+function defaultLogbooks() {
+  return [
+    {
+      id: "book-admin",
+      name: "Admin Log",
+      types: ["Hired, Open Interview", "Hired, Application", "Resignation", "Transfer In", "Transfer Out"],
+      fields: [{ id: "lf-admin-notes", label: "Notes", type: "textarea" }],
+    },
+    {
+      id: "book-fto",
+      name: "FTO Logbook",
+      types: ["Academy Training", "Field Training, Phase 1", "Field Training, Phase 2", "Final Evaluation"],
+      fields: [{ id: "lf-fto-notes", label: "Result / Notes", type: "textarea" }],
+    },
+    {
+      id: "book-interview",
+      name: "Interview Logbook",
+      types: ["Interview Conducted", "Interview Passed", "Interview Failed"],
+      fields: [{ id: "lf-interview-notes", label: "Notes", type: "textarea" }],
+    },
+    {
+      id: "book-booth",
+      name: "Booth Log",
+      types: ["Open Interview Booth"],
+      fields: [
+        { id: "lf-booth-duration", label: "Duration (minutes)", type: "text" },
+        { id: "lf-booth-hires", label: "Hires from booth", type: "text" },
+        { id: "lf-booth-notes", label: "Notes", type: "textarea" },
+      ],
+    },
+  ];
+}
+
 /** The pages every department starts with, before its own content is added. */
 function corePages({ heroKicker, heroTitle, heroSubtitle, blocks = [] }) {
   return [
@@ -45,7 +84,7 @@ function corePages({ heroKicker, heroTitle, heroSubtitle, blocks = [] }) {
     { id: "calendar", label: "Calendar", navGroup: "resources", icon: "Calendar", type: "calendar", config: { events: [] } },
     { id: "hours", label: "Duty Hours", navGroup: "resources", icon: "Clock", type: "hours" },
     { id: "activity", label: "Activity", navGroup: "admin", icon: "Activity", type: "activity" },
-    { id: "adminlog", label: "Admin Log", navGroup: "admin", icon: "Gavel", type: "adminlog", config: { entries: [] } },
+    { id: "adminlog", label: "Admin Log", navGroup: "admin", icon: "Gavel", type: "adminlog", config: { books: defaultLogbooks(), entries: [] } },
     { id: "audit", label: "Audit Log", navGroup: "admin", icon: "ScrollText", type: "audit" },
     { id: "access", label: "Access & Roles", navGroup: "admin", icon: "Shield", type: "access" },
     {

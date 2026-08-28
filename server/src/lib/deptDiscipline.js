@@ -18,18 +18,33 @@ import { query } from "../db.js";
 import { ACTION_BODY_MAP } from "./discipline.js";
 
 /**
- * Admin-log action label → disciplinary action type. Only the entries that
- * follow a member onto a background check are here; rank changes and
- * commendations resolve to null and are skipped.
+ * Map an admin-log entry TYPE (a free-form label, since logbooks and their types
+ * are configurable) to a disciplinary action type. Only the entries that follow
+ * a member onto a background check match; hires, trainings, interviews, rank
+ * changes and commendations resolve to null and are skipped.
  */
-const ACTION_TO_TYPE = {
-  "Written warning": "written_warning",
-  Suspension: "suspension",
-  Demotion: "demotion",
-  Removal: "termination",
-};
+function disciplinaryType(type = "") {
+  const t = String(type).toLowerCase();
+  if (/terminat|removal|removed|fired/.test(t)) return "termination";
+  if (/suspen/.test(t)) return "suspension";
+  if (/demot/.test(t)) return "demotion";
+  if (/written warning|\bwarning\b|\bwarn\b|strike/.test(t)) return "written_warning";
+  return null;
+}
 
 const SNOWFLAKE = /^\d{17,20}$/;
+
+/**
+ * Pull the free-text detail out of a snapshot entry's `values` — the notes-style
+ * field is the body of the entry; fall back to joining every filled field.
+ */
+function entryDetail(entry) {
+  const values = Array.isArray(entry?.values) ? entry.values : [];
+  const filled = values.filter((v) => v && v.value && v.type !== "checkbox");
+  const note = filled.find((v) => /note/i.test(v.label || ""));
+  if (note) return String(note.value);
+  return filled.map((v) => `${v.label}: ${v.value}`).join(" · ");
+}
 
 /**
  * File every newly-added disciplinary admin-log entry into the discipline store.
@@ -47,8 +62,8 @@ export async function fileAdminLogDiscipline(deptId, before, after, user) {
   const fresh = (Array.isArray(after) ? after : []).filter((e) => e?.id && !seen.has(e.id));
 
   for (const entry of fresh) {
-    const type = ACTION_TO_TYPE[entry.action];
-    const discordId = String(entry.discordId ?? "").trim();
+    const type = disciplinaryType(entry.type);
+    const discordId = String(entry.subject?.discordId ?? "").trim();
     // Only disciplinary entries that name a member by Discord id can be folded
     // into a background check; the rest stay department-local log lines.
     if (!type || !SNOWFLAKE.test(discordId)) continue;
@@ -63,11 +78,11 @@ export async function fileAdminLogDiscipline(deptId, before, after, user) {
         [
           type,
           deptId,
-          String(entry.member ?? "").slice(0, 128),
+          String(entry.subject?.name ?? "").slice(0, 128),
           discordId,
           user.displayName ?? user.username ?? "Unknown",
           user.id,
-          String(entry.detail ?? "").slice(0, 1000),
+          entryDetail(entry).slice(0, 1000),
         ],
       );
     } catch {
