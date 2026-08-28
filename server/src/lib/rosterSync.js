@@ -14,6 +14,7 @@
 import { query } from "../db.js";
 import * as seed from "../rosterSeed.js";
 import { DEPARTMENT_CONFIGS } from "../departmentSeed.js";
+import { normalizeConfig } from "./departmentConfig.js";
 import { resolveRole, buildNickname, renderDisplayName } from "./roster.js";
 import { fetchGuildMembers } from "./discord.js";
 
@@ -194,6 +195,101 @@ async function collectGuildIds() {
   return [...ids];
 }
 
+/**
+ * Per-department callsign settings and the guild each reads nicknames from:
+ * `{ deptId: { guildId, min, max, auto } }`. Seeds set the shipped ranges; a
+ * stored config overrides them, but an empty guild or a zero range falls back to
+ * the seed so an older save that predates these fields does not blank them.
+ */
+async function loadDeptMeta() {
+  const meta = {};
+  const setFrom = (cfg, id) => {
+    const c = normalizeConfig(cfg, id);
+    const cur = meta[c.id] || { guildId: "", min: 0, max: 0, auto: true };
+    const guildId = SNOWFLAKE.test(String(c.guildId ?? "")) ? String(c.guildId) : "";
+    const cs = c.roster?.callsigns ?? {};
+    meta[c.id] = {
+      guildId: guildId || cur.guildId,
+      min: cs.min || cur.min,
+      max: cs.max || cur.max,
+      auto: cs.auto !== false,
+    };
+  };
+  for (const [id, cfg] of Object.entries(DEPARTMENT_CONFIGS)) setFrom(cfg, id);
+  try {
+    const rows = await query("SELECT id, config FROM department_configs");
+    for (const row of rows) {
+      setFrom(typeof row.config === "object" ? row.config : JSON.parse(row.config), row.id);
+    }
+  } catch {
+    // No database — the seed meta stands.
+  }
+  return meta;
+}
+
+/**
+ * Give every member of one department a callsign from its range, keeping the one
+ * they already have. A member who carries a callsign in their nickname keeps it
+ * and reserves that number; everyone else keeps a still-valid stored number or
+ * is handed the next free one. Rows for members who left, or who now carry a
+ * nickname callsign, are removed. Best-effort — a failure never fails the sync.
+ */
+async function assignDeptCallsigns(deptId, members, meta) {
+  try {
+    const rows = await query(
+      "SELECT discord_id, callsign FROM dept_callsigns WHERE department = $1",
+      [deptId],
+    );
+    const existing = new Map(rows.map((r) => [r.discord_id, String(r.callsign)]));
+
+    // Numbers already spoken for: every present member's nickname callsign.
+    const occupied = new Set();
+    for (const m of members) if (m.nickCallsign) occupied.add(String(m.nickCallsign));
+
+    const assign = new Map(); // discordId -> number string, for members without a nick callsign
+    // Keep a still-valid stored number that no nickname now claims.
+    for (const m of members) {
+      if (m.nickCallsign) continue;
+      const prev = existing.get(m.discordId);
+      const n = prev ? Number(prev) : NaN;
+      if (Number.isFinite(n) && n >= meta.min && n <= meta.max && !occupied.has(prev)) {
+        assign.set(m.discordId, prev);
+        occupied.add(prev);
+      }
+    }
+    // Hand the next free number to anyone still without one.
+    let cursor = meta.min;
+    for (const m of members) {
+      if (m.nickCallsign || assign.has(m.discordId)) continue;
+      while (cursor <= meta.max && occupied.has(String(cursor))) cursor += 1;
+      if (cursor > meta.max) break; // range exhausted — leave the rest blank
+      assign.set(m.discordId, String(cursor));
+      occupied.add(String(cursor));
+      cursor += 1;
+    }
+
+    for (const [discordId, cs] of assign) {
+      await query(
+        `INSERT INTO dept_callsigns (department, discord_id, callsign, assigned_at)
+           VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (department, discord_id) DO UPDATE SET callsign = EXCLUDED.callsign`,
+        [deptId, discordId, cs],
+      );
+    }
+    const keep = [...assign.keys()];
+    if (keep.length) {
+      await query(
+        "DELETE FROM dept_callsigns WHERE department = $1 AND NOT (discord_id = ANY($2))",
+        [deptId, keep],
+      );
+    } else {
+      await query("DELETE FROM dept_callsigns WHERE department = $1", [deptId]);
+    }
+  } catch {
+    // Auto-callsigns are a convenience; never let them break a roster sync.
+  }
+}
+
 let lastSyncAt = 0;
 let inProgress = false;
 const MIN_INTERVAL_MS = 60_000;
@@ -251,10 +347,12 @@ export async function syncRosterFromGuild() {
     if (ok === 0) return { configured: true, error: errors ? "unreadable" : "no-guilds", perGuild };
 
     const roleMap = await loadRankMap();
+    const deptMeta = await loadDeptMeta();
     // Which held roles to persist per member: only the ones the map knows, so a
     // department roster can bucket a member by any of their mapped ranks.
     const mappedRoleIds = new Set(roleMap.map((r) => String(r.roleId)));
     const byDept = {}; // department -> matched count, for the pull diagnostic
+    const deptMembers = {}; // department -> [{ discordId, nickCallsign }] for callsigns
     const keep = [];
     for (const [discordId, data] of byId) {
       const held = [...data.roles].map(String);
@@ -272,7 +370,12 @@ export async function syncRosterFromGuild() {
         const depts = new Set(
           roleIds.map((id) => roleMap.find((r) => String(r.roleId) === id)?.department).filter(Boolean),
         );
-        for (const d of depts) byDept[d] = (byDept[d] ?? 0) + 1;
+        for (const d of depts) {
+          byDept[d] = (byDept[d] ?? 0) + 1;
+          const gid = deptMeta[d]?.guildId;
+          const nickCallsign = gid && data.nicks[gid] ? parseNick(data.nicks[gid]).callsign : "";
+          (deptMembers[d] ??= []).push({ discordId, nickCallsign });
+        }
       }
     }
 
@@ -291,6 +394,14 @@ export async function syncRosterFromGuild() {
         }
       } catch {
         // Pruning is best-effort; a failed delete just leaves a stale row.
+      }
+
+      // Hand out auto callsigns once the read is clean, so numbers aren't churned
+      // by a partial view of a department. Only departments with a real range and
+      // auto-assignment on are touched.
+      for (const [deptId, meta] of Object.entries(deptMeta)) {
+        if (!meta.auto || meta.min <= 0 || meta.max < meta.min) continue;
+        await assignDeptCallsigns(deptId, deptMembers[deptId] ?? [], meta);
       }
     }
 

@@ -120,6 +120,7 @@ function department({
   hero,
   categories,
   grants,
+  callsignRange = [0, 0],
   extraPages = [],
 }) {
   return {
@@ -134,6 +135,7 @@ function department({
       source: "shared",
       memberFields: MEMBER_FIELDS,
       stats: { show: true, items: STAT_ITEMS },
+      callsigns: { auto: true, min: callsignRange[0], max: callsignRange[1] },
       subdivisions: [
         {
           id: "sub-main",
@@ -179,6 +181,7 @@ function sopPage(id, label, title, sections) {
 const FHP = department({
   id: "fhp",
   guildId: "1534486963065978990",
+  callsignRange: [901, 999],
   name: "Florida Highway Patrol",
   shortName: "FHP",
   accent: "#d2b48c",
@@ -242,6 +245,7 @@ const FHP = department({
 const BCSO = department({
   id: "bcso",
   guildId: "1534487473206595718",
+  callsignRange: [501, 599],
   name: "Broward County Sheriff's Office",
   shortName: "BCSO",
   accent: "green",
@@ -283,6 +287,7 @@ const BCSO = department({
 const MPD = department({
   id: "mpd",
   guildId: "1534487217299525634",
+  callsignRange: [701, 799],
   name: "Miami Police Department",
   shortName: "MPD",
   accent: "brand",

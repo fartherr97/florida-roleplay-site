@@ -273,6 +273,19 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
       : ROLE_MAP;
     roleMap = fullMap.filter((role) => role.department === deptId);
 
+    // Auto-assigned callsigns for this department, used when a member does not
+    // carry one in their nickname.
+    let assigned = new Map();
+    try {
+      const csRows = await query(
+        "SELECT discord_id, callsign FROM dept_callsigns WHERE department = $1",
+        [deptId],
+      );
+      assigned = new Map(csRows.map((r) => [r.discord_id, String(r.callsign)]));
+    } catch {
+      // No table yet — nickname callsigns still apply.
+    }
+
     const memberRows = await query("SELECT * FROM roster_members");
     if (memberRows.length) {
       const byRoleId = new Map(fullMap.map((role) => [String(role.roleId), role]));
@@ -288,6 +301,10 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
           if (name) base.characterName = name;
           if (callsign) base.callsign = callsign;
           base.displayName = nick;
+        }
+        // Fall back to the number the hub assigned this member in this department.
+        if (!base.callsign && assigned.has(row.discord_id)) {
+          base.callsign = assigned.get(row.discord_id);
         }
         const held = Array.isArray(row.role_ids) ? row.role_ids.map(String) : null;
         const deptRoles = (held ?? [])

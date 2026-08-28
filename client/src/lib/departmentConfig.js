@@ -357,6 +357,15 @@ export function normalizeConfig(raw, id) {
         show: roster.stats?.show !== false,
         items: Array.isArray(roster.stats?.items) ? roster.stats.items : [],
       },
+      // Callsigns handed out automatically from a per-department number range, so
+      // a new member is assigned the next free number in the range and keeps it.
+      // A zero range (the default) means no auto-assignment — callsigns then come
+      // only from a member's Discord nickname, or nowhere.
+      callsigns: {
+        auto: roster.callsigns?.auto !== false,
+        min: Number.isFinite(roster.callsigns?.min) ? Math.max(0, Math.trunc(roster.callsigns.min)) : 0,
+        max: Number.isFinite(roster.callsigns?.max) ? Math.max(0, Math.trunc(roster.callsigns.max)) : 0,
+      },
       subdivisions: (Array.isArray(roster.subdivisions) ? roster.subdivisions : []).map(
         (sub, index) => ({
           id: String(sub.id ?? `sub-${index}`),
