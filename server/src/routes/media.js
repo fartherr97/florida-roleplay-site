@@ -16,8 +16,15 @@
 import { randomBytes } from "node:crypto";
 import express, { Router } from "express";
 import { execute, query } from "../db.js";
-import { requirePermission } from "../middleware/requirePermission.js";
+import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
+import { permissionsFor } from "../permissions.js";
 import { str } from "../validate.js";
+
+/** Whether the caller may administer the host — see and remove anyone's images. */
+async function canManage(req) {
+  const perms = permissionsFor(req.user?.roles ?? [], await loadGrants());
+  return perms.has("media.manage");
+}
 
 const router = Router();
 
@@ -90,13 +97,31 @@ function noStore(res) {
  * Authenticated API (mounted under /api/media)
  * ------------------------------------------------------------------ */
 
-/** The recent uploads, newest first — a shared gallery for everyone who may host. */
+/**
+ * The uploads, newest first. By default a caller sees only their own — the image
+ * host is personal. `?scope=all` returns everyone's, with the uploader on each,
+ * and needs `media.manage`: that is the Image Hosting Administration view.
+ */
 router.get("/", requirePermission("media.upload"), async (req, res) => {
+  const all = str(req.query.scope) === "all";
+  if (all && !(await canManage(req))) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: "Seeing every upload needs the image-host admin permission.",
+    });
+  }
   try {
-    const rows = await query(
-      `SELECT id, content_type, size, original_name, uploaded_by_id, uploaded_by_name, created_at
-         FROM media_images ORDER BY created_at DESC LIMIT 200`,
-    );
+    const rows = all
+      ? await query(
+          `SELECT id, content_type, size, original_name, uploaded_by_id, uploaded_by_name, created_at
+             FROM media_images ORDER BY created_at DESC LIMIT 500`,
+        )
+      : await query(
+          `SELECT id, content_type, size, original_name, uploaded_by_id, uploaded_by_name, created_at
+             FROM media_images WHERE uploaded_by_id = $1 ORDER BY created_at DESC LIMIT 200`,
+          [req.user.id],
+        );
     return res.json({ images: rows.map((row) => shape(row, req)) });
   } catch {
     return res.json({ images: [] });
@@ -164,11 +189,19 @@ router.post(
   },
 );
 
-/** Remove an image. Any holder may tidy the shared host. */
+/** Remove an image — your own, or anyone's with the admin permission. */
 router.delete("/:id", requirePermission("media.upload"), async (req, res) => {
   const id = String(req.params.id);
   if (!ID_RE.test(id)) return res.status(400).json({ ok: false, message: "Not an image id." });
   try {
+    const rows = await query(`SELECT uploaded_by_id FROM media_images WHERE id = $1 LIMIT 1`, [id]);
+    if (rows.length && rows[0].uploaded_by_id !== req.user.id && !(await canManage(req))) {
+      return res.status(403).json({
+        ok: false,
+        code: "AUTH_ROLE_MISSING",
+        message: "That image was uploaded by someone else.",
+      });
+    }
     await execute(`DELETE FROM media_images WHERE id = $1`, [id]);
   } catch {
     return noStore(res);

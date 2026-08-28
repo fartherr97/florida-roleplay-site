@@ -98,7 +98,7 @@ export default function ImageHost() {
       <PageHeader
         eyebrow="Emergency Services"
         title="Image Hosting"
-        subtitle="Upload an image and get a shareable link. Anyone with the link can view it; only authorized members can upload or remove."
+        subtitle="Upload an image and get a shareable link. Anyone with the link can view it. This page shows your own uploads."
       />
 
       <button
@@ -141,14 +141,14 @@ export default function ImageHost() {
       <div className="mt-10">
         <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400">
           <ImagePlus className="size-4" />
-          Hosted images
+          Your uploads
         </h2>
 
         {loading ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : images.length === 0 ? (
           <Card className="p-8 text-center text-sm text-slate-500">
-            No images yet. Upload one above to get a link.
+            You haven't uploaded any images yet. Drop one above to get a link.
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -163,7 +163,7 @@ export default function ImageHost() {
 }
 
 /** One hosted image: a thumbnail, a format switch, and a copyable embed snippet. */
-function ImageCard({ image, onDelete }) {
+export function ImageCard({ image, onDelete }) {
   const [format, setFormat] = useState("link");
   const alt = image.originalName || "image";
   const snippet = useMemo(() => {

@@ -23,6 +23,7 @@ export const GUARDS = [
     permission: "site.department_heads",
     reason: "department",
   },
+  { path: "/management/image-hosting", permission: "media.manage" },
 
   // Staff Hub
   { path: "/staff-hub/home", permission: "staff.view" },

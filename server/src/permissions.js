@@ -218,7 +218,12 @@ export const PERMISSION_GROUPS = [
       {
         key: "media.upload",
         label: "Upload images",
-        detail: "Upload an image to the host, get its link, and remove images.",
+        detail: "Upload an image to the host, get its link, and remove your own images.",
+      },
+      {
+        key: "media.manage",
+        label: "Administer the image host",
+        detail: "See every uploaded image with who posted it, and remove anyone's.",
       },
     ],
   },
@@ -411,6 +416,7 @@ export const DEFAULT_GRANTS = {
   // Uploading to the image host — seeded to staff and department command, widen
   // it on this page for anyone else who should host images.
   "media.upload": [...staffFrom("mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "media.manage": staffFrom("senior_admin"),
 
   // The dev team works development requests; department command see their own
   // department's work. Managing the hub (vehicle library, request categories)

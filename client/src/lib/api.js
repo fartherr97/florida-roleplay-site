@@ -764,7 +764,9 @@ export const api = {
     })),
 
   // --- Image host ---------------------------------------------------------
-  listImages: () => get("/media", { images: [] }),
+  // Default scope is the caller's own uploads; "all" is the admin gallery.
+  listImages: (scope) =>
+    get(`/media${scope === "all" ? "?scope=all" : ""}`, { images: [] }),
 
   /**
    * Uploads one image file. The bytes are sent raw with the file's own

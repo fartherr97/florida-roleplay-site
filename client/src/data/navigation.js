@@ -108,6 +108,7 @@ export const navGroups = [
       { label: "Department Heads", to: "/management/department-heads", icon: "UserCog" },
       { label: "Site Administration", to: "/staff-hub/administration", icon: "SlidersHorizontal" },
       { label: "Access & Roles", to: "/staff-hub/access", icon: "KeyRound" },
+      { label: "Image Hosting Administration", to: "/management/image-hosting", icon: "Image" },
       { label: "Contact Management", to: "/management/contact", icon: "Mail" },
       { label: "Bot Dashboard", to: "/management/bot", icon: "Bot" },
     ],
