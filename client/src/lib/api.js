@@ -379,6 +379,19 @@ export const api = {
   pullRoster: () =>
     post("/roster/pull", {}, () => ({ configured: false, perGuild: [] })),
 
+  /** Add or edit a manual (hand-maintained) department roster member. */
+  saveManualMember: (deptId, payload) =>
+    post(`/dept/${encodeURIComponent(deptId)}/roster/manual`, payload, () => ({
+      ok: false,
+      message: NOT_PERSISTED,
+    })),
+  /** Remove a manual department roster member. */
+  deleteManualMember: (deptId, memberId) =>
+    del(
+      `/dept/${encodeURIComponent(deptId)}/roster/manual/${encodeURIComponent(memberId)}`,
+      () => ({ ok: false, message: NOT_PERSISTED }),
+    ),
+
   /** The guild's live Discord roles, or configured:false when no bot token is set. */
   guildRoles: (guildId) =>
     get(

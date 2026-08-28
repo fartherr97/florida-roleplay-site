@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Users } from "lucide-react";
+import { BarChart3, Pencil, Plus, Trash2, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
+import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
+import Field from "../../components/ui/Field";
+import Select from "../../components/ui/Select";
+import { TextInput } from "../../components/ui/TextInput";
 import DeptBrandMark from "../../components/dept/DeptBrandMark";
 import RosterFilters from "../../components/roster/RosterFilters";
 import RosterHeader from "../../components/roster/RosterHeader";
@@ -36,7 +41,9 @@ const STATUS_OPTIONS = [
  */
 export default function DeptRoster({ page, config }) {
   const { hasPermission } = useAuth();
-  const { id } = useDeptConfig();
+  const { id, can } = useDeptConfig();
+  const canEditRoster = can("editRoster");
+  const [managing, setManaging] = useState(null); // "new" | member row | null
   const [loaded, setLoaded] = useState({ id: null, subdivisions: [] });
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState("");
@@ -112,6 +119,18 @@ export default function DeptRoster({ page, config }) {
     () => (active?.categories ?? []).flatMap((category) => category.members),
     [active],
   );
+
+  // Ranks already on the roster, offered as suggestions when adding a manual member
+  // so a hand-typed rank matches an existing band rather than landing in Unassigned.
+  const rankOptions = useMemo(
+    () => [...new Set(everyone.map((m) => m.rankFull || m.rank).filter(Boolean))],
+    [everyone],
+  );
+
+  const removeManual = async (member) => {
+    await api.deleteManualMember(id, member.id);
+    setReloadKey((key) => key + 1);
+  };
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -196,6 +215,40 @@ export default function DeptRoster({ page, config }) {
           <MemberCell field={field} member={member} editable={canEditStatus} onEdit={setEditing} />
         ),
       })),
+    // Edit/remove only ever touch a hand-added (manual) member; a Discord-synced
+    // one is owned by the bot and shows nothing here.
+    ...(canEditRoster
+      ? [
+          {
+            key: "manage",
+            label: "",
+            width: "w-20",
+            render: (member) =>
+              member.source === "manual" ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setManaging(member)}
+                    aria-label={`Edit ${member.characterName}`}
+                    className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeManual(member)}
+                    aria-label={`Remove ${member.characterName}`}
+                    className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[10px] uppercase tracking-wide text-slate-600">synced</span>
+              ),
+          },
+        ]
+      : []),
   ];
 
   const saveStatus = async (payload) => {
@@ -229,14 +282,24 @@ export default function DeptRoster({ page, config }) {
         totals={totals}
       />
 
-      <RosterFilters
-        query={query}
-        onQuery={setQuery}
-        placeholder="Search name, rank or callsign…"
-        filters={[
-          { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS_OPTIONS },
-        ]}
-      />
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <RosterFilters
+            query={query}
+            onQuery={setQuery}
+            placeholder="Search name, rank or callsign…"
+            filters={[
+              { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS_OPTIONS },
+            ]}
+          />
+        </div>
+        {canEditRoster && (
+          <Button variant="ghost" size="sm" onClick={() => setManaging("new")}>
+            <Plus className="size-4" />
+            Add member
+          </Button>
+        )}
+      </div>
 
       {notice && (
         <Card className="mb-5 p-4">
@@ -277,7 +340,129 @@ export default function DeptRoster({ page, config }) {
           canManageLoa={canManageLoa}
         />
       )}
+
+      {managing && (
+        <ManualMemberModal
+          deptId={id}
+          member={managing === "new" ? null : managing}
+          rankOptions={rankOptions}
+          onClose={() => setManaging(null)}
+          onSaved={() => {
+            setManaging(null);
+            setReloadKey((key) => key + 1);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** Add or edit a hand-maintained roster member — the backup for the Discord sync. */
+function ManualMemberModal({ deptId, member, rankOptions, onClose, onSaved }) {
+  const isEdit = Boolean(member);
+  const [values, setValues] = useState({
+    characterName: member?.characterName ?? "",
+    rank: member?.rankFull || member?.rank || "",
+    callsign: member?.callsign ?? "",
+    status: member?.status ?? "Active",
+    discordId: /^\d{17,20}$/.test(String(member?.discordId ?? "")) ? member.discordId : "",
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!values.characterName.trim()) return setError("A name is required.");
+    if (!values.rank.trim()) return setError("A rank is required.");
+    setError("");
+    setSaving(true);
+    try {
+      const result = await api.saveManualMember(deptId, {
+        ...(isEdit ? { id: member.id } : {}),
+        characterName: values.characterName.trim(),
+        rank: values.rank.trim(),
+        callsign: values.callsign.trim(),
+        status: values.status,
+        discordId: values.discordId.trim(),
+      });
+      if (result?.ok === false) {
+        setError(result.message || "Could not save.");
+        setSaving(false);
+        return;
+      }
+      onSaved();
+    } catch (err) {
+      setError(err?.message || "Could not save the member.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={isEdit ? "Edit roster member" : "Add roster member"}>
+      <p className="mb-4 text-xs leading-relaxed text-slate-500">
+        A manual entry the Discord sync never touches — use it for someone the bot can't
+        cover yet. Match an existing rank so they land in the right band.
+      </p>
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name" htmlFor="mm-name" required>
+            <TextInput
+              id="mm-name"
+              value={values.characterName}
+              onChange={(e) => setValues((v) => ({ ...v, characterName: e.target.value }))}
+            />
+          </Field>
+          <Field label="Callsign" htmlFor="mm-cs" hint="Optional.">
+            <TextInput
+              id="mm-cs"
+              value={values.callsign}
+              onChange={(e) => setValues((v) => ({ ...v, callsign: e.target.value }))}
+            />
+          </Field>
+        </div>
+        <Field label="Rank" htmlFor="mm-rank" required hint="Type a rank; suggestions match this roster's bands.">
+          <TextInput
+            id="mm-rank"
+            list="mm-rank-options"
+            value={values.rank}
+            onChange={(e) => setValues((v) => ({ ...v, rank: e.target.value }))}
+          />
+          <datalist id="mm-rank-options">
+            {rankOptions.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Status" htmlFor="mm-status">
+            <Select
+              id="mm-status"
+              value={values.status}
+              onChange={(value) => setValues((v) => ({ ...v, status: value }))}
+              options={ACTIVITY_STATUSES.map((s) => ({ value: s.label, label: s.label }))}
+            />
+          </Field>
+          <Field label="Discord ID" htmlFor="mm-did" hint="Optional — lets a later sync take over.">
+            <TextInput
+              id="mm-did"
+              inputMode="numeric"
+              value={values.discordId}
+              onChange={(e) => setValues((v) => ({ ...v, discordId: e.target.value }))}
+              className="font-mono text-xs"
+            />
+          </Field>
+        </div>
+        {error && <p className="text-sm font-semibold text-rose-300">{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={saving}>
+            {saving ? "Saving…" : isEdit ? "Save" : "Add"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

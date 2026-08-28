@@ -19,6 +19,7 @@
  * failing silently.
  */
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { query } from "../db.js";
 import { DEPARTMENT_CONFIGS } from "../departmentSeed.js";
 import { roster as rosterSeed, ROLE_MAP } from "../rosterSeed.js";
@@ -236,6 +237,9 @@ function mapMemberRow(row) {
     rankFull: row.rank_full,
     callsign: row.callsign,
     status: row.status,
+    // 'manual' rows are the backup roster entries an admin adds by hand; the UI
+    // offers edit/remove only for those, never for Discord-synced members.
+    source: row.source,
     loaUntil:
       row.loa_until instanceof Date ? row.loa_until.toISOString().slice(0, 10) : row.loa_until,
     joinedAt:
@@ -337,6 +341,92 @@ router.get(
     maybeSyncRoster();
     const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId);
     res.json({ subdivisions: projectRoster(req.deptConfig, roster, roleMap) });
+  },
+);
+
+/**
+ * Manual roster entries — a hand-maintained backup for anyone the Discord sync
+ * cannot cover (no account yet, a role not mapped, the bot briefly offline).
+ *
+ * Rows are stored with source 'manual', which the Discord sync never prunes, so
+ * they sit on the roster beside synced members and survive every reconcile. Only
+ * manual rows are editable here; a synced member is owned by Discord. Gated on
+ * the department's editRoster capability.
+ */
+router.post(
+  "/:deptId/roster/manual",
+  requirePermission("departments.view"),
+  withDepartment,
+  requireCapability("editRoster"),
+  async (req, res) => {
+    const b = req.body ?? {};
+    const characterName = str(b.characterName).slice(0, 128);
+    const rank = str(b.rank).slice(0, 64);
+    if (!characterName) return res.status(400).json({ ok: false, message: "A name is required." });
+    if (!rank) return res.status(400).json({ ok: false, message: "A rank is required." });
+    const callsign = str(b.callsign).slice(0, 32) || null;
+    const status = str(b.status).slice(0, 32) || "Active";
+    const discordId = /^\d{17,20}$/.test(str(b.discordId)) ? str(b.discordId) : "";
+    const id = str(b.id);
+
+    try {
+      if (id) {
+        // Edit an existing manual row. The source guard makes a synced member
+        // impossible to overwrite through this route even with its id.
+        const rows = await query(
+          `UPDATE roster_members
+             SET character_name = $2, display_name = $2, rank_label = $3, callsign = $4, status = $5
+           WHERE id = $1 AND department = $6 AND source = 'manual'
+           RETURNING id`,
+          [id, characterName, rank, callsign, status, req.departmentId],
+        );
+        if (!rows.length) {
+          return res.status(404).json({ ok: false, message: "No such manual member." });
+        }
+        return res.json({ ok: true, id });
+      }
+
+      const newId = `man-${randomUUID()}`;
+      // A real Discord id keys the row (so a later sync can take it over); without
+      // one, a non-numeric placeholder keeps the NOT NULL/unique column happy and
+      // never collides with a real snowflake.
+      const did = discordId || `mnl${randomUUID().replace(/-/g, "").slice(0, 17)}`;
+      await query(
+        `INSERT INTO roster_members
+           (id, discord_id, character_name, display_name, department, rank_label, callsign, status, joined_at, synced_at, source)
+         VALUES ($1, $2, $3, $3, $4, $5, $6, $7, CURRENT_DATE, CURRENT_TIMESTAMP, 'manual')
+         ON CONFLICT (discord_id) DO UPDATE SET
+           character_name = EXCLUDED.character_name,
+           display_name   = EXCLUDED.display_name,
+           department     = EXCLUDED.department,
+           rank_label     = EXCLUDED.rank_label,
+           callsign       = EXCLUDED.callsign,
+           status         = EXCLUDED.status,
+           source         = 'manual'`,
+        [newId, did, characterName, req.departmentId, rank, callsign, status],
+      );
+      return res.json({ ok: true, id: newId });
+    } catch {
+      return res.status(500).json({ ok: false, message: "Could not save the manual member." });
+    }
+  },
+);
+
+router.delete(
+  "/:deptId/roster/manual/:id",
+  requirePermission("departments.view"),
+  withDepartment,
+  requireCapability("editRoster"),
+  async (req, res) => {
+    try {
+      await query(
+        "DELETE FROM roster_members WHERE id = $1 AND department = $2 AND source = 'manual'",
+        [req.params.id, req.departmentId],
+      );
+      return res.json({ ok: true });
+    } catch {
+      return res.status(500).json({ ok: false, message: "Could not remove the member." });
+    }
   },
 );
 
