@@ -18,6 +18,28 @@ import { resolveRole, buildNickname, renderDisplayName } from "./roster.js";
 import { fetchGuildMembers } from "./discord.js";
 
 /**
+ * Pull a callsign and a display name out of a server nickname.
+ *
+ * Communities nickname members "901 | Trooper | Jamison" — callsign, rank, then
+ * name — which is exactly the template the bot builds. So the leading number is
+ * the callsign and the last segment is the name to show. A bare nickname with no
+ * separators ("Jamison") is just the name; an empty one yields nothing and the
+ * caller falls back to what it already had.
+ */
+export function parseNick(nick) {
+  const raw = String(nick ?? "").trim();
+  if (!raw) return { callsign: "", name: "" };
+  const parts = raw.split("|").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0];
+    // A callsign is a short number, optionally with a one-letter prefix (A-12).
+    const callsign = /^[A-Za-z]?\d{1,4}$/.test(first) ? first : "";
+    return { callsign, name: parts[parts.length - 1] };
+  }
+  return { callsign: "", name: raw };
+}
+
+/**
  * Resolves one member against the role map and returns what the roster should
  * look like for them. Pure, so every caller shares it.
  */
@@ -59,8 +81,9 @@ export function resolveMember(payload, roleMap, departments) {
  * with today, so a promotion or transfer shows when it happened with nothing to
  * update by hand. The first time a member is seen is not a move.
  */
-export async function applyUpsert(resolved, joinedAt, roleIds = null) {
+export async function applyUpsert(resolved, joinedAt, roleIds = null, nicks = null) {
   const e = resolved.entry;
+  const nicksJson = nicks && Object.keys(nicks).length ? JSON.stringify(nicks) : null;
 
   let prior = null;
   try {
@@ -75,8 +98,8 @@ export async function applyUpsert(resolved, joinedAt, roleIds = null) {
 
   await query(`INSERT INTO roster_members
        (id, discord_id, character_name, display_name, department, rank_label,
-        callsign, status, joined_at, synced_at, source, role_ids)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync', $10::text[])
+        callsign, status, joined_at, synced_at, source, role_ids, nicks)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, CURRENT_DATE), CURRENT_TIMESTAMP, 'discord-sync', $10::text[], $11::jsonb)
      ON CONFLICT (discord_id) DO UPDATE SET
        character_name = EXCLUDED.character_name,
        display_name   = EXCLUDED.display_name,
@@ -86,7 +109,8 @@ export async function applyUpsert(resolved, joinedAt, roleIds = null) {
        status         = EXCLUDED.status,
        synced_at      = CURRENT_TIMESTAMP,
        source         = 'discord-sync',
-       role_ids       = COALESCE(EXCLUDED.role_ids, roster_members.role_ids)`,
+       role_ids       = COALESCE(EXCLUDED.role_ids, roster_members.role_ids),
+       nicks          = COALESCE(EXCLUDED.nicks, roster_members.nicks)`,
     [
       `rm-${e.discordId}`,
       e.discordId,
@@ -98,6 +122,7 @@ export async function applyUpsert(resolved, joinedAt, roleIds = null) {
       e.status,
       joinedAt || null,
       roleIds && roleIds.length ? roleIds : null,
+      nicksJson,
     ],
   );
 
@@ -213,8 +238,11 @@ export async function syncRosterFromGuild() {
       ok += 1;
       perGuild.push({ guildId: gid, ok: true, count: members.length, error: null });
       for (const m of members) {
-        const cur = byId.get(m.id) ?? { roles: new Set(), name: "" };
+        const cur = byId.get(m.id) ?? { roles: new Set(), name: "", nicks: {} };
         for (const r of m.roles) cur.roles.add(r);
+        // Keep each guild's nickname so a department roster can read the name and
+        // callsign from its own server.
+        if (m.nick) cur.nicks[gid] = m.nick;
         if (!cur.name) cur.name = m.displayName || m.username || "";
         byId.set(m.id, cur);
       }
@@ -237,7 +265,7 @@ export async function syncRosterFromGuild() {
       );
       if (resolved.action === "upsert") {
         const roleIds = held.filter((id) => mappedRoleIds.has(id));
-        await applyUpsert(resolved, null, roleIds);
+        await applyUpsert(resolved, null, roleIds, data.nicks);
         keep.push(discordId);
         // A member counts toward every department they hold a mapped role in —
         // the same way they now appear on each of those department rosters.

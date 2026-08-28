@@ -26,7 +26,7 @@ import { requirePermission, loadGrants } from "../middleware/requirePermission.j
 import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { projectRoster } from "../lib/deptRoster.js";
-import { maybeSyncRoster } from "../lib/rosterSync.js";
+import { maybeSyncRoster, parseNick } from "../lib/rosterSync.js";
 import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
 import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
 import { resolveDepartmentId } from "../lib/tenant.js";
@@ -256,7 +256,7 @@ function mapMemberRow(row) {
  * Rows synced before the roles were recorded fall back to their stored primary
  * department, so nobody vanishes between a schema upgrade and the next sync.
  */
-async function loadRosterAndMap(deptId) {
+async function loadRosterAndMap(deptId, deptGuildId = "") {
   let roster = rosterSeed.filter((entry) => entry.department === deptId);
   let roleMap = ROLE_MAP.filter((role) => role.department === deptId);
   try {
@@ -279,6 +279,16 @@ async function loadRosterAndMap(deptId) {
       const built = [];
       for (const row of memberRows) {
         const base = mapMemberRow(row);
+        // The character name and callsign the member shows here come from their
+        // nickname in *this department's* Discord server, so the roster reads in
+        // character rather than by global Discord username.
+        const nick = deptGuildId && row.nicks ? row.nicks[deptGuildId] : "";
+        if (nick) {
+          const { callsign, name } = parseNick(nick);
+          if (name) base.characterName = name;
+          if (callsign) base.callsign = callsign;
+          base.displayName = nick;
+        }
         const held = Array.isArray(row.role_ids) ? row.role_ids.map(String) : null;
         const deptRoles = (held ?? [])
           .map((rid) => byRoleId.get(rid))
@@ -307,7 +317,7 @@ router.get(
     // Opening a department roster nudges a throttled Discord refresh, so it
     // populates on its own once the department's roles are mapped.
     maybeSyncRoster();
-    const { roster, roleMap } = await loadRosterAndMap(req.departmentId);
+    const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId);
     res.json({ subdivisions: projectRoster(req.deptConfig, roster, roleMap) });
   },
 );
@@ -404,7 +414,7 @@ router.get("/:deptId/public", async (req, res) => {
   const config = await loadConfig(id);
   if (!config) return res.status(404).json({ ok: false, message: `No department "${id}".` });
 
-  const { roster, roleMap } = await loadRosterAndMap(id);
+  const { roster, roleMap } = await loadRosterAndMap(id, config.guildId);
 
   // The rank ladder is every rank mapped to this department, highest first.
   const ranks = roleMap

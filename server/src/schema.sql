@@ -538,6 +538,13 @@ ALTER TABLE roster_members
 ALTER TABLE roster_members
   ADD COLUMN IF NOT EXISTS role_ids TEXT[] NULL;
 
+-- The member's server nickname in each guild the bot shares with them, keyed by
+-- guild id. A department roster shows the character name and callsign from *its*
+-- server's nickname — the "901 | Trooper | Jamison" a member sets there — rather
+-- than a global Discord username that means nothing in-character.
+ALTER TABLE roster_members
+  ADD COLUMN IF NOT EXISTS nicks JSONB NULL;
+
 -- Staff activity overlay. The bot owns who is on the roster and at what rank;
 -- this holds the human-managed activity a Discord role cannot express — status,
 -- leave, probation and when they last moved rank — keyed by Discord id so it
