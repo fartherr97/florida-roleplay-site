@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RotateCcw, Save, Search, TriangleAlert, Trash2 } from "lucide-react";
+import { Download, Plus, RotateCcw, Save, Search, TriangleAlert, Trash2 } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
 import Select from "../../components/ui/Select";
 import { TextInput } from "../../components/ui/TextInput";
 import { api } from "../../lib/api";
@@ -79,6 +80,44 @@ function blankRole(department = "staff") {
   };
 }
 
+/** A key safe for the role map: lowercase letters, digits and underscores. */
+function slugify(name) {
+  const base = String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+  return base.length >= 2 ? base : `role_${base}`;
+}
+
+/** `base`, then `base_2`, `base_3`… until it is not already taken. */
+function uniqueKey(base, taken) {
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}_${n}`)) n += 1;
+  return `${base}_${n}`;
+}
+
+/**
+ * Best guess at which department a Discord role belongs to, from its name: an
+ * exact abbreviation (FHP, BCSO, MPD), then any word of the department's label.
+ * Returns "" when nothing matches, so the importer leaves it for the user.
+ */
+function guessDepartment(name, departments) {
+  const text = ` ${String(name || "").toLowerCase()} `;
+  for (const dept of departments) {
+    if (dept.abbr && text.includes(` ${dept.abbr.toLowerCase()} `)) return dept.id;
+  }
+  for (const dept of departments) {
+    const words = String(dept.label || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3);
+    if (words.some((w) => text.includes(w))) return dept.id;
+  }
+  return "";
+}
+
 /**
  * Every Discord role the community binds something to, in one editable table:
  * membership and whitelisting, civilian tiers, the staff ladder, each
@@ -97,6 +136,7 @@ export default function HubDiscordRoles() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [importState, setImportState] = useState(null); // null | {loading|roles|error}
 
   useEffect(() => {
     let active = true;
@@ -189,6 +229,50 @@ export default function HubDiscordRoles() {
     setSpecial((prev) =>
       prev.map((role) => (role.key === key ? { ...role, roleId: value } : role)),
     );
+
+  /** Pull the guild's live roles from the bot and open the import picker. */
+  const openImport = async () => {
+    setImportState({ loading: true });
+    try {
+      const data = await api.guildRoles();
+      if (!data?.configured) {
+        setImportState({
+          error:
+            "No Discord bot token is configured on the site, so its live roles can't be read. Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID.",
+        });
+        return;
+      }
+      setImportState({ roles: data.roles ?? [] });
+    } catch (err) {
+      setImportState({ error: err?.message ?? "Could not reach Discord." });
+    }
+  };
+
+  /** Turn picked guild roles into mapping rows — real id, name, generated key. */
+  const importRoles = (picks) => {
+    const taken = new Set([...roles, ...special].map((r) => r.key));
+    const additions = picks.map((pick) => {
+      const key = uniqueKey(slugify(pick.name), taken);
+      taken.add(key);
+      return {
+        roleId: String(pick.id),
+        key,
+        department: pick.department || "staff",
+        rank: pick.name,
+        rankFull: pick.name,
+        // Discord's own ordering: a higher role sits higher on the roster.
+        order: Math.max(0, Math.min(100000, Number(pick.position) || 100)),
+        displayTemplate: "{callsign} | {rank} | {surname}",
+        isNew: true,
+      };
+    });
+    setRoles((prev) => [...prev, ...additions]);
+    setImportState(null);
+    setStatus({
+      tone: "amber",
+      text: `Added ${additions.length} role${additions.length === 1 ? "" : "s"} from Discord — set each department, then Save.`,
+    });
+  };
 
   const save = async () => {
     setSaving(true);
@@ -448,6 +532,10 @@ export default function HubDiscordRoles() {
           removing the old role first.
         </p>
         <div className="flex flex-wrap gap-3">
+          <Button variant="ghost" size="sm" onClick={openImport}>
+            <Download className="size-4" />
+            Import from Discord
+          </Button>
           {scope !== "special" && (
             <Button
               variant="ghost"
@@ -485,7 +573,138 @@ export default function HubDiscordRoles() {
           </Button>
         </div>
       </div>
+
+      {importState && (
+        <ImportModal
+          state={importState}
+          departments={departments}
+          departmentOptions={DEPARTMENT_OPTIONS}
+          mappedIds={new Set([...roles, ...special].map((r) => String(r.roleId ?? "").trim()))}
+          onClose={() => setImportState(null)}
+          onImport={importRoles}
+        />
+      )}
     </>
+  );
+}
+
+/**
+ * Picks which of the guild's live Discord roles to turn into mapping rows.
+ * Every role the bot can see is listed, minus the ones already mapped; each is
+ * pre-checked with a guessed department, and imports with its real id and name.
+ */
+function ImportModal({ state, departments, departmentOptions, mappedIds, onClose, onImport }) {
+  const available = useMemo(
+    () => (state.roles ?? []).filter((role) => !mappedIds.has(String(role.id))),
+    [state.roles, mappedIds],
+  );
+
+  // { [roleId]: { picked, department } } — seeded once from the guessed department.
+  const [rows, setRows] = useState(() =>
+    Object.fromEntries(
+      available.map((role) => [
+        role.id,
+        { picked: true, department: guessDepartment(role.name, departments) },
+      ]),
+    ),
+  );
+
+  const setRow = (id, changes) =>
+    setRows((prev) => ({ ...prev, [id]: { ...prev[id], ...changes } }));
+  const pickedCount = available.filter((r) => rows[r.id]?.picked).length;
+  const allPicked = pickedCount === available.length && available.length > 0;
+
+  const doImport = () =>
+    onImport(
+      available
+        .filter((role) => rows[role.id]?.picked)
+        .map((role) => ({
+          id: role.id,
+          name: role.name,
+          position: role.position,
+          department: rows[role.id]?.department || "",
+        })),
+    );
+
+  return (
+    <Modal open onClose={onClose} title="Import roles from Discord" className="max-w-2xl">
+      {state.loading ? (
+        <p className="py-6 text-center text-sm text-slate-400">Reading the guild's roles…</p>
+      ) : state.error ? (
+        <p className="rounded-xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-inset ring-rose-400/25">
+          {state.error}
+        </p>
+      ) : available.length === 0 ? (
+        <p className="py-6 text-center text-sm text-slate-400">
+          Every role the bot can see is already mapped. Nothing to import.
+        </p>
+      ) : (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm text-slate-400">
+              {available.length} unmapped role{available.length === 1 ? "" : "s"} from Discord. The
+              department is guessed from the name — correct any before importing.
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                setRows((prev) =>
+                  Object.fromEntries(
+                    available.map((role) => [
+                      role.id,
+                      { ...prev[role.id], picked: !allPicked },
+                    ]),
+                  ),
+                )
+              }
+              className="shrink-0 text-xs font-semibold text-primary-400 hover:underline"
+            >
+              {allPicked ? "Clear all" : "Select all"}
+            </button>
+          </div>
+
+          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto pr-1">
+            {available.map((role) => {
+              const row = rows[role.id] ?? {};
+              return (
+                <div
+                  key={role.id}
+                  className="flex flex-wrap items-center gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!row.picked}
+                    onChange={(e) => setRow(role.id, { picked: e.target.checked })}
+                    aria-label={`Import ${role.name}`}
+                    className="size-4 shrink-0 accent-primary-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white">{role.name}</p>
+                    <code className="text-[10px] text-slate-600">{role.id}</code>
+                  </div>
+                  <Select
+                    value={row.department ?? ""}
+                    onChange={(value) => setRow(role.id, { department: value })}
+                    options={[{ value: "", label: "Choose department…" }, ...departmentOptions]}
+                    className="w-52"
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={doImport} disabled={pickedCount === 0}>
+              <Download className="size-4" />
+              Import {pickedCount || ""}
+            </Button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
