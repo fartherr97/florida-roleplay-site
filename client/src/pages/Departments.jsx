@@ -25,6 +25,9 @@ const DEPT_LOGOS = {
 export default function Departments() {
   const [departments, setDepartments] = useState(seedDepartments);
   const [hubs, setHubs] = useState([]);
+  // Live member counts, projected from the actual roster per department, keyed
+  // by id — so the headcount matches the roster rather than a static record.
+  const [counts, setCounts] = useState({});
   const { hasPermission } = useAuth();
   const canEnter = hasPermission("departments.view");
 
@@ -35,6 +38,16 @@ export default function Departments() {
     });
     api.deptList().then((data) => {
       if (active) setHubs(data ?? []);
+    });
+    Promise.all(
+      LEO_IDS.map((id) =>
+        api
+          .deptPublic(id)
+          .then((d) => [id, d?.memberCount])
+          .catch(() => [id, null]),
+      ),
+    ).then((entries) => {
+      if (active) setCounts(Object.fromEntries(entries));
     });
     return () => {
       active = false;
@@ -55,14 +68,14 @@ export default function Departments() {
           name: dept.name ?? hub.name ?? id.toUpperCase(),
           tagline: hub.tagline ?? dept.tagline ?? "",
           description: dept.tagline ?? hub.description ?? "",
-          members: dept.roster ?? null,
+          members: counts[id] ?? dept.roster ?? null,
           status: RECRUITMENT_STATUS_MAP[hub.recruitment?.status] ?? RECRUITMENT_STATUS_MAP.hiring,
           logo: DEPT_LOGOS[id],
           color: accent.color,
           soft: accent.soft,
         };
       }),
-    [departments, hubs],
+    [departments, hubs, counts],
   );
 
   return (
