@@ -3,7 +3,12 @@ import Field from "../../../components/ui/Field";
 import { TextArea, TextInput } from "../../../components/ui/TextInput";
 import DeptBrandMark from "../../../components/dept/DeptBrandMark";
 import { useDeptConfig } from "../../../context/useDeptConfig";
-import { ACCENT_PRESETS, accentOf, themeVars } from "../../../lib/departmentConfig";
+import {
+  ACCENT_PRESETS,
+  RECRUITMENT_STATUSES,
+  accentOf,
+  themeVars,
+} from "../../../lib/departmentConfig";
 import TabIntro from "./TabIntro";
 import { cn } from "../../../lib/cn";
 
@@ -132,6 +137,107 @@ export default function BrandingTab({ config }) {
           </Card>
         </div>
       </div>
+
+      <RecruitmentCard config={config} />
     </>
+  );
+}
+
+/**
+ * The department's recruitment state and the fleet it features on its public
+ * page. Both feed the departments split and the department's recruitment page,
+ * so a department head controls that page here rather than through a separate
+ * record.
+ */
+function RecruitmentCard({ config }) {
+  const { mutate } = useDeptConfig();
+  const recruitment = config.recruitment ?? { status: "hiring", featuredVehicles: [] };
+  const featured = Array.isArray(recruitment.featuredVehicles) ? recruitment.featuredVehicles : [];
+
+  const setRecruitment = (changes) =>
+    mutate((current) => ({
+      ...current,
+      recruitment: { ...(current.recruitment ?? {}), ...changes },
+    }));
+
+  const fleetPage = config.pages.find((page) => page.type === "fleet");
+  const vehicles = Array.isArray(fleetPage?.config?.vehicles) ? fleetPage.config.vehicles : [];
+
+  const toggleVehicle = (id) => {
+    if (featured.includes(id)) {
+      setRecruitment({ featuredVehicles: featured.filter((v) => v !== id) });
+    } else if (featured.length < 4) {
+      setRecruitment({ featuredVehicles: [...featured, id] });
+    }
+  };
+
+  return (
+    <Card className="mt-5 p-5">
+      <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Recruitment</h3>
+      <p className="mt-1 text-sm text-slate-400">
+        The status pill and featured fleet on this department's public page and the departments
+        split.
+      </p>
+
+      <p className="mt-4 mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+        Status
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {RECRUITMENT_STATUSES.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setRecruitment({ status: s.id })}
+            className={cn(
+              "flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold ring-1 ring-inset transition",
+              recruitment.status === s.id
+                ? "bg-white/[0.06] text-white ring-white/25"
+                : "bg-white/[0.02] text-slate-300 ring-white/[0.06] hover:bg-white/[0.05]",
+            )}
+          >
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: s.color }}
+            />
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+          Featured fleet
+        </p>
+        <span className="text-[11px] text-slate-500">{featured.length}/4 chosen</span>
+      </div>
+      {vehicles.length === 0 ? (
+        <p className="mt-2 text-xs text-slate-500">
+          Add vehicles on the Fleet page first, then pick up to four to feature here.
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {vehicles.map((vehicle) => {
+            const on = featured.includes(vehicle.id);
+            const full = !on && featured.length >= 4;
+            return (
+              <button
+                key={vehicle.id}
+                type="button"
+                onClick={() => toggleVehicle(vehicle.id)}
+                disabled={full}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset transition",
+                  on
+                    ? "dept-accent-tile"
+                    : "bg-white/[0.02] text-slate-300 ring-white/[0.06] hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.02]",
+                )}
+              >
+                {vehicle.vehicle || "Untitled unit"}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }

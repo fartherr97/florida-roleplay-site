@@ -77,6 +77,27 @@ export const CAPABILITIES = [
 export const CAPABILITY_KEYS = CAPABILITIES.map((c) => c.key);
 
 /**
+ * A department's recruitment state, shown as a coloured pill on its public page
+ * and the departments split. A department head sets it from the Builder, so the
+ * pill is real rather than a hardcoded "hiring".
+ */
+export const RECRUITMENT_STATUSES = [
+  { id: "hiring", label: "Now Hiring", color: "#22c55e", apply: true },
+  { id: "interviews", label: "Open Interviews", color: "#3b82f6", apply: true },
+  { id: "limited", label: "Limited Hiring", color: "#f59e0b", apply: true },
+  { id: "closed", label: "Applications Closed", color: "#ef4444", apply: false },
+];
+
+export const RECRUITMENT_STATUS_MAP = Object.fromEntries(
+  RECRUITMENT_STATUSES.map((s) => [s.id, s]),
+);
+
+/** The status object for a config, always resolving to a known one. */
+export function recruitmentOf(config) {
+  return RECRUITMENT_STATUS_MAP[config?.recruitment?.status] ?? RECRUITMENT_STATUS_MAP.hiring;
+}
+
+/**
  * Community-wide permissions that grant the matching department capability in
  * *every* department. This is the bridge between the two models: a department
  * command role is scoped to its own site, while these reach across all of them.
@@ -365,6 +386,13 @@ export function normalizeConfig(raw, id) {
       ...Object.fromEntries(CAPABILITY_KEYS.map((key) => [key, !!grant[key]])),
     })).filter((grant) => grant.roleKey),
     webhooks: config.webhooks && typeof config.webhooks === "object" ? config.webhooks : {},
+    recruitment: {
+      status: RECRUITMENT_STATUS_MAP[config.recruitment?.status] ? config.recruitment.status : "hiring",
+      // Up to four fleet vehicle ids to feature on the public page.
+      featuredVehicles: Array.isArray(config.recruitment?.featuredVehicles)
+        ? config.recruitment.featuredVehicles.map(String).slice(0, 4)
+        : [],
+    },
   };
 }
 
@@ -484,5 +512,6 @@ export function summarize(config) {
     accent: config.branding.accent,
     logoUrl: config.branding.logoUrl,
     pageCount: config.pages.length,
+    recruitment: config.recruitment,
   };
 }

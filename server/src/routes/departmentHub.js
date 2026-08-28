@@ -35,6 +35,7 @@ import {
   mergeRedactedBack,
   normalizeConfig,
   PAGE_TYPE_MAP,
+  recruitmentOf,
   redactAccess,
   redactSensitive,
   summarize,
@@ -199,57 +200,116 @@ router.get(
  * The department's roster, projected through its config. The membership itself
  * is the community roster the Discord bot maintains — see server/src/lib/deptRoster.js.
  */
+/**
+ * The community roster and role map, scoped to one department, falling back to
+ * the seeds when there is no database. Shared by the authenticated roster route
+ * and the public recruitment endpoint.
+ */
+async function loadRosterAndMap(deptId) {
+  let roster = rosterSeed;
+  let roleMap = ROLE_MAP;
+  try {
+    const rows = await query("SELECT * FROM roster_members WHERE department = $1 ORDER BY sort_order, callsign",
+      [deptId],
+    );
+    if (rows.length) {
+      roster = rows.map((row) => ({
+        id: String(row.id),
+        discordId: row.discord_id,
+        characterName: row.character_name,
+        displayName: row.display_name,
+        department: row.department,
+        rank: row.rank_label,
+        rankFull: row.rank_full,
+        callsign: row.callsign,
+        status: row.status,
+        loaUntil:
+          row.loa_until instanceof Date ? row.loa_until.toISOString().slice(0, 10) : row.loa_until,
+        joinedAt:
+          row.joined_at instanceof Date ? row.joined_at.toISOString().slice(0, 10) : row.joined_at,
+      }));
+    }
+    const roleRows = await query("SELECT * FROM roster_role_map WHERE department = $1", [deptId]);
+    if (roleRows.length) {
+      roleMap = roleRows.map((row) => ({
+        roleId: row.role_id,
+        key: row.role_key,
+        department: row.department,
+        rank: row.rank_label,
+        rankFull: row.rank_full,
+        order: row.sort_order,
+      }));
+    }
+  } catch {
+    // No database — the seeds already loaded above.
+  }
+  return { roster, roleMap };
+}
+
 router.get(
   "/:deptId/roster",
   requirePermission("departments.view"),
   withDepartment,
   async (req, res) => {
-    let roster = rosterSeed;
-    let roleMap = ROLE_MAP;
-    try {
-      const rows = await query("SELECT * FROM roster_members WHERE department = $1 ORDER BY sort_order, callsign",
-        [req.departmentId],
-      );
-      if (rows.length) {
-        roster = rows.map((row) => ({
-          id: String(row.id),
-          discordId: row.discord_id,
-          characterName: row.character_name,
-          displayName: row.display_name,
-          department: row.department,
-          rank: row.rank_label,
-          rankFull: row.rank_full,
-          callsign: row.callsign,
-          status: row.status,
-          loaUntil:
-            row.loa_until instanceof Date
-              ? row.loa_until.toISOString().slice(0, 10)
-              : row.loa_until,
-          joinedAt:
-            row.joined_at instanceof Date
-              ? row.joined_at.toISOString().slice(0, 10)
-              : row.joined_at,
-        }));
-      }
-      const roleRows = await query("SELECT * FROM roster_role_map WHERE department = $1", [
-        req.departmentId,
-      ]);
-      if (roleRows.length) {
-        roleMap = roleRows.map((row) => ({
-          roleId: row.role_id,
-          key: row.role_key,
-          department: row.department,
-          rank: row.rank_label,
-          rankFull: row.rank_full,
-          order: row.sort_order,
-        }));
-      }
-    } catch {
-      // No database — the seeds already loaded above.
-    }
+    const { roster, roleMap } = await loadRosterAndMap(req.departmentId);
     res.json({ subdivisions: projectRoster(req.deptConfig, roster, roleMap) });
   },
 );
+
+/**
+ * The recruitment-facing summary for one department: its status pill, the rank
+ * ladder from the role map, a few featured fleet vehicles, and a live member
+ * count. Deliberately public — this is the page a prospective applicant sees —
+ * and derived entirely from the department's own config, so a department head
+ * controls all of it from the Builder without touching a separate record.
+ */
+router.get("/:deptId/public", async (req, res) => {
+  const id = req.params.deptId;
+  if (!validDepartmentId(id)) {
+    return res.status(400).json({ ok: false, message: "Invalid department id." });
+  }
+  const config = await loadConfig(id);
+  if (!config) return res.status(404).json({ ok: false, message: `No department "${id}".` });
+
+  const { roster, roleMap } = await loadRosterAndMap(id);
+
+  // The rank ladder is every rank mapped to this department, highest first.
+  const ranks = roleMap
+    .filter((role) => role.department === id)
+    .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
+    .map((role) => ({ rank: role.rank, rankFull: role.rankFull }));
+
+  // Featured fleet: the vehicles the department chose, else the first few.
+  const fleetPage = config.pages.find((page) => page.type === "fleet");
+  const vehicles = Array.isArray(fleetPage?.config?.vehicles) ? fleetPage.config.vehicles : [];
+  const featuredIds = config.recruitment?.featuredVehicles ?? [];
+  const chosen = featuredIds.length
+    ? featuredIds.map((vid) => vehicles.find((v) => v.id === vid)).filter(Boolean)
+    : vehicles.slice(0, 4);
+  const fleet = chosen.map((v) => ({ name: v.vehicle || "Unit", imageUrl: v.imageUrl || "" }));
+
+  // A live headcount from the projected main roster.
+  const subs = projectRoster(config, roster, roleMap);
+  const main = subs.find((s) => s.main) ?? subs[0];
+  const memberCount = main
+    ? new Set(main.categories.flatMap((c) => c.members.map((m) => m.id))).size
+    : 0;
+
+  res.json({
+    id: config.id,
+    name: config.branding.name,
+    shortName: config.branding.shortName,
+    tagline: config.branding.tagline,
+    description: config.branding.description,
+    accent: config.branding.accent,
+    logoUrl: config.branding.logoUrl,
+    recruitment: recruitmentOf(config),
+    ranks,
+    fleet,
+    fleetCount: vehicles.length,
+    memberCount,
+  });
+});
 
 router.get(
   "/:deptId/versions",

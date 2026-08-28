@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Car, ExternalLink, Users } from "lucide-react";
 import Section from "../components/layout/Section";
 import Card from "../components/ui/Card";
-import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import NotFound from "../components/auth/NotFound";
 import { api } from "../lib/api";
@@ -36,16 +35,25 @@ export default function DepartmentDetail() {
   // Stamping the result with its id keeps a stale response from a previous param
   // out of the render without an extra reset effect.
   const [fetched, setFetched] = useState(null);
+  // The recruitment-facing extras (status, rank ladder, featured fleet, live
+  // headcount) come from the department's own hub config, so a department head
+  // controls them from the Builder rather than a separate static record.
+  const [pub, setPub] = useState(null);
 
   useEffect(() => {
     let active = true;
     api.department(id).then((data) => {
       if (active) setFetched({ id, data: data ?? null });
     });
+    api.deptPublic(id).then((data) => {
+      if (active) setPub({ id, data: data ?? null });
+    });
     return () => {
       active = false;
     };
   }, [id]);
+
+  const live = pub?.id === id ? pub.data : null;
 
   const seed = seedDepartments.find((d) => d.id === id) ?? null;
   const settled = fetched?.id === id;
@@ -63,6 +71,22 @@ export default function DepartmentDetail() {
   }
 
   const logo = DEPT_LOGOS[department.id] ?? department.logo ?? null;
+
+  // Prefer the live hub-config data; fall back to the static record so the page
+  // still renders fully before the fetch settles or without a database.
+  const rec = live?.recruitment ?? {
+    label: department.hiring ? "Now Hiring" : "Applications Closed",
+    color: department.hiring ? "#22c55e" : "#ef4444",
+    apply: !!department.hiring,
+  };
+  const ranks = live?.ranks?.length
+    ? live.ranks
+    : (department.ranks ?? []).map((r) => ({ rank: r, rankFull: r }));
+  const fleet = live?.fleet?.length
+    ? live.fleet
+    : (department.fleet ?? []).map((v) => ({ name: v, imageUrl: "" }));
+  const memberCount = live?.memberCount ?? department.roster;
+  const fleetCount = live?.fleetCount ?? fleet.length;
 
   return (
     <Section>
@@ -123,10 +147,17 @@ export default function DepartmentDetail() {
               </Button>
             )}
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <Badge tone={department.hiring ? "green" : "slate"} dot={department.hiring}>
-                {department.hiring ? "Now hiring" : "Recruitment closed"}
-              </Badge>
-              {department.hiring && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${rec.color} 15%, transparent)`,
+                  color: rec.color,
+                }}
+              >
+                <span className="size-1.5 rounded-full" style={{ backgroundColor: rec.color }} />
+                {rec.label}
+              </span>
+              {rec.apply && (
                 <Button
                   as="a"
                   href={SITE.applyUrl}
@@ -145,12 +176,12 @@ export default function DepartmentDetail() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 border-t border-white/[0.06] pt-6">
             <span className="inline-flex items-center gap-2 text-sm text-slate-400">
               <Users className="size-4 text-slate-500" />
-              <strong className="font-bold text-white">{department.roster}</strong>
+              <strong className="font-bold text-white">{memberCount}</strong>
               sworn members
             </span>
             <span className="inline-flex items-center gap-2 text-sm text-slate-400">
               <Car className="size-4 text-slate-500" />
-              <strong className="font-bold text-white">{department.fleet.length}</strong>
+              <strong className="font-bold text-white">{fleetCount}</strong>
               fleet vehicles
             </span>
           </div>
@@ -162,39 +193,58 @@ export default function DepartmentDetail() {
             <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
               Rank structure
             </h2>
-            <ol className="mt-5 space-y-2.5">
-              {department.ranks.map((rank, index) => (
-                <li key={rank} className="flex items-center gap-3">
-                  <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-[11px] font-bold text-primary-400 ring-1 ring-inset ring-white/10">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm text-slate-300">{rank}</span>
-                </li>
-              ))}
-            </ol>
+            {ranks.length > 0 ? (
+              <ol className="mt-5 space-y-2.5">
+                {ranks.map((rank, index) => (
+                  <li key={`${rank.rank}-${index}`} className="flex items-center gap-3">
+                    <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-[11px] font-bold text-primary-400 ring-1 ring-inset ring-white/10">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm text-slate-300">{rank.rankFull || rank.rank}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-5 text-sm text-slate-500">
+                No ranks are mapped to this department yet.
+              </p>
+            )}
           </Card>
 
           <Card className="p-6">
             <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
               Fleet
             </h2>
-            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-              {department.fleet.map((vehicle) => (
-                <li
-                  key={vehicle}
-                  className="rounded-xl bg-black/20 p-4 ring-1 ring-inset ring-white/[0.06]"
-                >
-                  <span className="grid size-8 place-items-center rounded-lg bg-white/[0.04] text-slate-400 ring-1 ring-inset ring-white/10">
-                    <Car className="size-4" />
-                  </span>
-                  <p className="mt-3 text-sm text-slate-300">{vehicle}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-4 text-xs text-slate-500">
-              Fleet photography coming soon — screenshots are being retaken after the v2.14
-              vehicle pass.
-            </p>
+            {fleet.length > 0 ? (
+              <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+                {fleet.map((vehicle, index) => (
+                  <li
+                    key={`${vehicle.name}-${index}`}
+                    className="overflow-hidden rounded-xl bg-black/20 ring-1 ring-inset ring-white/[0.06]"
+                  >
+                    {vehicle.imageUrl ? (
+                      <div className="aspect-[16/10] overflow-hidden border-b border-white/[0.06] bg-black/30">
+                        <img
+                          src={vehicle.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          className="size-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid aspect-[16/10] place-items-center border-b border-white/[0.06]">
+                        <Car className="size-6 text-slate-600" />
+                      </div>
+                    )}
+                    <p className="p-4 text-sm text-slate-300">{vehicle.name}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-5 text-sm text-slate-500">
+                This department hasn't featured any fleet vehicles yet.
+              </p>
+            )}
           </Card>
         </div>
       </div>

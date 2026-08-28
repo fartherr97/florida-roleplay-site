@@ -445,6 +445,16 @@ export const api = {
 
   deptConfig: (id) => get(`/dept/${encodeURIComponent(id)}/config`, deptFallback(id)),
 
+  // The public recruitment summary: status pill, rank ladder, featured fleet.
+  deptPublic: (id) =>
+    get(`/dept/${encodeURIComponent(id)}/public`, {
+      recruitment: { id: "hiring", label: "Now Hiring", color: "#22c55e", apply: true },
+      ranks: [],
+      fleet: [],
+      fleetCount: 0,
+      memberCount: null,
+    }),
+
   deptRoster: (id) => {
     const config = DEPARTMENT_CONFIGS[id];
     return get(`/dept/${encodeURIComponent(id)}/roster`, {
