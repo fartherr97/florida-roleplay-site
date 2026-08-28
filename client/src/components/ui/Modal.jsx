@@ -53,7 +53,11 @@ export default function Modal({
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
-              "card relative w-full max-w-lg overflow-hidden shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)]",
+              "card relative w-full overflow-hidden shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)]",
+              // `cn` is a plain join, not tailwind-merge, so a hardcoded max-width would
+              // sit alongside a caller's `max-w-*` and win by CSS order — leaving "wide"
+              // modals rendering narrow. Only apply the default when none was passed.
+              !/(?:^|\s)max-w-/.test(className ?? "") && "max-w-lg",
               className,
             )}
           >
