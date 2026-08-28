@@ -376,7 +376,11 @@ export const api = {
     })),
 
   /** The guild's live Discord roles, or configured:false when no bot token is set. */
-  guildRoles: () => get("/roster/guild-roles", { configured: false, roles: [] }),
+  guildRoles: (guildId) =>
+    get(
+      `/roster/guild-roles${guildId ? `?guildId=${encodeURIComponent(guildId)}` : ""}`,
+      { configured: false, roles: [] },
+    ),
 
   permissionGrants: () => get("/permissions/grants", DEFAULT_GRANTS),
   permissionCatalogue: () =>

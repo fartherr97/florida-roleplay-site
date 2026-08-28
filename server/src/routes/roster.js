@@ -141,9 +141,15 @@ router.get("/role-map", async (_req, res) => {
  * gated the same as editing the role map. Returns `configured:false` (not an error) when no
  * bot token is set, so the page falls back to the seeded ladder cleanly.
  */
-router.get("/guild-roles", requirePermission("discord.roles.manage"), async (_req, res) => {
+router.get("/guild-roles", requirePermission("discord.roles.manage"), async (req, res) => {
   try {
-    const roles = await fetchGuildRoles();
+    // A department can run its own server; ?guildId reads that one instead of
+    // the main guild, so its ranks can be imported from where they actually live.
+    const guildId = str(req.query.guildId).trim();
+    if (guildId && !SNOWFLAKE.test(guildId)) {
+      return res.status(400).json({ configured: true, roles: [], error: "Invalid guild id." });
+    }
+    const roles = await fetchGuildRoles(guildId || undefined);
     if (roles === null) return res.json({ configured: false, roles: [] });
     return res.json({ configured: true, roles });
   } catch (err) {

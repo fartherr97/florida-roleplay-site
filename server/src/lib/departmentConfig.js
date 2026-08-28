@@ -517,5 +517,6 @@ export function summarize(config) {
     logoUrl: config.branding.logoUrl,
     pageCount: config.pages.length,
     recruitment: config.recruitment,
+    guildId: config.guildId,
   };
 }

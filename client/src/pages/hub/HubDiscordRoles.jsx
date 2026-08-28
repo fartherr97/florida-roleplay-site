@@ -136,7 +136,8 @@ export default function HubDiscordRoles() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [importState, setImportState] = useState(null); // null | {loading|roles|error}
+  const [importOpen, setImportOpen] = useState(false);
+  const [deptGuilds, setDeptGuilds] = useState([]); // [{ value: guildId, label, deptId }]
 
   useEffect(() => {
     let active = true;
@@ -230,23 +231,22 @@ export default function HubDiscordRoles() {
       prev.map((role) => (role.key === key ? { ...role, roleId: value } : role)),
     );
 
-  /** Pull the guild's live roles from the bot and open the import picker. */
-  const openImport = async () => {
-    setImportState({ loading: true });
-    try {
-      const data = await api.guildRoles();
-      if (!data?.configured) {
-        setImportState({
-          error:
-            "No Discord bot token is configured on the site, so its live roles can't be read. Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID.",
-        });
-        return;
-      }
-      setImportState({ roles: data.roles ?? [] });
-    } catch (err) {
-      setImportState({ error: err?.message ?? "Could not reach Discord." });
-    }
-  };
+  // The departments that run their own Discord server, so their roles can be
+  // imported from where they live rather than only the main guild.
+  useEffect(() => {
+    let active = true;
+    api.deptList().then((list) => {
+      if (!active) return;
+      setDeptGuilds(
+        (list ?? [])
+          .filter((d) => d.guildId)
+          .map((d) => ({ value: d.guildId, label: `${d.shortName || d.name} server`, deptId: d.id })),
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /** Turn picked guild roles into mapping rows — real id, name, generated key. */
   const importRoles = (picks) => {
@@ -267,7 +267,7 @@ export default function HubDiscordRoles() {
       };
     });
     setRoles((prev) => [...prev, ...additions]);
-    setImportState(null);
+    setImportOpen(false);
     setStatus({
       tone: "amber",
       text: `Added ${additions.length} role${additions.length === 1 ? "" : "s"} from Discord — set each department, then Save.`,
@@ -532,7 +532,7 @@ export default function HubDiscordRoles() {
           removing the old role first.
         </p>
         <div className="flex flex-wrap gap-3">
-          <Button variant="ghost" size="sm" onClick={openImport}>
+          <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
             <Download className="size-4" />
             Import from Discord
           </Button>
@@ -574,13 +574,13 @@ export default function HubDiscordRoles() {
         </div>
       </div>
 
-      {importState && (
+      {importOpen && (
         <ImportModal
-          state={importState}
+          guildOptions={[{ value: "", label: "Main server", deptId: "" }, ...deptGuilds]}
           departments={departments}
           departmentOptions={DEPARTMENT_OPTIONS}
           mappedIds={new Set([...roles, ...special].map((r) => String(r.roleId ?? "").trim()))}
-          onClose={() => setImportState(null)}
+          onClose={() => setImportOpen(false)}
           onImport={importRoles}
         />
       )}
@@ -589,25 +589,56 @@ export default function HubDiscordRoles() {
 }
 
 /**
- * Picks which of the guild's live Discord roles to turn into mapping rows.
- * Every role the bot can see is listed, minus the ones already mapped; each is
- * pre-checked with a guessed department, and imports with its real id and name.
+ * Picks which of a guild's live Discord roles to turn into mapping rows. A guild
+ * selector chooses which server to read — the main one, or a department that
+ * runs its own — and every role the bot can see there, minus the ones already
+ * mapped, is listed pre-checked with a guessed (or guild-implied) department.
  */
-function ImportModal({ state, departments, departmentOptions, mappedIds, onClose, onImport }) {
+function ImportModal({ guildOptions, departments, departmentOptions, mappedIds, onClose, onImport }) {
+  const [guild, setGuild] = useState(guildOptions[0]?.value ?? "");
+  const [state, setState] = useState({ loading: true }); // { loading | roles | error }
+  const guildDeptId = guildOptions.find((o) => o.value === guild)?.deptId || "";
+
+  useEffect(() => {
+    let active = true;
+    setState({ loading: true });
+    api
+      .guildRoles(guild || undefined)
+      .then((data) => {
+        if (!active) return;
+        if (!data?.configured) {
+          setState({
+            error:
+              "No Discord bot token is configured on the site, so its live roles can't be read.",
+          });
+          return;
+        }
+        setState({ roles: data.roles ?? [] });
+      })
+      .catch((err) => active && setState({ error: err?.message ?? "Could not reach Discord." }));
+    return () => {
+      active = false;
+    };
+  }, [guild]);
+
   const available = useMemo(
     () => (state.roles ?? []).filter((role) => !mappedIds.has(String(role.id))),
     [state.roles, mappedIds],
   );
 
-  // { [roleId]: { picked, department } } — seeded once from the guessed department.
-  const [rows, setRows] = useState(() =>
-    Object.fromEntries(
-      available.map((role) => [
-        role.id,
-        { picked: true, department: guessDepartment(role.name, departments) },
-      ]),
-    ),
-  );
+  // { [roleId]: { picked, department } } — reseeded whenever the guild's roles
+  // load, defaulting to the guild's own department when it has one.
+  const [rows, setRows] = useState({});
+  useEffect(() => {
+    setRows(
+      Object.fromEntries(
+        available.map((role) => [
+          role.id,
+          { picked: true, department: guildDeptId || guessDepartment(role.name, departments) },
+        ]),
+      ),
+    );
+  }, [available, guildDeptId, departments]);
 
   const setRow = (id, changes) =>
     setRows((prev) => ({ ...prev, [id]: { ...prev[id], ...changes } }));
@@ -628,6 +659,14 @@ function ImportModal({ state, departments, departmentOptions, mappedIds, onClose
 
   return (
     <Modal open onClose={onClose} title="Import roles from Discord" className="max-w-2xl">
+      {guildOptions.length > 1 && (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            Server
+          </span>
+          <Select value={guild} onChange={setGuild} options={guildOptions} className="w-64" />
+        </div>
+      )}
       {state.loading ? (
         <p className="py-6 text-center text-sm text-slate-400">Reading the guild's roles…</p>
       ) : state.error ? (
