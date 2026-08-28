@@ -530,14 +530,17 @@ router.get("/:deptId/public", async (req, res) => {
     .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
     .map((role) => ({ rank: role.rank, rankFull: role.rankFull }));
 
-  // Featured fleet: the vehicles the department chose, else the first few.
+  // Featured fleet: the vehicles the department chose, else the first few. The
+  // fleet page is a matrix of tiers (ranks/units) each holding vehicle cards, so
+  // flatten every tier's vehicles into one list to pick from.
   const fleetPage = config.pages.find((page) => page.type === "fleet");
-  const vehicles = Array.isArray(fleetPage?.config?.vehicles) ? fleetPage.config.vehicles : [];
+  const tiers = Array.isArray(fleetPage?.config?.tiers) ? fleetPage.config.tiers : [];
+  const vehicles = tiers.flatMap((t) => (Array.isArray(t?.vehicles) ? t.vehicles : []));
   const featuredIds = config.recruitment?.featuredVehicles ?? [];
   const chosen = featuredIds.length
     ? featuredIds.map((vid) => vehicles.find((v) => v.id === vid)).filter(Boolean)
     : vehicles.slice(0, 4);
-  const fleet = chosen.map((v) => ({ name: v.vehicle || "Unit", imageUrl: v.imageUrl || "" }));
+  const fleet = chosen.map((v) => ({ name: v.name || "Unit", code: v.code || "" }));
 
   // A live headcount from the projected main roster.
   const subs = projectRoster(config, roster, roleMap);

@@ -40,7 +40,7 @@ function corePages({ heroKicker, heroTitle, heroSubtitle, blocks = [] }) {
     },
     { id: "roster", label: "Roster", navGroup: "main", icon: "Users", type: "roster" },
     { id: "chain", label: "Chain of Command", navGroup: "main", icon: "Network", type: "chain" },
-    { id: "fleet", label: "Fleet", navGroup: "resources", icon: "Car", type: "fleet", config: { vehicles: [] } },
+    { id: "fleet", label: "Fleet", navGroup: "resources", icon: "Car", type: "fleet", config: { tags: [], tiers: [], notes: "", layout: "columns" } },
     { id: "uniforms", label: "Uniforms", navGroup: "resources", icon: "Shirt", type: "uniforms", config: { kits: [] } },
     { id: "calendar", label: "Calendar", navGroup: "resources", icon: "Calendar", type: "calendar", config: { events: [] } },
     { id: "hours", label: "Duty Hours", navGroup: "resources", icon: "Clock", type: "hours" },

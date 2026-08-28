@@ -220,23 +220,17 @@ export default function DepartmentDetail() {
                 {fleet.map((vehicle, index) => (
                   <li
                     key={`${vehicle.name}-${index}`}
-                    className="overflow-hidden rounded-xl bg-black/20 ring-1 ring-inset ring-white/[0.06]"
+                    className="flex items-center gap-3 rounded-xl bg-black/20 p-4 ring-1 ring-inset ring-white/[0.06]"
                   >
-                    {vehicle.imageUrl ? (
-                      <div className="aspect-[16/10] overflow-hidden border-b border-white/[0.06] bg-black/30">
-                        <img
-                          src={vehicle.imageUrl}
-                          alt=""
-                          loading="lazy"
-                          className="size-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="grid aspect-[16/10] place-items-center border-b border-white/[0.06]">
-                        <Car className="size-6 text-slate-600" />
-                      </div>
-                    )}
-                    <p className="p-4 text-sm text-slate-300">{vehicle.name}</p>
+                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-black/30">
+                      <Car className="size-4 text-slate-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-200">{vehicle.name}</p>
+                      {vehicle.code ? (
+                        <p className="truncate font-mono text-xs text-slate-500">{vehicle.code}</p>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>

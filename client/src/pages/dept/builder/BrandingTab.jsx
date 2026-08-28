@@ -173,7 +173,8 @@ function RecruitmentCard({ config }) {
     }));
 
   const fleetPage = config.pages.find((page) => page.type === "fleet");
-  const vehicles = Array.isArray(fleetPage?.config?.vehicles) ? fleetPage.config.vehicles : [];
+  const fleetTiers = Array.isArray(fleetPage?.config?.tiers) ? fleetPage.config.tiers : [];
+  const vehicles = fleetTiers.flatMap((t) => (Array.isArray(t?.vehicles) ? t.vehicles : []));
 
   const toggleVehicle = (id) => {
     if (featured.includes(id)) {
@@ -244,7 +245,7 @@ function RecruitmentCard({ config }) {
                     : "bg-white/[0.02] text-slate-300 ring-white/[0.06] hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.02]",
                 )}
               >
-                {vehicle.vehicle || "Untitled unit"}
+                {vehicle.name || "Untitled unit"}
               </button>
             );
           })}
