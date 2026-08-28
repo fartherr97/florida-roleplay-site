@@ -6,7 +6,15 @@ import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Modal from "../../../components/ui/Modal";
 import Field from "../../../components/ui/Field";
+import Select from "../../../components/ui/Select";
 import { TextArea, TextInput } from "../../../components/ui/TextInput";
+
+/** Cross-guild name priority for a rank — mirrors the bot's NicknamePriority. */
+const PRIORITY_OPTIONS = [
+  { value: "NONE", label: "Default — main community name" },
+  { value: "MAIN", label: "Main community wins (staff, dev, directors, owners)" },
+  { value: "DEPARTMENT", label: "This server wins (full-time department members)" },
+];
 import PageHeader from "../../../components/layout/PageHeader";
 import BotError from "../../../components/bot/BotError";
 import Loading from "../../../components/bot/Loading";
@@ -178,6 +186,10 @@ export default function BotRosterDetail() {
                     <Badge tone="primary">
                       Callsigns {rank.callsignRangeStart}–{rank.callsignRangeEnd}
                     </Badge>
+                  )}
+                  {rank.nicknamePriority === "MAIN" && <Badge tone="amber">Main name</Badge>}
+                  {rank.nicknamePriority === "DEPARTMENT" && (
+                    <Badge tone="green">Dept name</Badge>
                   )}
                   <code className="text-xs text-slate-600">{rank.discordRoleId}</code>
                   <span className="ml-auto text-xs text-slate-500">
@@ -408,6 +420,7 @@ function RankModal({ slug, rank = null, onClose, onSaved }) {
     position: rank?.position ?? 0,
     callsignStart: rank?.callsignRangeStart ?? "",
     callsignEnd: rank?.callsignRangeEnd ?? "",
+    nicknamePriority: rank?.nicknamePriority ?? "NONE",
   });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -443,6 +456,7 @@ function RankModal({ slug, rank = null, onClose, onSaved }) {
           // Always send both, so clearing the fields clears the range on the server.
           callsignRangeStart: start,
           callsignRangeEnd: end,
+          nicknamePriority: values.nicknamePriority,
         },
       });
       onSaved();
@@ -526,6 +540,19 @@ function RankModal({ slug, rank = null, onClose, onSaved }) {
             </Field>
           </div>
         </div>
+
+        <Field
+          label="Nickname priority"
+          htmlFor="b-nick"
+          hint="Whose name a member holding this rank shows across every server. Main community wins over Department; leave on Default for regular ranks."
+        >
+          <Select
+            id="b-nick"
+            value={values.nicknamePriority}
+            onChange={(value) => setValues((v) => ({ ...v, nicknamePriority: value }))}
+            options={PRIORITY_OPTIONS}
+          />
+        </Field>
 
         {error && <BotError error={error} />}
         <div className="flex justify-end gap-2 pt-2">
