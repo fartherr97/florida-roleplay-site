@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
@@ -63,6 +63,21 @@ export default function RosterTab({ config }) {
       .find((sub) => sub.id === subId)
       ?.categories.find((cat) => (cat.roleKeys ?? []).includes(roleKey));
 
+  /**
+   * Reorder a band within its unit. The category order is the roster's display
+   * order (command-first) and, through it, the Chain of Command order — so
+   * moving a band here moves it on both.
+   */
+  const moveCategory = (subId, catId, dir) => {
+    const sub = subdivisions.find((entry) => entry.id === subId);
+    const cats = [...sub.categories];
+    const i = cats.findIndex((cat) => cat.id === catId);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= cats.length) return;
+    [cats[i], cats[j]] = [cats[j], cats[i]];
+    updateSub(subId, { categories: cats });
+  };
+
   const toggleRole = (subId, catId, roleKey) => {
     const sub = subdivisions.find((entry) => entry.id === subId);
     updateSub(subId, {
@@ -103,7 +118,7 @@ export default function RosterTab({ config }) {
           </div>
 
           <div className="space-y-3">
-            {sub.categories.map((category) => (
+            {sub.categories.map((category, catIndex) => (
               <div
                 key={category.id}
                 className="rounded-2xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.06]"
@@ -139,18 +154,40 @@ export default function RosterTab({ config }) {
                   <span className="text-xs text-slate-500">
                     {(category.roleKeys ?? []).length} ranks
                   </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateSub(sub.id, {
-                        categories: sub.categories.filter((cat) => cat.id !== category.id),
-                      })
-                    }
-                    aria-label={`Remove ${category.name}`}
-                    className="ml-auto rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <div className="ml-auto flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={catIndex === 0}
+                      onClick={() => moveCategory(sub.id, category.id, -1)}
+                      aria-label={`Move ${category.name} up`}
+                      title="Move band up"
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <ChevronUp className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={catIndex === sub.categories.length - 1}
+                      onClick={() => moveCategory(sub.id, category.id, 1)}
+                      aria-label={`Move ${category.name} down`}
+                      title="Move band down"
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <ChevronDown className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSub(sub.id, {
+                          categories: sub.categories.filter((cat) => cat.id !== category.id),
+                        })
+                      }
+                      aria-label={`Remove ${category.name}`}
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
