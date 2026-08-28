@@ -13,6 +13,7 @@
  */
 import { query } from "../db.js";
 import * as seed from "../rosterSeed.js";
+import { DEPARTMENT_CONFIGS } from "../departmentSeed.js";
 import { resolveRole, buildNickname, renderDisplayName } from "./roster.js";
 import { fetchGuildMembers } from "./discord.js";
 
@@ -98,54 +99,115 @@ async function loadRankMap() {
   return seed.ROLE_MAP;
 }
 
+const SNOWFLAKE = /^\d{17,20}$/;
+
+/**
+ * Every Discord server the roster spans: the main guild, plus each department's
+ * own server when it runs one. Reads the stored configs, falling back to the
+ * seeds, so a department head can point their hub at a new server from the
+ * Builder without a redeploy.
+ */
+async function collectGuildIds() {
+  const ids = new Set();
+  const main = String(process.env.DISCORD_GUILD_ID ?? "").trim();
+  if (SNOWFLAKE.test(main)) ids.add(main);
+
+  const add = (cfg) => {
+    const g = String(cfg?.guildId ?? "").trim();
+    if (SNOWFLAKE.test(g)) ids.add(g);
+  };
+  try {
+    const rows = await query("SELECT config FROM department_configs");
+    for (const row of rows) {
+      const cfg = typeof row.config === "object" ? row.config : JSON.parse(row.config);
+      add(cfg);
+    }
+  } catch {
+    // No database — the seed configs below stand.
+  }
+  for (const cfg of Object.values(DEPARTMENT_CONFIGS)) add(cfg);
+  return [...ids];
+}
+
 let lastSyncAt = 0;
 let inProgress = false;
 const MIN_INTERVAL_MS = 60_000;
 
 /**
- * Pull the whole guild and reconcile the roster to it: upsert everyone holding a
- * mapped role, and drop the bot-synced rows for anyone who no longer holds one
- * (or has left the guild). Never throws — a missing intent or a Discord blip is
- * swallowed so the caller (an interval or a page view) is unaffected.
+ * Reconcile the roster to Discord across every guild it spans: a member's roles
+ * from all the servers they share with the bot are merged and resolved once (so
+ * someone in the main guild and a department guild lands under the higher rank),
+ * everyone matched is upserted, and the bot-synced rows for anyone who resolves
+ * nowhere are pruned. Never throws. Pruning only runs when every guild was read
+ * cleanly, so a single server's outage never wipes the roster.
  */
 export async function syncRosterFromGuild() {
   if (inProgress) return { skipped: "in-progress" };
   inProgress = true;
   try {
-    const members = await fetchGuildMembers();
-    if (!members) return { configured: false };
+    const guildIds = await collectGuildIds();
+    if (guildIds.length === 0) return { configured: false };
+
+    // Merge each member's roles across every guild they're in with the bot.
+    const byId = new Map(); // discordId -> { roles:Set, name }
+    let errors = 0;
+    let ok = 0;
+    for (const gid of guildIds) {
+      let members;
+      try {
+        members = await fetchGuildMembers(gid);
+      } catch (err) {
+        errors += 1;
+        // eslint-disable-next-line no-console
+        console.warn("[roster-sync] guild", gid, err?.code || err?.message || err);
+        continue;
+      }
+      if (!members) continue;
+      ok += 1;
+      for (const m of members) {
+        const cur = byId.get(m.id) ?? { roles: new Set(), name: "" };
+        for (const r of m.roles) cur.roles.add(r);
+        if (!cur.name) cur.name = m.displayName || m.username || "";
+        byId.set(m.id, cur);
+      }
+    }
+
+    if (ok === 0) return { configured: true, error: errors ? "unreadable" : "no-guilds" };
 
     const roleMap = await loadRankMap();
     const keep = [];
-    for (const m of members) {
+    for (const [discordId, data] of byId) {
       const resolved = resolveMember(
-        { discordId: m.id, characterName: m.displayName || m.username || "Member", roles: m.roles, callsign: "" },
+        { discordId, characterName: data.name || "Member", roles: [...data.roles], callsign: "" },
         roleMap,
         seed.DEPARTMENTS,
       );
       if (resolved.action === "upsert") {
         await applyUpsert(resolved, null);
-        keep.push(m.id);
+        keep.push(discordId);
       }
     }
 
-    // Prune bot-synced members who no longer resolve — left the guild, or lost
-    // the role. Manually-added rows (a different source) are never touched.
-    try {
-      if (keep.length) {
-        await query(
-          "DELETE FROM roster_members WHERE source = 'discord-sync' AND NOT (discord_id = ANY($1))",
-          [keep],
-        );
-      } else {
-        await query("DELETE FROM roster_members WHERE source = 'discord-sync'");
+    // Prune only on a clean full read, so a transient outage on one server does
+    // not delete members the roster still holds. Manually-added rows (a
+    // different source) are never touched.
+    if (errors === 0) {
+      try {
+        if (keep.length) {
+          await query(
+            "DELETE FROM roster_members WHERE source = 'discord-sync' AND NOT (discord_id = ANY($1))",
+            [keep],
+          );
+        } else {
+          await query("DELETE FROM roster_members WHERE source = 'discord-sync'");
+        }
+      } catch {
+        // Pruning is best-effort; a failed delete just leaves a stale row.
       }
-    } catch {
-      // Pruning is best-effort; a failed delete just leaves a stale row.
     }
 
     lastSyncAt = Date.now();
-    return { configured: true, scanned: members.length, matched: keep.length };
+    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, errors };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[roster-sync]", err?.code || err?.message || err);

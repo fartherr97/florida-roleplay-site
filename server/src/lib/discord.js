@@ -111,9 +111,8 @@ export async function fetchMemberRoles(userId) {
  * to the seeded role map rather than error. `@everyone` (the role whose id is the guild id)
  * and integration-managed roles are dropped: neither is something a human assigns by hand.
  */
-export async function fetchGuildRoles() {
+export async function fetchGuildRoles(guildId = process.env.DISCORD_GUILD_ID) {
   const token = process.env.DISCORD_BOT_TOKEN;
-  const guildId = process.env.DISCORD_GUILD_ID;
   if (!token || !guildId) return null;
 
   const res = await fetch(`${API_BASE}/guilds/${guildId}/roles`, {
@@ -143,9 +142,8 @@ export async function fetchGuildRoles() {
  * without it Discord answers 403, which the caller treats as "not available"
  * rather than an error. Returns `null` when no token or guild is configured.
  */
-export async function fetchGuildMembers() {
+export async function fetchGuildMembers(guildId = process.env.DISCORD_GUILD_ID) {
   const token = process.env.DISCORD_BOT_TOKEN;
-  const guildId = process.env.DISCORD_GUILD_ID;
   if (!token || !guildId) return null;
 
   const members = [];

@@ -59,6 +59,18 @@ export default function BrandingTab({ config }) {
               onChange={(e) => set({ description: e.target.value })}
             />
           </Field>
+          <Field
+            label="Discord server ID"
+            htmlFor="b-guild"
+            hint="If this department runs its own Discord server, paste its ID so the roster syncs members from it. Leave blank to use the main server."
+          >
+            <TextInput
+              id="b-guild"
+              value={config.guildId ?? ""}
+              placeholder="e.g. 1534486963065978990"
+              onChange={(e) => mutate((current) => ({ ...current, guildId: e.target.value.trim() }))}
+            />
+          </Field>
         </Card>
 
         <div className="space-y-5">

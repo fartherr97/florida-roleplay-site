@@ -175,6 +175,7 @@ function sopPage(id, label, title, sections) {
 
 const FHP = department({
   id: "fhp",
+  guildId: "1534486963065978990",
   name: "Florida Highway Patrol",
   shortName: "FHP",
   accent: "#d2b48c",
@@ -237,6 +238,7 @@ const FHP = department({
 
 const BCSO = department({
   id: "bcso",
+  guildId: "1534487473206595718",
   name: "Broward County Sheriff's Office",
   shortName: "BCSO",
   accent: "green",
@@ -277,6 +279,7 @@ const BCSO = department({
 
 const MPD = department({
   id: "mpd",
+  guildId: "1534487217299525634",
   name: "Miami Police Department",
   shortName: "MPD",
   accent: "brand",

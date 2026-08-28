@@ -332,6 +332,10 @@ export function normalizeConfig(raw, id) {
   return {
     version: CONFIG_VERSION,
     id: String(config.id || id || "department"),
+    // This department's own Discord server id, when it runs one — the roster
+    // sync reads members from it as well as the main guild. Empty means the
+    // department lives in the main guild only.
+    guildId: /^\d{17,20}$/.test(String(config.guildId ?? "")) ? String(config.guildId) : "",
     branding: {
       name: branding.name || "Department",
       shortName: branding.shortName || branding.name || "Department",
