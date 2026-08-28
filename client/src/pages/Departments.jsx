@@ -93,7 +93,7 @@ function DepartmentPanel({ panel, first, canEnter }) {
   return (
     <section
       className={[
-        "group relative flex min-h-[60vh] flex-1 items-end overflow-hidden transition-[flex-grow] duration-500 ease-out lg:min-h-0 lg:hover:flex-[2.4]",
+        "group relative flex min-h-[60vh] flex-1 items-end overflow-hidden transition-[flex-grow] duration-500 ease-out lg:min-h-0 lg:hover:flex-[1.35]",
         first ? "" : "border-t border-white/10 lg:border-l lg:border-t-0",
       ].join(" ")}
       style={{ "--p": panel.color, "--ps": panel.soft }}
@@ -112,7 +112,7 @@ function DepartmentPanel({ panel, first, canEnter }) {
           src={panel.logo}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-[42%] w-[115%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.07] transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-[0.14]"
+          className="pointer-events-none absolute left-1/2 top-[38%] w-[55%] max-w-[16rem] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.06] transition-all duration-700 ease-out group-hover:opacity-[0.1]"
         />
       )}
       {/* Bottom accent glow, revealed on hover. */}
@@ -130,7 +130,7 @@ function DepartmentPanel({ panel, first, canEnter }) {
           <img
             src={panel.logo}
             alt={`${panel.name} crest`}
-            className="mx-auto size-20 object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-transform duration-500 group-hover:-translate-y-1"
+            className="mx-auto size-14 object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-transform duration-500 group-hover:-translate-y-0.5"
           />
         )}
         <h2
