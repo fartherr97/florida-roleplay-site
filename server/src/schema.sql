@@ -537,6 +537,7 @@ CREATE TABLE IF NOT EXISTS leadership_seats (
 INSERT INTO leadership_seats (seat_key, grp, title, sort_order) VALUES
   ('owner',                  'ownership', 'Owner',                   0),
   ('co-owner',               'ownership', 'Co-Owner',                1),
+  ('co-owner-2',             'ownership', 'Co-Owner',                2),
   ('staff-director',         'directors', 'Staff Director',          0),
   ('es-director',            'directors', 'ES Director',             1),
   ('dev-director',           'directors', 'Dev. Director',           2),

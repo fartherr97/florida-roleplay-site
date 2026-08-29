@@ -40,6 +40,7 @@ const seatStub = (seatKey, seat) => ({ seatKey, seat, role: seat, vacant: true, 
 const OWNERSHIP_SEATS = [
   seatStub("owner", "Owner"),
   seatStub("co-owner", "Co-Owner"),
+  seatStub("co-owner-2", "Co-Owner"),
 ];
 const DIRECTOR_SEATS = [
   seatStub("staff-director", "Staff Director"),

@@ -235,6 +235,7 @@ router.get("/rules", (req, res) => {
 const LEADERSHIP_FALLBACK_SEATS = [
   { seatKey: "owner", grp: "ownership", title: "Owner", order: 0 },
   { seatKey: "co-owner", grp: "ownership", title: "Co-Owner", order: 1 },
+  { seatKey: "co-owner-2", grp: "ownership", title: "Co-Owner", order: 2 },
   { seatKey: "staff-director", grp: "directors", title: "Staff Director", order: 0 },
   { seatKey: "es-director", grp: "directors", title: "ES Director", order: 1 },
   { seatKey: "dev-director", grp: "directors", title: "Dev. Director", order: 2 },
