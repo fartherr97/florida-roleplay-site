@@ -17,6 +17,7 @@ import formsRouter from "./forms.js";
 import promotionsRouter from "./promotions.js";
 import transfersRouter from "./transfers.js";
 import disciplineRouter from "./discipline.js";
+import staffLogRouter from "./staffLog.js";
 import supportRouter from "./support.js";
 import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
@@ -58,6 +59,7 @@ router.use("/transfers", transfersRouter);
 // because a background check that covers half the community reads as a clean
 // record rather than an incomplete one.
 router.use("/discipline", disciplineRouter);
+router.use("/staff-log", staffLogRouter);
 // The support portal. Members open tickets here; the support team works them.
 router.use("/support", supportRouter);
 

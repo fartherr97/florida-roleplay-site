@@ -41,6 +41,8 @@ import { Router } from "express";
 import { query } from "../db.js";
 import { resolveUser } from "../middleware/requireRole.js";
 import { str } from "../validate.js";
+import { loadActions } from "../lib/disciplineData.js";
+import { backgroundFor } from "../lib/discipline.js";
 import {
   DEFAULT_WEBHOOK_CFG,
   DEPT_KEYS,
@@ -582,6 +584,47 @@ router.get("/:id", async (req, res) => {
   if (!transfer) return res.status(404).json({ error: "not found" });
   if (!canView(session, transfer)) return forbidden(res);
   return res.json(transfer);
+});
+
+/* ─── GET /:id/bgcheck ─── the transferee's folded disciplinary record ─────── */
+
+/**
+ * A background check on the person the ticket is about, for whoever manages the
+ * ticket to read before they process a transfer.
+ *
+ * This is the same folded record the DA Hub and Discord's `/bgcheck` show, but it
+ * is authorized by the *ticket*, not by `discipline.view`: a department head runs
+ * the department the member is moving to or from, so they may read the record in
+ * that context even without the site-wide disciplinary grant. Management may
+ * always. It is never returned to the transferee — `canManageTicket` excludes the
+ * ticket's own owner — so a member cannot pull their own record through here.
+ *
+ * The lookup is keyed on the submitter's recorded Discord id, which is immutable,
+ * rather than the free-text `discord`/`member` fields that a correction can change.
+ */
+router.get("/:id/bgcheck", async (req, res) => {
+  const session = await sessionFor(req);
+  if (!session) return unauthorized(res);
+
+  let transfer;
+  try {
+    transfer = await getTransfer(req.params.id);
+  } catch {
+    return res.status(503).json({ error: "unavailable", message: "Transfers need a database." });
+  }
+  if (!transfer) return res.status(404).json({ error: "not found" });
+  if (!canManageTicket(session, transfer)) return forbidden(res);
+
+  const discordId = str(transfer.createdById).trim();
+  const member = transfer.member || transfer.discord || null;
+  if (!/^\d{17,20}$/.test(discordId)) {
+    // Tickets opened before the submitter's id was recorded have only the free-text
+    // fields, which are not a reliable key for a record. Say so rather than guess.
+    return res.json({ background: null, member, reason: "no_discord_id" });
+  }
+
+  const actions = await loadActions({ targetDiscordId: discordId });
+  return res.json({ background: backgroundFor(actions, { discordId }), member });
 });
 
 /* ─── PATCH /:id ─── approve · revoke · reject · close · reopen · process ─── */

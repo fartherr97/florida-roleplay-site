@@ -40,6 +40,7 @@ import {
 } from "./portalPrimitives";
 import { api, fmtMsgTime } from "./portalUtils";
 import { useToast } from "./usePortalToast";
+import { actionLabel, actionTone, bodyLabel } from "../../lib/discipline";
 
 /* ─── Presence Bar ─────────────────────────────────────────────────────────── */
 // "Who's actively viewing" — avatars of everyone with the ticket open.
@@ -585,32 +586,175 @@ function HistoryTimeline({ history }) {
 
 /* ─── Background Check Modal ───────────────────────────────────────────────── */
 
+/** Badge colours for a disciplinary action type, keyed off its tone. */
+const BG_TONE = {
+  amber: "bg-amber-500/15 text-amber-300 ring-amber-400/30",
+  primary: "bg-blue-500/15 text-blue-300 ring-blue-400/30",
+  brand: "bg-sky-500/15 text-sky-300 ring-sky-400/30",
+  violet: "bg-violet-500/15 text-violet-300 ring-violet-400/30",
+  rose: "bg-rose-500/15 text-rose-300 ring-rose-400/30",
+  slate: "bg-slate-500/15 text-slate-300 ring-slate-400/30",
+};
+
+function bgDate(value) {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** One disciplinary entry as a labelled row. */
+function BgEntry({ action }) {
+  return (
+    <li className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset ${
+            BG_TONE[actionTone(action.type)] ?? BG_TONE.slate
+          } ${action.voided ? "line-through opacity-60" : ""}`}
+        >
+          {actionLabel(action.type)}
+        </span>
+        <span className="text-xs font-medium text-slate-400">{bodyLabel(action.bodyId)}</span>
+        <span className="ml-auto text-[11px] text-slate-500">{bgDate(action.createdAt)}</span>
+      </div>
+      {action.reason && <p className="mt-1.5 text-xs leading-relaxed text-slate-300">{action.reason}</p>}
+      {action.voided && (
+        <p className="mt-1 text-[11px] italic text-slate-500">
+          Revoked{action.voidReason ? ` — ${action.voidReason}` : ""}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** A whole section — non-verbal or verbal — always shown, "None on record" when empty. */
+function BgSection({ label, list }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+        {label} <span className="text-slate-600">({list.length})</span>
+      </p>
+      {list.length ? (
+        <ul className="space-y-1.5">
+          {list.map((action, i) => (
+            <BgEntry key={action.id ?? i} action={action} />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-lg border border-dashed border-white/[0.08] px-3 py-2 text-xs text-slate-500">
+          None on record.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The transferee's disciplinary record, pulled into the ticket for whoever manages it.
+ *
+ * Fetches the same folded record the DA Hub renders, authorized by the ticket rather than
+ * by `discipline.view` (see the /:id/bgcheck endpoint) so a department head can read it in
+ * this context. Ephemeral to the modal — nothing is stored or posted.
+ */
 function BgCheckModal({ transfer, onClose }) {
+  const [state, setState] = useState({ loading: true, error: null, data: null });
+
+  useEffect(() => {
+    let active = true;
+    api(`/${encodeURIComponent(transfer.id)}/bgcheck`)
+      .then((res) => active && setState({ loading: false, error: null, data: res }))
+      .catch(
+        (err) =>
+          active &&
+          setState({
+            loading: false,
+            error: err?.status === 403 ? "You don't manage this ticket." : "Could not load the record.",
+            data: null,
+          }),
+      );
+    return () => {
+      active = false;
+    };
+  }, [transfer.id]);
+
+  const bg = state.data?.background;
+  const nonVerbal = bg ? [...bg.nonVerbal.staff, ...bg.nonVerbal.department] : [];
+  const verbal = bg ? [...bg.verbal.staff, ...bg.verbal.department] : [];
+  const sortByDate = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+
   return (
     <ModalShell
       title="Background Check"
       subtitle={`${transfer.member} · ${transfer.rank}`}
       onClose={onClose}
-      width="max-w-md"
+      width="max-w-lg"
     >
-      <div className="space-y-3 px-5 py-6 text-center">
-        <Shield className="mx-auto size-10 text-slate-600" strokeWidth={1.25} />
-        <p className="font-semibold text-white">Disciplinary background</p>
-        <p className="text-sm leading-relaxed text-slate-500">
-          This community keeps its own record — the DA Database, and{" "}
-          <code className="rounded bg-black/40 px-1 py-0.5 text-xs text-slate-300">/bgcheck</code>{" "}
-          in Discord. Look{" "}
-          <span className="font-semibold text-white">{transfer.member}</span> up there by their
-          Discord ID for the six-month history, split into verbal and non-verbal and by whether it
-          came from staff or a department.
-        </p>
-        <p className="text-xs italic text-slate-600">
-          A ticket does not pull the record in on its own: a disciplinary history rendered beside a
-          transfer is read by whoever has the ticket open, and that is a wider audience than the
-          record is meant for.
-        </p>
+      <div className="space-y-4 px-5 py-5">
+        {state.loading && (
+          <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
+            <RefreshCw className="size-4 animate-spin" /> Pulling the record…
+          </div>
+        )}
+
+        {state.error && (
+          <p className="rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+            {state.error}
+          </p>
+        )}
+
+        {!state.loading && !state.error && !bg && (
+          <div className="space-y-2 py-4 text-center">
+            <Shield className="mx-auto size-9 text-slate-600" strokeWidth={1.25} />
+            <p className="text-sm text-slate-400">
+              No Discord ID is recorded on this ticket, so a reliable record can't be pulled. Run{" "}
+              <code className="rounded bg-black/40 px-1 py-0.5 text-xs text-slate-300">/bgcheck</code> in
+              Discord instead.
+            </p>
+          </div>
+        )}
+
+        {bg && (
+          <>
+            {/* Headline + summary. */}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex items-center gap-2">
+                <Shield className="size-4 text-slate-400" strokeWidth={1.75} />
+                <p className="text-sm font-semibold text-white">{bg.headline}</p>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <Stat label="Non-verbal" value={bg.nonVerbal.total} tone={bg.nonVerbal.total ? "rose" : "slate"} />
+                <Stat label="Verbal" value={bg.verbal.total} tone={bg.verbal.total ? "amber" : "slate"} />
+                <Stat label="Revoked" value={bg.voided.length} tone="slate" />
+              </div>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Last {Math.round(bg.windowDays / 30)} months · read from this ticket, not stored.
+              </p>
+            </div>
+
+            {bg.active.length > 0 && (
+              <p className="rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300">
+                {bg.active.length} action{bg.active.length === 1 ? "" : "s"} still active right now.
+              </p>
+            )}
+
+            <BgSection label="Non-verbal" list={[...nonVerbal].sort(sortByDate)} />
+            <BgSection label="Verbal" list={[...verbal].sort(sortByDate)} />
+          </>
+        )}
       </div>
     </ModalShell>
+  );
+}
+
+function Stat({ label, value, tone }) {
+  return (
+    <div className="rounded-lg bg-black/20 px-2 py-2">
+      <p className={`text-lg font-extrabold ${tone === "rose" ? "text-rose-300" : tone === "amber" ? "text-amber-300" : "text-slate-300"}`}>
+        {value}
+      </p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">{label}</p>
+    </div>
   );
 }
 

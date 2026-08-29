@@ -35,6 +35,7 @@ export const GUARDS = [
   // stricter `discipline.view` grant the API enforces — the lookup surface on the
   // page hides itself when the caller lacks it.
   { path: "/staff-hub/da-hub", permission: "staff.view" },
+  { path: "/staff-hub/admin-log", permission: "staff.records.manage" },
   { path: "/staff-hub/reports", permission: "site.moderation" },
   { path: "/staff-hub/training", permission: "staff.view" },
   { path: "/staff-hub/analytics", permission: "staff.view" },

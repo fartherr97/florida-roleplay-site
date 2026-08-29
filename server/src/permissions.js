@@ -44,6 +44,7 @@ export const PERMISSION_GROUPS = [
       { key: "staff.links.admin", label: "Administrator resources", detail: "The Administrators link collection." },
       { key: "staff.links.senior", label: "Senior resources", detail: "The Senior Admins+ link collection." },
       { key: "staff.portal.manage", label: "Manage the portal", detail: "Edit reminders, the featured member, quick notes and every rank's links." },
+      { key: "staff.records.manage", label: "Admin logs", detail: "Internal staff record log — resignations, LOAs, strikes, terminations. Never touches a background check. Senior Admins+." },
     ],
   },
   {
@@ -355,6 +356,7 @@ export const DEFAULT_GRANTS = {
   "staff.links.admin": staffFrom("junior_admin"),
   "staff.links.senior": staffFrom("senior_admin"),
   "staff.portal.manage": ["head_admin", "directorship", "ownership"],
+  "staff.records.manage": staffFrom("senior_admin"),
 
   "departments.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "departments.roster.edit": staffFrom("admin"),

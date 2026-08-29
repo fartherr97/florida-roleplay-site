@@ -12,7 +12,7 @@
  */
 import { Router } from "express";
 import { execute, query, changedRows } from "../db.js";
-import * as seed from "../disciplineSeed.js";
+import { loadActions } from "../lib/disciplineData.js";
 import { loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser, withOwnerOverride } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
@@ -44,41 +44,6 @@ async function contextFor(req) {
   req.user = user;
   const roleKeys = user?.roles ?? [];
   return { user, roleKeys, permissions: permissionsFor(roleKeys, await loadGrants()) };
-}
-
-const COLUMNS = `
-  id, type, body_id AS "bodyId", target_name AS "targetName",
-  target_discord_id AS "targetDiscordId", issued_by_name AS "issuedByName",
-  issued_by_discord_id AS "issuedByDiscordId", reason, expires_at AS "expiresAt",
-  voided, void_reason AS "voidReason", created_at AS "createdAt", updated_at AS "updatedAt"`;
-
-async function loadActions({ targetDiscordId, since } = {}) {
-  // Postgres numbers its placeholders, so a clause is written after its value is
-  // pushed and reads its own position off the array. Building the two lists
-  // independently is how a filter ends up bound to the wrong value.
-  const where = [];
-  const params = [];
-  if (targetDiscordId) {
-    params.push(targetDiscordId);
-    where.push(`target_discord_id = $${params.length}`);
-  }
-  if (since) {
-    params.push(since);
-    where.push(`created_at >= $${params.length}`);
-  }
-  try {
-    const rows = await query(
-      `SELECT ${COLUMNS} FROM disciplinary_actions${where.length ? ` WHERE ${where.join(" AND ")}` : ""}
-       ORDER BY created_at DESC LIMIT 2000`,
-      params,
-    );
-    if (rows.length) return rows.map((row) => normalizeAction({ ...row, voided: Boolean(row.voided) }));
-  } catch {
-    // No database — the seeds stand, so the hub and the embed both render.
-  }
-  return seed.ACTIONS.map(normalizeAction).filter(
-    (a) => !targetDiscordId || a.targetDiscordId === targetDiscordId,
-  );
 }
 
 function noStore(res) {

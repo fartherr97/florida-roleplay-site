@@ -760,6 +760,31 @@ export const api = {
       null,
     ),
 
+  /* --------------------------- Staff admin log --------------------------- */
+
+  /**
+   * The staff team's internal log — resignations, LOAs, strikes, terminations.
+   * Separate from the DA Hub: nothing here reaches a background check, and only
+   * Senior Admins+ may read it, so there is no browser-seed fallback — a signed
+   * out or lower-ranked reader gets an empty log, never a stale one.
+   */
+  staffLog: () => get("/staff-log", { entries: [], types: [] }),
+
+  staffLogProfile: (discordId) =>
+    get(`/staff-log/profile/${encodeURIComponent(discordId)}`, null),
+
+  fileStaffLog: (payload) =>
+    post("/staff-log", payload, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was logged.",
+    })),
+
+  deleteStaffLog: (id) =>
+    del(`/staff-log/${encodeURIComponent(id)}`, () => ({
+      ok: false,
+      message: "The API is unreachable, so nothing was deleted.",
+    })),
+
   /* --------------------------- Promotion board --------------------------- */
 
   /**
