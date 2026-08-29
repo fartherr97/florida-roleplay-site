@@ -18,6 +18,7 @@ import Events from "./pages/Events";
 import Reports from "./pages/Reports";
 import ImageHost from "./pages/ImageHost";
 import ImageHostAdmin from "./pages/management/ImageHostAdmin";
+import EmailDirectory from "./pages/management/EmailDirectory";
 import Staff from "./pages/Staff";
 import Join from "./pages/Join";
 import Whitelist from "./pages/Whitelist";
@@ -152,6 +153,7 @@ export default function App() {
             <Route path="departments/:id" element={<DepartmentDetail />} />
             <Route path="image-host" element={<ImageHost />} />
             <Route path="management/image-hosting" element={<ImageHostAdmin />} />
+            <Route path="management/emails" element={<EmailDirectory />} />
 
             <Route path="store" element={<Store />} />
             <Route path="knowledge-base" element={<KnowledgeBase />} />

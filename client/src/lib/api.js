@@ -769,6 +769,9 @@ export const api = {
       totals: { mine: 0, all: 0 },
     }),
 
+  /** The community email directory — every member's email with roster context. */
+  emails: () => get("/emails", { members: [], departments: [] }),
+
   /* --------------------------- Staff admin log --------------------------- */
 
   /**

@@ -179,6 +179,21 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "emails",
+    label: "Email directory",
+    description:
+      "The community email directory — every member's email on file, with their department and rank, read on the site and looked up by the bot.",
+    permissions: [
+      {
+        key: "emails.view",
+        label: "View the email directory",
+        detail:
+          "See every member's email alongside their department and rank, and look one up by member or by address. Anyone can add their own email; reading others' needs this.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "transfers",
     label: "Transfer portal",
     description:
@@ -399,6 +414,8 @@ export const DEFAULT_GRANTS = {
   "discipline.file": ["senior_admin", "head_admin", "directorship", "ownership"],
   "discipline.view": ["senior_admin", "head_admin", "directorship", "ownership"],
   "discipline.manage": ["head_admin", "directorship", "ownership"],
+
+  "emails.view": ["directorship", "ownership"],
 
   // Opening a ticket needs nothing but a Discord account — support that only
   // answers people who already hold a role is not support. These decide who
