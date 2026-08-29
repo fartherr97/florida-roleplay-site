@@ -66,10 +66,11 @@ async function ensureTables() {
  * may read an email off the record.
  *
  * Off their live main-guild roles, exactly as the DA Hub authorises `/bgcheck`, so
- * the answer can never disagree with the site. Two ways in: holding `emails.view`
- * (Directorship+, who also read the whole directory on the site), or being a
- * department head — command may look a member up without the site-wide grant, the
- * same shape department command file DAs without `discipline.file`. Fails closed.
+ * the answer can never disagree with the site. Ways in: holding `emails.view`
+ * (Directorship+, who also read the whole directory on the site), being on the
+ * staff team (`staff.view`), or being a department head — command may look a member
+ * up without the site-wide grant, the same shape department command file DAs
+ * without `discipline.file`. Fails closed.
  */
 async function actorMayViewEmails(actorDiscordId) {
   if (!/^\d{17,20}$/.test(actorDiscordId)) return false;
@@ -78,7 +79,7 @@ async function actorMayViewEmails(actorDiscordId) {
     if (membership === null) return false; // not in the guild
     const roleKeys = withOwnerOverride(actorDiscordId, await resolveRoleKeys(membership.roles));
     const permissions = permissionsFor(roleKeys, await loadGrants());
-    if (permissions.has("emails.view")) return true;
+    if (permissions.has("emails.view") || permissions.has("staff.view")) return true;
     const held = new Set(roleKeys);
     return DEPT_HEAD_KEYS.some((key) => held.has(key));
   } catch {
