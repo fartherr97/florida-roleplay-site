@@ -297,6 +297,29 @@ function nickRole(nick) {
 }
 
 /**
+ * The leadership Discord roles, keyed by their real snowflake in the main FLRP
+ * guild. Membership of one of these roles is what puts someone on the home
+ * page's Leadership section — no site login or nickname parsing needed. The
+ * ownership titles and the director seats are fixed here, in order of seniority.
+ */
+const LEADERSHIP_ROLES = {
+  ownership: [
+    { id: "1534380747689824276", label: "Owner" },
+    { id: "1534911243142303744", label: "Co-Owner" },
+  ],
+  directorSeats: [
+    { id: "1535994200808497162", label: "Staff Director" },
+    { id: "1535994241392582706", label: "ES Director" },
+    { id: "1535994278193528912", label: "Dev. Director" },
+    { id: "1535994315258724415", label: "Civilian Director" },
+    { id: "1542221076216676422", label: "Asst. Staff Director" },
+    { id: "1542221112442618027", label: "Asst. ES Director" },
+    { id: "1542221148102725642", label: "Asst. Dev. Director" },
+    { id: "1542221004561190983", label: "Asst. Civilian Director" },
+  ],
+};
+
+/**
  * The Discord roles that mark someone as leadership, split into the two groups
  * the home page shows: the Ownership tier role(s), and every role mapped to the
  * `management` department (Directorship). Read from the live role map, falling
@@ -443,33 +466,68 @@ export async function syncRosterFromGuild() {
       }
     }
 
-    // The public leadership team: whoever holds an Ownership or Directorship
-    // role, named and pictured from Discord even if they never signed in. Only
-    // refreshed on a clean read so an outage doesn't blank the home page.
+    // The public leadership team: whoever holds an Ownership or Director role,
+    // named and pictured from Discord even if they never signed in. Placement is
+    // by role id first (exact seat), with the mapped ownership-tier / management
+    // roles as a fallback. Only refreshed on a clean read so an outage doesn't
+    // blank the home page.
     if (errors === 0) {
       const lead = await loadLeadershipRoles();
       const mainGuild = String(process.env.DISCORD_GUILD_ID ?? "").trim();
       const leadership = [];
       for (const [discordId, data] of byId) {
         const held = data.roles;
-        const isOwner = [...lead.ownership].some((id) => held.has(id));
-        const isDirector = !isOwner && [...lead.directors].some((id) => held.has(id));
-        if (!isOwner && !isDirector) continue;
+        let grp = null;
+        let roleLabel = "";
+        let order = 0;
+
+        // 1. Exact leadership roles by id — Owner/Co-Owner, then the director seats.
+        const owner = LEADERSHIP_ROLES.ownership.find((r) => held.has(r.id));
+        if (owner) {
+          grp = "ownership";
+          roleLabel = owner.label;
+          order = LEADERSHIP_ROLES.ownership.indexOf(owner);
+        } else {
+          const seatIdx = LEADERSHIP_ROLES.directorSeats.findIndex((r) => held.has(r.id));
+          if (seatIdx !== -1) {
+            grp = "directors";
+            roleLabel = LEADERSHIP_ROLES.directorSeats[seatIdx].label;
+            order = seatIdx;
+          }
+        }
+
+        // 2. Fallback: the mapped ownership-tier / management-department roles,
+        //    labelled from the nickname's role segment.
+        if (!grp) {
+          const isOwner = [...lead.ownership].some((id) => held.has(id));
+          const isDirector = !isOwner && [...lead.directors].some((id) => held.has(id));
+          if (isOwner) {
+            grp = "ownership";
+            order = 90;
+          } else if (isDirector) {
+            grp = "directors";
+            order = 90;
+          }
+        }
+        if (!grp) continue;
+
         const nick = data.nicks[mainGuild] || Object.values(data.nicks)[0] || "";
         const parsed = parseNick(nick);
         leadership.push({
           discordId,
           name: parsed.name || data.name || data.username || "Member",
-          roleLabel: nickRole(nick) || (isOwner ? "Ownership" : "Director"),
+          roleLabel: roleLabel || nickRole(nick) || (grp === "ownership" ? "Ownership" : "Director"),
           handle: data.username || "",
           avatar: data.avatar || null,
-          grp: isOwner ? "ownership" : "directors",
+          grp,
           callsign: parsed.callsign || "",
+          order,
         });
       }
       leadership.sort(
         (a, b) =>
           (a.grp === b.grp ? 0 : a.grp === "ownership" ? -1 : 1) ||
+          a.order - b.order ||
           String(a.callsign).localeCompare(String(b.callsign), undefined, { numeric: true }) ||
           a.name.localeCompare(b.name),
       );

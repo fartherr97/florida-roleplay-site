@@ -31,11 +31,15 @@ const DEPT_LOGOS = {
 
 /** The director seats, shown as Vacant until the Discord sync fills them. */
 const DIRECTOR_SEATS = [
-  { seat: "Staff Director", vacant: true },
-  { seat: "ES Director", vacant: true },
-  { seat: "Dev. Director", vacant: true },
-  { seat: "Civilian Director", vacant: true },
-];
+  "Staff Director",
+  "ES Director",
+  "Dev. Director",
+  "Civilian Director",
+  "Asst. Staff Director",
+  "Asst. ES Director",
+  "Asst. Dev. Director",
+  "Asst. Civilian Director",
+].map((seat) => ({ seat, vacant: true }));
 
 /** The public landing page — full-bleed hero over stacked content sections. */
 export default function Landing() {
