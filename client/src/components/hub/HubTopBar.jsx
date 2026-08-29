@@ -9,7 +9,6 @@ import UserChip from "../layout/UserChip";
 import HubDrawer from "./HubDrawer";
 import { useAuth } from "../../context/useAuth";
 import { hubIcon } from "../../lib/hubIcons";
-import { PREVIEW_RANKS } from "../../data/mockData";
 import { cn } from "../../lib/cn";
 
 /** The More menu borrows the bar's own palette rather than a group colour. */
@@ -40,7 +39,7 @@ export default function HubTopBar({ hub }) {
     () => typeof window !== "undefined" && window.scrollY > 8,
   );
   const location = useLocation();
-  const { user, hasPermission, loading, previewRank } = useAuth();
+  const { user, hasPermission, loading } = useAuth();
 
   // Shared so only one group dropdown is open at a time (see NavDropdown).
   const [hoverGroup, setHoverGroup] = useState(null);
@@ -124,8 +123,7 @@ export default function HubTopBar({ hub }) {
     }))
     .filter((group) => group.items.length > 0);
 
-  const rank =
-    PREVIEW_RANKS.find((r) => r.id === previewRank)?.label ?? user?.rank ?? null;
+  const rank = user?.rank ?? null;
 
   return (
     <>
@@ -235,13 +233,6 @@ export default function HubTopBar({ hub }) {
             {/* Wrapped rather than given `hidden` classes of their own: Badge
                 sets `inline-flex` in its base, and utility order in the
                 stylesheet — not in the attribute — would decide the winner. */}
-            {previewRank && (
-              <span className="hidden md:block">
-                <Badge tone="primary" dot>
-                  Preview
-                </Badge>
-              </span>
-            )}
             {rank && (
               <span className="hidden sm:block">
                 <Badge tone="brand">{rank}</Badge>
