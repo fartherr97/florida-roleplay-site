@@ -100,6 +100,17 @@ export async function refreshUserRoles(userId) {
   }
   const roles = await resolveRoleKeys(membership.roles);
   await writeUserRoles(userId, roles);
+
+  // Keep the display name in step with the member's main-guild nickname, so the site
+  // shows their server identity — "100 | Owner | Mike" — rather than a bare global name.
+  // Only when the guild actually gives a nickname; never overwrite with nothing.
+  const nick = typeof membership.nick === "string" ? membership.nick.trim() : "";
+  if (nick) {
+    await execute(`UPDATE users SET display_name = $1 WHERE id = $2`, [nick.slice(0, 128), userId]).catch(
+      () => {},
+    );
+  }
+
   return { inGuild: true, roles };
 }
 

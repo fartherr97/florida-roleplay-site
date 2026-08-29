@@ -830,6 +830,27 @@ router.patch("/:id", async (req, res) => {
 
 /* ─── Presence ─────────────────────────────────────────────────────────────── */
 
+// transfer_viewers was added after the transfers tables first shipped, so a deploy that
+// has not re-run the schema can be missing it — which silently swallowed every presence
+// write and left the ticket showing "0 viewing". Create it on demand, the same way the
+// leadership table is, so presence works regardless of when the database was last built.
+let viewersTableReady = false;
+async function ensureViewersTable() {
+  if (viewersTableReady) return;
+  await query(`CREATE TABLE IF NOT EXISTS transfer_viewers (
+    transfer_id   VARCHAR(32)  NOT NULL,
+    viewer_id     VARCHAR(20)  NOT NULL,
+    viewer_name   VARCHAR(128) NOT NULL,
+    viewer_avatar VARCHAR(512) NULL,
+    last_seen     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (transfer_id, viewer_id),
+    CONSTRAINT fk_transfer_viewers FOREIGN KEY (transfer_id)
+      REFERENCES transfers(id) ON DELETE CASCADE
+  )`);
+  await query("CREATE INDEX IF NOT EXISTS idx_transfer_viewers_seen ON transfer_viewers (last_seen)");
+  viewersTableReady = true;
+}
+
 async function viewersFor(transferId) {
   const rows = await query(`SELECT viewer_id, viewer_name, viewer_avatar FROM transfer_viewers
       WHERE transfer_id = $1 AND last_seen >= (now() - make_interval(secs => $2))
@@ -844,6 +865,7 @@ router.get("/:id/presence", async (req, res) => {
   if (!session) return unauthorized(res);
   const transfer = await getTransfer(req.params.id).catch(() => null);
   if (!transfer || !canView(session, transfer)) return forbidden(res);
+  await ensureViewersTable().catch(() => {});
   return res.json(await viewersFor(req.params.id).catch(() => []));
 });
 
@@ -852,6 +874,8 @@ router.post("/:id/presence", async (req, res) => {
   if (!session) return unauthorized(res);
   const transfer = await getTransfer(req.params.id).catch(() => null);
   if (!transfer || !canView(session, transfer)) return forbidden(res);
+
+  await ensureViewersTable().catch(() => {});
 
   if (session.id) {
     try {
