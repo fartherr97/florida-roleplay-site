@@ -351,10 +351,12 @@ async function loadLeadershipRoles() {
  * sort before directors; within a group, by callsign then name. Best-effort —
  * a write failure never fails the roster sync that already landed.
  */
-async function writeLeadership(rows) {
+async function writeLeadership(rows, prune = true) {
   try {
     if (!rows.length) {
-      await query("DELETE FROM site_leadership");
+      // Only clear the table on a clean read — a partial read that happened to
+      // see no leaders must not blank the section.
+      if (prune) await query("DELETE FROM site_leadership");
       return;
     }
     for (const [i, r] of rows.entries()) {
@@ -368,7 +370,9 @@ async function writeLeadership(rows) {
         [r.discordId, r.name.slice(0, 128), r.roleLabel.slice(0, 64), r.handle.slice(0, 64), r.avatar, r.grp, r.callsign.slice(0, 16), i],
       );
     }
-    await query("DELETE FROM site_leadership WHERE NOT (discord_id = ANY($1))", [rows.map((r) => r.discordId)]);
+    if (prune) {
+      await query("DELETE FROM site_leadership WHERE NOT (discord_id = ANY($1))", [rows.map((r) => r.discordId)]);
+    }
   } catch {
     // Best-effort; a stale leadership row is harmless.
   }
@@ -441,6 +445,7 @@ export async function syncRosterFromGuild() {
     const byDept = {}; // department -> matched count, for the pull diagnostic
     const deptMembers = {}; // department -> [{ discordId, nickCallsign }] for callsigns
     const keep = [];
+    let leadershipCount = 0; // how many leaders were found, for the diagnostic
     for (const [discordId, data] of byId) {
       const held = [...data.roles].map(String);
       const resolved = resolveMember(
@@ -469,9 +474,10 @@ export async function syncRosterFromGuild() {
     // The public leadership team: whoever holds an Ownership or Director role,
     // named and pictured from Discord even if they never signed in. Placement is
     // by role id first (exact seat), with the mapped ownership-tier / management
-    // roles as a fallback. Only refreshed on a clean read so an outage doesn't
-    // blank the home page.
-    if (errors === 0) {
+    // roles as a fallback. Built from whatever was read — a department guild
+    // failing to read must not blank the leadership section, since these roles
+    // live in the main guild. Stale rows are only pruned on a fully clean read.
+    {
       const lead = await loadLeadershipRoles();
       const mainGuild = String(process.env.DISCORD_GUILD_ID ?? "").trim();
       const leadership = [];
@@ -531,7 +537,8 @@ export async function syncRosterFromGuild() {
           String(a.callsign).localeCompare(String(b.callsign), undefined, { numeric: true }) ||
           a.name.localeCompare(b.name),
       );
-      await writeLeadership(leadership);
+      leadershipCount = leadership.length;
+      await writeLeadership(leadership, errors === 0);
     }
 
     // Prune only on a clean full read, so a transient outage on one server does
@@ -561,7 +568,7 @@ export async function syncRosterFromGuild() {
     }
 
     lastSyncAt = Date.now();
-    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, byDept, errors, perGuild };
+    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, leadership: leadershipCount, byDept, errors, perGuild };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[roster-sync]", err?.code || err?.message || err);
