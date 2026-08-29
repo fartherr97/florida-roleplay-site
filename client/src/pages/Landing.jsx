@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, Bot, ChevronDown, Crown, ExternalLink, FileText, Newspaper,
+  ArrowRight, Bot, ChevronDown, ExternalLink, FileText, Newspaper,
   Pencil, ShieldCheck, UserPlus,
 } from "lucide-react";
 import Modal from "../components/ui/Modal";
@@ -276,7 +276,7 @@ export default function Landing() {
           {(leadership.ownership.length > 0 || isOwner) && (
             <LeadershipGroup
               label="Ownership"
-              icon={Crown}
+              logo="https://www.flrp.us/images/545caa3f9b31450e.png"
               members={leadership.ownership.length ? leadership.ownership : OWNERSHIP_SEATS}
               canEdit={isOwner}
               onEdit={setEditingSeat}
@@ -284,7 +284,7 @@ export default function Landing() {
           )}
           <LeadershipGroup
             label="Board of Directors"
-            icon={ShieldCheck}
+            logo="https://www.flrp.us/images/03dcce8e59da87ed.png"
             members={leadership.directors.length ? leadership.directors : DIRECTOR_SEATS}
             canEdit={isOwner}
             onEdit={setEditingSeat}
@@ -365,14 +365,18 @@ export default function Landing() {
 }
 
 /** One leadership band (Ownership / Board of Directors) with a header + count. */
-function LeadershipGroup({ label, icon: Icon, members, canEdit, onEdit }) {
+function LeadershipGroup({ label, icon: Icon, logo, members, canEdit, onEdit }) {
   if (!members || members.length === 0) return null;
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <span className="grid size-8 place-items-center rounded-lg bg-primary-500/12 text-primary-300 ring-1 ring-inset ring-primary-400/20">
-          <Icon className="size-4" />
-        </span>
+        {logo ? (
+          <img src={logo} alt="" className="size-9 shrink-0 object-contain" />
+        ) : (
+          <span className="grid size-8 place-items-center rounded-lg bg-primary-500/12 text-primary-300 ring-1 ring-inset ring-primary-400/20">
+            <Icon className="size-4" />
+          </span>
+        )}
         <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white">{label}</h3>
         <span className="h-px flex-1 bg-white/[0.06]" />
         <span className="text-xs font-bold tabular-nums text-slate-500">
