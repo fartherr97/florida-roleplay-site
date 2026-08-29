@@ -64,8 +64,10 @@ export default function TopBar() {
         .map((group) => ({
           ...group,
           items: group.items.filter((item) => {
-            const guard = guardFor(item.to);
-            return !guard || loading || hasPermission(guard.permission);
+            // An item can name its own permission (for a route that self-gates,
+            // like the bot dashboard); otherwise fall back to the route guard.
+            const permission = item.permission ?? guardFor(item.to)?.permission;
+            return !permission || loading || hasPermission(permission);
           }),
         }))
         .filter((group) => group.items.length > 0),

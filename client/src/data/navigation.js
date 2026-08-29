@@ -107,8 +107,11 @@ export const navGroups = [
       { label: "Site Administration", to: "/staff-hub/administration", icon: "SlidersHorizontal" },
       { label: "Access & Roles", to: "/staff-hub/access", icon: "KeyRound" },
       { label: "Image Hosting Administration", to: "/management/image-hosting", icon: "Image" },
-      { label: "Contact Management", to: "/management/contact", icon: "Mail" },
-      { label: "Bot Dashboard", to: "/management/bot", icon: "Bot" },
+      // The route stays open (a public contact form) but the link is management-only.
+      { label: "Contact Management", to: "/management/contact", icon: "Mail", permission: "permissions.manage" },
+      // The bot dashboard has its own session-based gate; hide the link from anyone
+      // who isn't management so the tab doesn't leak to signed-out visitors.
+      { label: "Bot Dashboard", to: "/management/bot", icon: "Bot", permission: "permissions.manage" },
     ],
   },
 ];
