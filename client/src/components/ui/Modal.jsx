@@ -42,7 +42,11 @@ export default function Modal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            // A plain scrim, not a backdrop-blur. Blurring the whole viewport forces
+            // the browser to re-composite everything behind the dialog on every repaint
+            // — so a modal over a long roster stutters on each keystroke. A darker solid
+            // scrim reads the same and costs nothing per frame.
+            className="absolute inset-0 bg-black/70"
           />
           <motion.div
             role="dialog"
