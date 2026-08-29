@@ -64,6 +64,9 @@ export class ApiForbiddenError extends Error {
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
+    // Never serve an API read from the browser's HTTP cache — a just-saved edit
+    // must not be masked by a stale cached response when the page is revisited.
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       ...previewHeaders(),

@@ -302,15 +302,20 @@ router.put("/leadership/:seatKey", async (req, res) => {
   if (avatarUrl && !/^https?:\/\//i.test(avatarUrl)) {
     return res.status(400).json({ ok: false, message: "Avatar must be an http(s) URL." });
   }
+  // Only the seats we define are editable; this also supplies grp/title/order so
+  // the row can be created if its seed is somehow missing.
+  const def = LEADERSHIP_FALLBACK_SEATS.find((s) => s.seatKey === seatKey);
+  if (!def) return res.status(404).json({ ok: false, message: "No such seat." });
   try {
     const rows = await query(
-      `UPDATE leadership_seats
-         SET name = $2, handle = $3, discord_id = $4, avatar_url = $5, updated_at = CURRENT_TIMESTAMP
-       WHERE seat_key = $1
+      `INSERT INTO leadership_seats (seat_key, grp, title, name, handle, discord_id, avatar_url, sort_order, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+       ON CONFLICT (seat_key) DO UPDATE SET
+         name = EXCLUDED.name, handle = EXCLUDED.handle, discord_id = EXCLUDED.discord_id,
+         avatar_url = EXCLUDED.avatar_url, updated_at = CURRENT_TIMESTAMP
        RETURNING seat_key, grp, title, name, handle, discord_id, avatar_url`,
-      [seatKey, name, handle, discordId, avatarUrl || null],
+      [seatKey, def.grp, def.title, name, handle, discordId, avatarUrl || null, def.order],
     );
-    if (!rows.length) return res.status(404).json({ ok: false, message: "No such seat." });
     return res.json({ ok: true, seat: shapeSeat(rows[0]) });
   } catch {
     return res.status(503).json({ ok: false, message: "The leadership store isn't available." });
