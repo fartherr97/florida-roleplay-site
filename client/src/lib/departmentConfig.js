@@ -299,6 +299,17 @@ const DEFAULT_MEMBER_FIELDS = [
  * older build, a hand-edited backup or a half-finished Builder session still
  * renders instead of throwing somewhere deep in a page.
  */
+/** A rank-seniority override map — string role keys to finite integer orders. */
+function normalizeRankOrder(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const n = Number(value);
+    if (key && Number.isFinite(n)) out[String(key)] = Math.trunc(n);
+  }
+  return out;
+}
+
 export function normalizeConfig(raw, id) {
   const config = raw && typeof raw === "object" ? raw : {};
   const branding = config.branding || {};
@@ -388,6 +399,11 @@ export function normalizeConfig(raw, id) {
         min: Number.isFinite(roster.callsigns?.min) ? Math.max(0, Math.trunc(roster.callsigns.min)) : 0,
         max: Number.isFinite(roster.callsigns?.max) ? Math.max(0, Math.trunc(roster.callsigns.max)) : 0,
       },
+      // A department-local override of rank seniority — { roleKey: order } — set
+      // from the roster's Rank order control, so command can reorder ranks (e.g.
+      // put a Lieutenant Colonel below a Colonel) without touching the site-wide
+      // role map. Empty means every rank keeps its mapped order.
+      rankOrder: normalizeRankOrder(roster.rankOrder),
       subdivisions: (Array.isArray(roster.subdivisions) ? roster.subdivisions : []).map(
         (sub, index) => ({
           id: String(sub.id ?? `sub-${index}`),

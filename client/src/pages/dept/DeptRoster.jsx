@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, Trash2, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -41,9 +41,10 @@ const STATUS_OPTIONS = [
  */
 export default function DeptRoster({ page, config }) {
   const { hasPermission } = useAuth();
-  const { id, can } = useDeptConfig();
+  const { id, can, mutate } = useDeptConfig();
   const canEditRoster = can("editRoster");
   const [managing, setManaging] = useState(null); // "new" | member row | null
+  const [rankOpen, setRankOpen] = useState(false);
   const [loaded, setLoaded] = useState({ id: null, subdivisions: [] });
   const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState("");
@@ -132,6 +133,12 @@ export default function DeptRoster({ page, config }) {
     setReloadKey((key) => key + 1);
   };
 
+  // The department's manual rank-seniority override. Applied here as well as on the
+  // server so a save from the Rank order control reorders the roster instantly.
+  const rankOrder = config.roster?.rankOrder ?? {};
+  const effOrder = (member) =>
+    (member.roleKey != null && member.roleKey in rankOrder ? rankOrder[member.roleKey] : member.order) ?? 0;
+
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return (active?.categories ?? [])
@@ -140,16 +147,60 @@ export default function DeptRoster({ page, config }) {
         label: category.name,
         color: category.color,
         insigniaUrl: category.insigniaUrl,
-        rows: category.members.filter((member) => {
-          if (status !== "all" && member.status !== status) return false;
-          if (!needle) return true;
-          return [member.characterName, member.rank, member.rankFull, member.callsign]
-            .filter(Boolean)
-            .some((value) => String(value).toLowerCase().includes(needle));
-        }),
+        rows: category.members
+          .filter((member) => {
+            if (status !== "all" && member.status !== status) return false;
+            if (!needle) return true;
+            return [member.characterName, member.rank, member.rankFull, member.callsign]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(needle));
+          })
+          .sort(
+            (a, b) =>
+              effOrder(b) - effOrder(a) ||
+              String(a.callsign || "").localeCompare(String(b.callsign || ""), undefined, { numeric: true }) ||
+              String(a.characterName || "").localeCompare(String(b.characterName || "")),
+          ),
       }))
       .filter((group) => group.rows.length > 0);
-  }, [active, query, status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, query, status, rankOrder]);
+
+  // The distinct ranks on the roster, richest first — what the Rank order control reorders.
+  const rankList = useMemo(() => {
+    const seen = new Map();
+    for (const sub of subdivisions) {
+      for (const category of sub.categories ?? []) {
+        for (const member of category.members ?? []) {
+          if (!member.roleKey || seen.has(member.roleKey)) continue;
+          seen.set(member.roleKey, {
+            roleKey: member.roleKey,
+            label: member.rankFull || member.rank || member.roleKey,
+            order: effOrder(member),
+          });
+        }
+      }
+    }
+    return [...seen.values()].sort((a, b) => b.order - a.order);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subdivisions, rankOrder]);
+
+  // Reuse the reordered ranks' own order values, reassigned top-first, so each rank
+  // keeps its band and only its position relative to its neighbours changes.
+  const saveRankOrder = async (ordered) => {
+    const values = ordered.map((r) => r.order).sort((a, b) => b - a);
+    await mutate(
+      (c) => {
+        const next = { ...(c.roster?.rankOrder ?? {}) };
+        ordered.forEach((r, i) => {
+          next[r.roleKey] = values[i];
+        });
+        return { ...c, roster: { ...c.roster, rankOrder: next } };
+      },
+      { immediate: true },
+    );
+    setRankOpen(false);
+  };
 
   const totals = useMemo(
     () =>
@@ -293,6 +344,12 @@ export default function DeptRoster({ page, config }) {
             ]}
           />
         </div>
+        {canEditRoster && rankList.length > 1 && (
+          <Button variant="ghost" size="sm" onClick={() => setRankOpen(true)}>
+            <ListOrdered className="size-4" />
+            Rank order
+          </Button>
+        )}
         {canEditRoster && (
           <Button variant="ghost" size="sm" onClick={() => setManaging("new")}>
             <Plus className="size-4" />
@@ -353,7 +410,90 @@ export default function DeptRoster({ page, config }) {
           }}
         />
       )}
+
+      {rankOpen && (
+        <RankOrderModal ranks={rankList} onClose={() => setRankOpen(false)} onSave={saveRankOrder} />
+      )}
     </>
+  );
+}
+
+/**
+ * Reorder ranks by hand — the manual alternative to editing seniority numbers on
+ * the role-mapping page. It moves ranks up and down and saves a department-local
+ * override, so command can, say, drop a Lieutenant Colonel below a Colonel without
+ * touching the site-wide role map. Every rank keeps its band; only its position
+ * among its neighbours changes.
+ */
+function RankOrderModal({ ranks, onClose, onSave }) {
+  const [items, setItems] = useState(ranks);
+  const [saving, setSaving] = useState(false);
+
+  const move = (index, delta) => {
+    const next = index + delta;
+    if (next < 0 || next >= items.length) return;
+    setItems((list) => {
+      const copy = [...list];
+      [copy[index], copy[next]] = [copy[next], copy[index]];
+      return copy;
+    });
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await onSave(items);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Rank order" className="max-w-md">
+      <p className="mb-4 text-xs leading-relaxed text-slate-500">
+        Highest rank at the top. Move a rank up or down to set who outranks whom on this
+        department's roster and chain of command — no role-map edit needed.
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((rank, index) => (
+          <li
+            key={rank.roleKey}
+            className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+          >
+            <span className="w-5 shrink-0 text-center text-xs font-bold text-slate-500">{index + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{rank.label}</span>
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => move(index, -1)}
+                disabled={index === 0}
+                aria-label={`Move ${rank.label} up`}
+                className="grid size-7 place-items-center rounded-lg text-slate-400 ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+              >
+                <ArrowUp className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(index, 1)}
+                disabled={index === items.length - 1}
+                aria-label={`Move ${rank.label} down`}
+                className="grid size-7 place-items-center rounded-lg text-slate-400 ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+              >
+                <ArrowDown className="size-3.5" />
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={submit} disabled={saving}>
+          {saving ? "Saving…" : "Save order"}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 

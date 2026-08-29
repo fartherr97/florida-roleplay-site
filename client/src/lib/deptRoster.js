@@ -42,12 +42,16 @@ export function roleKeyFor(entry, roleMap) {
  * that should hold it is a routine state, and silently dropping those people
  * would look like the roster was broken.
  */
-export function projectSubdivision(subdivision, members, roleMap) {
-  const withRole = members.map((entry) => ({
-    ...entry,
-    roleKey: roleKeyFor(entry, roleMap),
-    order: (roleMap || []).find((role) => role.key === roleKeyFor(entry, roleMap))?.order ?? 0,
-  }));
+export function projectSubdivision(subdivision, members, roleMap, rankOrder = null) {
+  const withRole = members.map((entry) => {
+    const roleKey = roleKeyFor(entry, roleMap);
+    const base = (roleMap || []).find((role) => role.key === roleKey)?.order ?? 0;
+    // A department can override rank seniority locally (config.roster.rankOrder,
+    // set from the roster's Rank order control) without touching the site-wide
+    // role map; that override wins over the mapped order when present.
+    const order = rankOrder && roleKey != null && roleKey in rankOrder ? rankOrder[roleKey] : base;
+    return { ...entry, roleKey, order };
+  });
 
   const claimed = new Set();
   const categories = (subdivision.categories || []).map((category) => {
@@ -92,13 +96,14 @@ function sortMembers(rows) {
  */
 export function projectRoster(config, roster, roleMap) {
   const members = (roster || []).filter((entry) => entry.department === config.id);
+  const rankOrder = config.roster?.rankOrder || null;
   return (config.roster?.subdivisions || []).map((subdivision) => {
     const scoped = subdivision.roleKeys?.length
       ? members.filter((entry) => subdivision.roleKeys.includes(roleKeyFor(entry, roleMap)))
       : members;
     return {
       ...subdivision,
-      categories: projectSubdivision(subdivision, scoped, roleMap),
+      categories: projectSubdivision(subdivision, scoped, roleMap, rankOrder),
       total: scoped.length,
     };
   });
