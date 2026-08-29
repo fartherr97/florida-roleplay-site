@@ -231,6 +231,15 @@ router.get("/rules", (req, res) => {
 
 /* ------------------------------------------------------------ leadership */
 
+// The fixed director seats, shown even when nobody holds them (as "Vacant").
+// A director is matched to a seat by their role label / nickname keyword.
+const DIRECTOR_SEATS = [
+  { key: "staff", label: "Staff Director", match: /staff/i },
+  { key: "es", label: "ES Director", match: /\bes\b|emergenc|\bservices?\b/i },
+  { key: "dev", label: "Dev. Director", match: /\bdev/i },
+  { key: "civilian", label: "Civilian Director", match: /civ/i },
+];
+
 /** The public leadership team, grouped, kept current by the Discord sync. */
 router.get("/leadership", (_req, res) => {
   safe(
@@ -247,9 +256,29 @@ router.get("/leadership", (_req, res) => {
         avatar: r.avatar,
         callsign: r.callsign,
       });
+
+      const directorRows = rows.filter((r) => r.grp === "directors");
+      const taken = new Set();
+      // Fill each seat with the first director whose label/name matches it.
+      const seats = DIRECTOR_SEATS.map((seat) => {
+        const held = directorRows.find(
+          (r) => !taken.has(r.discord_id) && (seat.match.test(r.role_label || "") || seat.match.test(r.name || "")),
+        );
+        if (held) {
+          taken.add(held.discord_id);
+          return { seat: seat.label, vacant: false, ...map(held) };
+        }
+        return { seat: seat.label, vacant: true };
+      });
+      // Any director who didn't match a known seat still gets a card, so nobody
+      // is dropped — labelled by their own role.
+      const extras = directorRows
+        .filter((r) => !taken.has(r.discord_id))
+        .map((r) => ({ seat: r.role_label || "Director", vacant: false, ...map(r) }));
+
       return {
         ownership: rows.filter((r) => r.grp === "ownership").map(map),
-        directors: rows.filter((r) => r.grp === "directors").map(map),
+        directors: [...seats, ...extras],
       };
     },
     { ownership: [], directors: [] },

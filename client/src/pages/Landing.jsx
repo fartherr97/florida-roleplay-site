@@ -327,16 +327,38 @@ function LeadershipGroup({ label, icon: Icon, members }) {
         </span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {members.map((m) => (
-          <LeadershipCard key={m.discordId || `${m.name}-${m.role}`} member={m} />
+        {members.map((m, i) => (
+          <LeadershipCard key={m.discordId || m.seat || `${m.name}-${i}`} member={m} />
         ))}
       </div>
     </div>
   );
 }
 
-/** A single leader: avatar, role, their Discord nickname line, and a profile link. */
+/** A single leader: avatar, role/seat, their Discord nickname line and a profile
+ *  link — or, for an unfilled director seat, a dashed "Vacant" card. */
 function LeadershipCard({ member }) {
+  // The small label is the fixed seat name for directors, else their live role.
+  const label = member.seat || member.role;
+
+  if (member.vacant) {
+    return (
+      <div className="flex items-center gap-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-4">
+        <span className="grid size-14 shrink-0 place-items-center rounded-full border border-dashed border-white/15 text-slate-600">
+          <ShieldCheck className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          {label && (
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              {label}
+            </p>
+          )}
+          <p className="mt-0.5 truncate text-sm font-semibold italic text-slate-500">Vacant</p>
+        </div>
+      </div>
+    );
+  }
+
   const initials = (member.name || "?")
     .split(/[\s.|]+/)
     .filter(Boolean)
@@ -361,9 +383,9 @@ function LeadershipCard({ member }) {
         </span>
       )}
       <div className="min-w-0 flex-1">
-        {member.role && (
+        {label && (
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-primary-400">
-            {member.role}
+            {label}
           </p>
         )}
         <p className="mt-0.5 truncate text-sm font-bold text-white" title={line}>
