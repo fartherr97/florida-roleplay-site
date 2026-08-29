@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Menu } from "lucide-react";
+import { ArrowLeft, Home, Menu } from "lucide-react";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import NavDropdown from "../layout/NavDropdown";
@@ -93,6 +93,13 @@ export default function DeptTopBar({ config, base, groups, saveState, saveMessag
                 </Badge>
               </span>
             )}
+
+            <span className="hidden lg:block">
+              <Button as={Link} to="/" variant="ghost" size="sm">
+                <Home className="size-4" />
+                Main site
+              </Button>
+            </span>
 
             <span className="hidden lg:block">
               <Button as={Link} to="/departments" variant="ghost" size="sm">
