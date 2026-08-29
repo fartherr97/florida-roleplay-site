@@ -231,60 +231,89 @@ router.get("/rules", (req, res) => {
 
 /* ------------------------------------------------------------ leadership */
 
-// The fixed director seats, shown even when nobody holds them (as "Vacant"),
-// in order of seniority. A director's stored role_label is the exact seat name
-// (the sync sets it from the role id), so seats fill by an exact-label match.
-const DIRECTOR_SEATS = [
-  "Staff Director",
-  "ES Director",
-  "Dev. Director",
-  "Civilian Director",
-  "Asst. Staff Director",
-  "Asst. ES Director",
-  "Asst. Dev. Director",
-  "Asst. Civilian Director",
+// The seats shown when there is no database, so the section still renders.
+const LEADERSHIP_FALLBACK_SEATS = [
+  { seatKey: "owner", grp: "ownership", title: "Owner", order: 0 },
+  { seatKey: "co-owner", grp: "ownership", title: "Co-Owner", order: 1 },
+  { seatKey: "staff-director", grp: "directors", title: "Staff Director", order: 0 },
+  { seatKey: "es-director", grp: "directors", title: "ES Director", order: 1 },
+  { seatKey: "dev-director", grp: "directors", title: "Dev. Director", order: 2 },
+  { seatKey: "civilian-director", grp: "directors", title: "Civilian Director", order: 3 },
+  { seatKey: "asst-staff-director", grp: "directors", title: "Asst. Staff Director", order: 4 },
+  { seatKey: "asst-es-director", grp: "directors", title: "Asst. ES Director", order: 5 },
+  { seatKey: "asst-dev-director", grp: "directors", title: "Asst. Dev. Director", order: 6 },
+  { seatKey: "asst-civilian-director", grp: "directors", title: "Asst. Civilian Director", order: 7 },
 ];
 
-/** The public leadership team, grouped, kept current by the Discord sync. */
+function shapeSeat(r) {
+  const name = (r.name || "").trim();
+  return {
+    seatKey: r.seat_key ?? r.seatKey,
+    seat: r.title,
+    role: r.title,
+    grp: r.grp,
+    vacant: !name,
+    name,
+    handle: r.handle || "",
+    discordId: r.discord_id || "",
+    avatar: r.avatar_url || null,
+  };
+}
+
+/** The public leadership team — a fixed set of seats, edited by hand. */
 router.get("/leadership", (_req, res) => {
   safe(
     res,
     async () => {
       const rows = await query(
-        "SELECT discord_id, name, role_label, handle, avatar, grp, callsign FROM site_leadership ORDER BY grp DESC, sort_order, callsign, name",
+        "SELECT seat_key, grp, title, name, handle, discord_id, avatar_url, sort_order FROM leadership_seats ORDER BY grp DESC, sort_order, title",
       );
-      const map = (r) => ({
-        discordId: r.discord_id,
-        name: r.name,
-        role: r.role_label,
-        handle: r.handle,
-        avatar: r.avatar,
-        callsign: r.callsign,
-      });
-
-      const directorRows = rows.filter((r) => r.grp === "directors");
-      const taken = new Set();
-      const seats = DIRECTOR_SEATS.map((label) => {
-        const held = directorRows.find((r) => !taken.has(r.discord_id) && r.role_label === label);
-        if (held) {
-          taken.add(held.discord_id);
-          return { seat: label, vacant: false, ...map(held) };
-        }
-        return { seat: label, vacant: true };
-      });
-      // A director whose role isn't one of the known seats still gets a card,
-      // labelled by their own role, so nobody is dropped.
-      const extras = directorRows
-        .filter((r) => !taken.has(r.discord_id))
-        .map((r) => ({ seat: r.role_label || "Director", vacant: false, ...map(r) }));
-
+      const seats = (rows.length ? rows : LEADERSHIP_FALLBACK_SEATS.map((s) => ({
+        seat_key: s.seatKey, grp: s.grp, title: s.title, sort_order: s.order,
+      }))).map(shapeSeat);
       return {
-        ownership: rows.filter((r) => r.grp === "ownership").map(map),
-        directors: [...seats, ...extras],
+        ownership: seats.filter((s) => s.grp === "ownership"),
+        directors: seats.filter((s) => s.grp === "directors"),
       };
     },
-    { ownership: [], directors: [] },
+    {
+      ownership: LEADERSHIP_FALLBACK_SEATS.filter((s) => s.grp === "ownership").map((s) => ({ seatKey: s.seatKey, seat: s.title, role: s.title, grp: s.grp, vacant: true, name: "", handle: "", discordId: "", avatar: null })),
+      directors: LEADERSHIP_FALLBACK_SEATS.filter((s) => s.grp === "directors").map((s) => ({ seatKey: s.seatKey, seat: s.title, role: s.title, grp: s.grp, vacant: true, name: "", handle: "", discordId: "", avatar: null })),
+    },
   );
+});
+
+// Ownership-only: edit one seat's occupant. A seat is cleared to Vacant by
+// saving a blank name.
+router.put("/leadership/:seatKey", async (req, res) => {
+  if (!req.user?.roles?.includes("ownership")) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Ownership only." });
+  }
+  const seatKey = String(req.params.seatKey || "");
+  const b = req.body ?? {};
+  const name = String(b.name ?? "").slice(0, 128).trim();
+  const handle = String(b.handle ?? "").replace(/^@/, "").slice(0, 64).trim();
+  const discordId = String(b.discordId ?? "").trim();
+  const avatarUrl = String(b.avatarUrl ?? "").slice(0, 2048).trim();
+  if (discordId && !/^\d{17,20}$/.test(discordId)) {
+    return res.status(400).json({ ok: false, message: "Discord ID must be 17–20 digits." });
+  }
+  if (avatarUrl && !/^https?:\/\//i.test(avatarUrl)) {
+    return res.status(400).json({ ok: false, message: "Avatar must be an http(s) URL." });
+  }
+  try {
+    const rows = await query(
+      `UPDATE leadership_seats
+         SET name = $2, handle = $3, discord_id = $4, avatar_url = $5, updated_at = CURRENT_TIMESTAMP
+       WHERE seat_key = $1
+       RETURNING seat_key, grp, title, name, handle, discord_id, avatar_url`,
+      [seatKey, name, handle, discordId, avatarUrl || null],
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, message: "No such seat." });
+    return res.json({ ok: true, seat: shapeSeat(rows[0]) });
+  } catch {
+    return res.status(503).json({ ok: false, message: "The leadership store isn't available." });
+  }
 });
 
 /* ----------------------------------------------------------------- staff */

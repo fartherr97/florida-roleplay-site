@@ -290,139 +290,6 @@ async function assignDeptCallsigns(deptId, members, meta) {
   }
 }
 
-/** The role segment of a "callsign | role | name" nickname, e.g. "Owner". */
-function nickRole(nick) {
-  const parts = String(nick ?? "").split("|").map((p) => p.trim()).filter(Boolean);
-  return parts.length >= 3 ? parts[1] : "";
-}
-
-/**
- * The leadership Discord roles, keyed by their real snowflake in the main FLRP
- * guild. Membership of one of these roles is what puts someone on the home
- * page's Leadership section — no site login or nickname parsing needed. The
- * ownership titles and the director seats are fixed here, in order of seniority.
- */
-const LEADERSHIP_ROLES = {
-  ownership: [
-    { id: "1534380747689824276", label: "Owner" },
-    { id: "1534911243142303744", label: "Co-Owner" },
-  ],
-  directorSeats: [
-    { id: "1535994200808497162", label: "Staff Director" },
-    { id: "1535994241392582706", label: "ES Director" },
-    { id: "1535994278193528912", label: "Dev. Director" },
-    { id: "1535994315258724415", label: "Civilian Director" },
-    { id: "1542221076216676422", label: "Asst. Staff Director" },
-    { id: "1542221112442618027", label: "Asst. ES Director" },
-    { id: "1542221148102725642", label: "Asst. Dev. Director" },
-    { id: "1542221004561190983", label: "Asst. Civilian Director" },
-  ],
-};
-
-/**
- * The Discord roles that mark someone as leadership, split into the two groups
- * the home page shows: the Ownership tier role(s), and every role mapped to the
- * `management` department (Directorship). Read from the live role map, falling
- * back to the seed so it works before anything is stored.
- */
-async function loadLeadershipRoles() {
-  const ownership = new Set();
-  const directors = new Set();
-  try {
-    const rows = await query("SELECT role_id, role_key, department, kind FROM roster_role_map");
-    if (rows.length) {
-      for (const r of rows) {
-        const id = String(r.role_id);
-        if (r.role_key === "ownership" || (r.kind === "tier" && /owner/i.test(r.role_key || ""))) ownership.add(id);
-        if (r.department === "management") directors.add(id);
-      }
-      return { ownership, directors };
-    }
-  } catch {
-    // No database — fall through to the seed.
-  }
-  for (const r of seed.SPECIAL_ROLES ?? []) if (r.key === "ownership") ownership.add(String(r.roleId));
-  for (const r of seed.ROLE_MAP) if (r.department === "management") directors.add(String(r.roleId));
-  return { ownership, directors };
-}
-
-/**
- * Replace the public leadership team from the members just read. Ownership rows
- * sort before directors; within a group, by callsign then name. Best-effort —
- * a write failure never fails the roster sync that already landed.
- */
-async function writeLeadership(rows, prune = true) {
-  try {
-    if (!rows.length) {
-      // Only clear the table on a clean read — a partial read that happened to
-      // see no leaders must not blank the section.
-      if (prune) await query("DELETE FROM site_leadership");
-      return;
-    }
-    for (const [i, r] of rows.entries()) {
-      await query(
-        `INSERT INTO site_leadership (discord_id, name, role_label, handle, avatar, grp, callsign, sort_order, synced_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
-         ON CONFLICT (discord_id) DO UPDATE SET
-           name = EXCLUDED.name, role_label = EXCLUDED.role_label, handle = EXCLUDED.handle,
-           avatar = EXCLUDED.avatar, grp = EXCLUDED.grp, callsign = EXCLUDED.callsign,
-           sort_order = EXCLUDED.sort_order, synced_at = CURRENT_TIMESTAMP`,
-        [r.discordId, r.name.slice(0, 128), r.roleLabel.slice(0, 64), r.handle.slice(0, 64), r.avatar, r.grp, r.callsign.slice(0, 16), i],
-      );
-    }
-    if (prune) {
-      await query("DELETE FROM site_leadership WHERE NOT (discord_id = ANY($1))", [rows.map((r) => r.discordId)]);
-    }
-  } catch {
-    // Best-effort; a stale leadership row is harmless.
-  }
-}
-
-/**
- * Diagnose why the leadership section is empty: which guilds were read, and how
- * many members hold each leadership role the site sees. If a role shows 0
- * holders the bot isn't seeing it (wrong guild, Members Intent off, or a role
- * id mismatch); if holders are found but `storedCount` is 0 the write is
- * failing (usually a missing table). Gated to staff by its route.
- */
-export async function leadershipDebug() {
-  const guildIds = await collectGuildIds();
-  const perGuild = [];
-  const byId = new Map();
-  for (const gid of guildIds) {
-    try {
-      const members = await fetchGuildMembers(gid);
-      if (!members) {
-        perGuild.push({ guildId: gid, ok: false, error: "not-configured" });
-        continue;
-      }
-      perGuild.push({ guildId: gid, ok: true, count: members.length });
-      for (const m of members) {
-        const cur = byId.get(m.id) ?? { roles: new Set() };
-        for (const r of m.roles) cur.roles.add(String(r));
-        byId.set(m.id, cur);
-      }
-    } catch (err) {
-      perGuild.push({ guildId: gid, ok: false, error: err?.code || err?.message || "failed" });
-    }
-  }
-  const holders = {};
-  for (const role of [...LEADERSHIP_ROLES.ownership, ...LEADERSHIP_ROLES.directorSeats]) {
-    let n = 0;
-    for (const [, data] of byId) if (data.roles.has(role.id)) n += 1;
-    holders[role.label] = n;
-  }
-  let tableOk = true;
-  let storedCount = null;
-  try {
-    const rows = await query("SELECT COUNT(*)::int AS n FROM site_leadership");
-    storedCount = rows[0]?.n ?? 0;
-  } catch {
-    tableOk = false;
-  }
-  return { guildIds, perGuild, scanned: byId.size, holders, tableOk, storedCount };
-}
-
 let lastSyncAt = 0;
 let inProgress = false;
 const MIN_INTERVAL_MS = 60_000;
@@ -467,15 +334,12 @@ export async function syncRosterFromGuild() {
       ok += 1;
       perGuild.push({ guildId: gid, ok: true, count: members.length, error: null });
       for (const m of members) {
-        const cur = byId.get(m.id) ?? { roles: new Set(), name: "", nicks: {}, username: "", avatar: null };
+        const cur = byId.get(m.id) ?? { roles: new Set(), name: "", nicks: {} };
         for (const r of m.roles) cur.roles.add(r);
         // Keep each guild's nickname so a department roster can read the name and
         // callsign from its own server.
         if (m.nick) cur.nicks[gid] = m.nick;
         if (!cur.name) cur.name = m.displayName || m.username || "";
-        // Handle and avatar for the public leadership team — first seen wins.
-        if (!cur.username) cur.username = m.username || "";
-        if (!cur.avatar && m.avatar) cur.avatar = m.avatar;
         byId.set(m.id, cur);
       }
     }
@@ -490,7 +354,6 @@ export async function syncRosterFromGuild() {
     const byDept = {}; // department -> matched count, for the pull diagnostic
     const deptMembers = {}; // department -> [{ discordId, nickCallsign }] for callsigns
     const keep = [];
-    let leadershipCount = 0; // how many leaders were found, for the diagnostic
     for (const [discordId, data] of byId) {
       const held = [...data.roles].map(String);
       const resolved = resolveMember(
@@ -514,76 +377,6 @@ export async function syncRosterFromGuild() {
           (deptMembers[d] ??= []).push({ discordId, nickCallsign });
         }
       }
-    }
-
-    // The public leadership team: whoever holds an Ownership or Director role,
-    // named and pictured from Discord even if they never signed in. Placement is
-    // by role id first (exact seat), with the mapped ownership-tier / management
-    // roles as a fallback. Built from whatever was read — a department guild
-    // failing to read must not blank the leadership section, since these roles
-    // live in the main guild. Stale rows are only pruned on a fully clean read.
-    {
-      const lead = await loadLeadershipRoles();
-      const mainGuild = String(process.env.DISCORD_GUILD_ID ?? "").trim();
-      const leadership = [];
-      for (const [discordId, data] of byId) {
-        const held = data.roles;
-        let grp = null;
-        let roleLabel = "";
-        let order = 0;
-
-        // 1. Exact leadership roles by id — Owner/Co-Owner, then the director seats.
-        const owner = LEADERSHIP_ROLES.ownership.find((r) => held.has(r.id));
-        if (owner) {
-          grp = "ownership";
-          roleLabel = owner.label;
-          order = LEADERSHIP_ROLES.ownership.indexOf(owner);
-        } else {
-          const seatIdx = LEADERSHIP_ROLES.directorSeats.findIndex((r) => held.has(r.id));
-          if (seatIdx !== -1) {
-            grp = "directors";
-            roleLabel = LEADERSHIP_ROLES.directorSeats[seatIdx].label;
-            order = seatIdx;
-          }
-        }
-
-        // 2. Fallback: the mapped ownership-tier / management-department roles,
-        //    labelled from the nickname's role segment.
-        if (!grp) {
-          const isOwner = [...lead.ownership].some((id) => held.has(id));
-          const isDirector = !isOwner && [...lead.directors].some((id) => held.has(id));
-          if (isOwner) {
-            grp = "ownership";
-            order = 90;
-          } else if (isDirector) {
-            grp = "directors";
-            order = 90;
-          }
-        }
-        if (!grp) continue;
-
-        const nick = data.nicks[mainGuild] || Object.values(data.nicks)[0] || "";
-        const parsed = parseNick(nick);
-        leadership.push({
-          discordId,
-          name: parsed.name || data.name || data.username || "Member",
-          roleLabel: roleLabel || nickRole(nick) || (grp === "ownership" ? "Ownership" : "Director"),
-          handle: data.username || "",
-          avatar: data.avatar || null,
-          grp,
-          callsign: parsed.callsign || "",
-          order,
-        });
-      }
-      leadership.sort(
-        (a, b) =>
-          (a.grp === b.grp ? 0 : a.grp === "ownership" ? -1 : 1) ||
-          a.order - b.order ||
-          String(a.callsign).localeCompare(String(b.callsign), undefined, { numeric: true }) ||
-          a.name.localeCompare(b.name),
-      );
-      leadershipCount = leadership.length;
-      await writeLeadership(leadership, errors === 0);
     }
 
     // Prune only on a clean full read, so a transient outage on one server does
@@ -613,7 +406,7 @@ export async function syncRosterFromGuild() {
     }
 
     lastSyncAt = Date.now();
-    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, leadership: leadershipCount, byDept, errors, perGuild };
+    return { configured: true, guilds: guildIds.length, scanned: byId.size, matched: keep.length, byDept, errors, perGuild };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("[roster-sync]", err?.code || err?.message || err);

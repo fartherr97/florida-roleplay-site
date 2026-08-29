@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, leadershipDebug } from "../lib/rosterSync.js";
+import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild } from "../lib/rosterSync.js";
 import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
@@ -290,22 +290,6 @@ router.post("/pull", requirePermission("discord.roles.manage"), async (_req, res
   return res.json(result);
 });
 
-// Why is the leadership section empty? Reports which guilds were read and how
-// many members hold each leadership role, plus whether the store is writable.
-router.get("/leadership-debug", requirePermission("discord.roles.manage"), async (_req, res) => {
-  return res.json(await leadershipDebug());
-});
-
-// Ownership-only: force a full Discord sync, which rebuilds the home page's
-// leadership team. Gated on the ownership role rather than a permission so only
-// owners see and use it.
-router.post("/leadership-resync", async (req, res) => {
-  if (!req.user?.roles?.includes("ownership")) {
-    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Ownership only." });
-  }
-  const result = await syncRosterFromGuild();
-  return res.json(result);
-});
 
 router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>
   (async () => {

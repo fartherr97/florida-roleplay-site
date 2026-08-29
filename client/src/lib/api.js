@@ -429,11 +429,12 @@ export const api = {
     }),
   rosterSyncLog: () => get("/roster/sync-log", rosterMock.syncLog),
 
-  /** The public leadership team (ownership + directors), synced from Discord. */
+  /** The public leadership team — a fixed set of seats, edited by Ownership. */
   leadership: () => get("/leadership", { ownership: [], directors: [] }),
 
-  /** Ownership-only: force a Discord sync that rebuilds the leadership team. */
-  leadershipResync: () => post("/roster/leadership-resync", {}, () => ({ ok: false, message: NOT_PERSISTED })),
+  /** Ownership-only: set (or clear) who fills one leadership seat. */
+  updateLeadershipSeat: (seatKey, patch) =>
+    put(`/leadership/${encodeURIComponent(seatKey)}`, patch, () => ({ ok: false, message: NOT_PERSISTED })),
 
   civBusinesses: () => get("/civilian-hub/businesses", civ.businesses),
   civPenalCode: (q = "") => {

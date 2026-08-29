@@ -516,21 +516,36 @@ CREATE TABLE IF NOT EXISTS dept_callsigns (
   PRIMARY KEY (department, discord_id)
 );
 
--- The leadership team the public home page shows, kept current by the Discord
--- sync: whoever holds an Ownership or Directorship role, tracked by role
--- membership so someone who has never signed into the site still appears.
-CREATE TABLE IF NOT EXISTS site_leadership (
-  discord_id  VARCHAR(20)  NOT NULL,
-  name        VARCHAR(128) NOT NULL,
-  role_label  VARCHAR(64)  NOT NULL DEFAULT '',
-  handle      VARCHAR(64)  NOT NULL DEFAULT '',
-  avatar      TEXT         NULL,
+-- The leadership team the public home page shows — a fixed set of seats
+-- (Ownership + the Board of Directors), edited by hand by Ownership. A seat with
+-- no name renders as "Vacant".
+CREATE TABLE IF NOT EXISTS leadership_seats (
+  seat_key    VARCHAR(48)  NOT NULL,
   grp         VARCHAR(16)  NOT NULL,
-  callsign    VARCHAR(16)  NOT NULL DEFAULT '',
+  title       VARCHAR(64)  NOT NULL,
+  name        VARCHAR(128) NOT NULL DEFAULT '',
+  handle      VARCHAR(64)  NOT NULL DEFAULT '',
+  discord_id  VARCHAR(20)  NOT NULL DEFAULT '',
+  avatar_url  TEXT         NULL,
   sort_order  INT          NOT NULL DEFAULT 0,
-  synced_at   TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (discord_id)
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (seat_key)
 );
+
+-- The seats ship empty; editing fills them. ON CONFLICT DO NOTHING keeps any
+-- edits across a redeploy while still adding a seat that is new to this list.
+INSERT INTO leadership_seats (seat_key, grp, title, sort_order) VALUES
+  ('owner',                  'ownership', 'Owner',                   0),
+  ('co-owner',               'ownership', 'Co-Owner',                1),
+  ('staff-director',         'directors', 'Staff Director',          0),
+  ('es-director',            'directors', 'ES Director',             1),
+  ('dev-director',           'directors', 'Dev. Director',           2),
+  ('civilian-director',      'directors', 'Civilian Director',       3),
+  ('asst-staff-director',    'directors', 'Asst. Staff Director',    4),
+  ('asst-es-director',       'directors', 'Asst. ES Director',       5),
+  ('asst-dev-director',      'directors', 'Asst. Dev. Director',     6),
+  ('asst-civilian-director', 'directors', 'Asst. Civilian Director', 7)
+ON CONFLICT (seat_key) DO NOTHING;
 
 -- Append-only record of what the bot changed, so a wrong rank can be traced.
 CREATE TABLE IF NOT EXISTS roster_sync_log (

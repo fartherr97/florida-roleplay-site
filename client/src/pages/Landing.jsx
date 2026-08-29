@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight, Bot, ChevronDown, Crown, ExternalLink, FileText, Newspaper,
-  RefreshCw, ShieldCheck, UserPlus,
+  Pencil, ShieldCheck, UserPlus,
 } from "lucide-react";
+import Modal from "../components/ui/Modal";
+import Field from "../components/ui/Field";
+import { TextInput } from "../components/ui/TextInput";
 import { FaDiscord } from "react-icons/fa6";
 import Section from "../components/layout/Section";
 import SocialLinks from "../components/layout/SocialLinks";
@@ -30,17 +33,23 @@ const DEPT_LOGOS = {
   mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
 };
 
-/** The director seats, shown as Vacant until the Discord sync fills them. */
+/** The fixed leadership seats — the fallback shown before the API responds, so
+ *  Ownership can edit them even on a fresh install. Keys match the server. */
+const seatStub = (seatKey, seat) => ({ seatKey, seat, role: seat, vacant: true, name: "", handle: "", discordId: "", avatar: null });
+const OWNERSHIP_SEATS = [
+  seatStub("owner", "Owner"),
+  seatStub("co-owner", "Co-Owner"),
+];
 const DIRECTOR_SEATS = [
-  "Staff Director",
-  "ES Director",
-  "Dev. Director",
-  "Civilian Director",
-  "Asst. Staff Director",
-  "Asst. ES Director",
-  "Asst. Dev. Director",
-  "Asst. Civilian Director",
-].map((seat) => ({ seat, vacant: true }));
+  seatStub("staff-director", "Staff Director"),
+  seatStub("es-director", "ES Director"),
+  seatStub("dev-director", "Dev. Director"),
+  seatStub("civilian-director", "Civilian Director"),
+  seatStub("asst-staff-director", "Asst. Staff Director"),
+  seatStub("asst-es-director", "Asst. ES Director"),
+  seatStub("asst-dev-director", "Asst. Dev. Director"),
+  seatStub("asst-civilian-director", "Asst. Civilian Director"),
+];
 
 /** The public landing page — full-bleed hero over stacked content sections. */
 export default function Landing() {
@@ -48,29 +57,16 @@ export default function Landing() {
   const [latest, setLatest] = useState(patchNotes[0]);
   const [leadership, setLeadership] = useState({ ownership: [], directors: [] });
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const [resync, setResync] = useState({ state: "idle", message: "" });
+  const [editingSeat, setEditingSeat] = useState(null);
   const { hasRole } = useAuth();
   const isOwner = hasRole(["ownership"]);
 
-  const runResync = async () => {
-    setResync({ state: "loading", message: "" });
-    try {
-      const result = await api.leadershipResync();
-      const l = await api.leadership();
-      setLeadership({ ownership: l.ownership ?? [], directors: l.directors ?? [] });
-      const count = typeof result?.leadership === "number" ? result.leadership : null;
-      setResync({
-        state: "done",
-        message:
-          result?.configured === false
-            ? "No Discord bot token is set on the server, so it can't read roles."
-            : count != null
-              ? `Synced — ${count} leader${count === 1 ? "" : "s"} found.`
-              : "Sync finished.",
-      });
-    } catch {
-      setResync({ state: "done", message: "Couldn't run the sync." });
-    }
+  // Apply a saved seat back into the grouped state, in place.
+  const applySeat = (saved) => {
+    setLeadership((cur) => {
+      const swap = (list) => list.map((m) => (m.seatKey === saved.seatKey ? saved : m));
+      return { ownership: swap(cur.ownership), directors: swap(cur.directors) };
+    });
   };
 
   useEffect(() => {
@@ -268,24 +264,28 @@ export default function Landing() {
 
       {/* 4.5 — Leadership, synced from Discord. Always shown; the director seats
           fall back to Vacant until the sync fills them. */}
-      <Section reveal eyebrow="The Team" title="Leadership" subtitle="The people who run Florida Roleplay, straight from Discord.">
-        {isOwner && (
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
-            <Button variant="ghost" size="sm" onClick={runResync} disabled={resync.state === "loading"}>
-              <RefreshCw className={`size-4 ${resync.state === "loading" ? "animate-spin" : ""}`} />
-              {resync.state === "loading" ? "Resyncing…" : "Resync from Discord"}
-            </Button>
-            {resync.message && <span className="text-xs text-slate-500">{resync.message}</span>}
-          </div>
-        )}
+      <Section
+        reveal
+        eyebrow="The Team"
+        title="Leadership"
+        subtitle={isOwner ? "Click any spot to edit who fills it." : "The people who run Florida Roleplay."}
+      >
         <div className="space-y-8">
-          {leadership.ownership.length > 0 && (
-            <LeadershipGroup label="Ownership" icon={Crown} members={leadership.ownership} />
+          {(leadership.ownership.length > 0 || isOwner) && (
+            <LeadershipGroup
+              label="Ownership"
+              icon={Crown}
+              members={leadership.ownership.length ? leadership.ownership : OWNERSHIP_SEATS}
+              canEdit={isOwner}
+              onEdit={setEditingSeat}
+            />
           )}
           <LeadershipGroup
             label="Board of Directors"
             icon={ShieldCheck}
             members={leadership.directors.length ? leadership.directors : DIRECTOR_SEATS}
+            canEdit={isOwner}
+            onEdit={setEditingSeat}
           />
         </div>
       </Section>
@@ -350,12 +350,20 @@ export default function Landing() {
       </Section>
 
       <AssistantModal open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      {editingSeat && (
+        <LeadershipEditModal
+          key={editingSeat.seatKey}
+          seat={editingSeat}
+          onClose={() => setEditingSeat(null)}
+          onSaved={applySeat}
+        />
+      )}
     </>
   );
 }
 
 /** One leadership band (Ownership / Board of Directors) with a header + count. */
-function LeadershipGroup({ label, icon: Icon, members }) {
+function LeadershipGroup({ label, icon: Icon, members, canEdit, onEdit }) {
   if (!members || members.length === 0) return null;
   return (
     <div>
@@ -371,34 +379,49 @@ function LeadershipGroup({ label, icon: Icon, members }) {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {members.map((m, i) => (
-          <LeadershipCard key={m.discordId || m.seat || `${m.name}-${i}`} member={m} />
+          <LeadershipCard
+            key={m.seatKey || m.discordId || `${m.name}-${i}`}
+            member={m}
+            canEdit={canEdit}
+            onEdit={onEdit}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-/** A single leader: avatar, role/seat, their Discord nickname line and a profile
- *  link — or, for an unfilled director seat, a dashed "Vacant" card. */
-function LeadershipCard({ member }) {
-  // The small label is the fixed seat name for directors, else their live role.
+/** A single leader: avatar, role/seat, their profile link — or, for an unfilled
+ *  seat, a dashed "Vacant" card. Ownership can click any card to edit it. */
+function LeadershipCard({ member, canEdit, onEdit }) {
   const label = member.seat || member.role;
+  const editable = canEdit && member.seatKey;
 
   if (member.vacant) {
     return (
-      <div className="flex items-center gap-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-4">
+      <button
+        type="button"
+        disabled={!editable}
+        onClick={() => editable && onEdit(member)}
+        className={cn(
+          "flex w-full items-center gap-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-4 text-left",
+          editable && "transition hover:border-primary-400/40 hover:bg-primary-500/[0.04]",
+          !editable && "cursor-default",
+        )}
+      >
         <span className="grid size-14 shrink-0 place-items-center rounded-full border border-dashed border-white/15 text-slate-600">
           <ShieldCheck className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           {label && (
-            <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {label}
-            </p>
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
           )}
-          <p className="mt-0.5 truncate text-sm font-semibold italic text-slate-500">Vacant</p>
+          <p className="mt-0.5 truncate text-sm font-semibold italic text-slate-500">
+            {editable ? "Vacant — click to assign" : "Vacant"}
+          </p>
         </div>
-      </div>
+        {editable && <Pencil className="size-4 shrink-0 text-slate-600" />}
+      </button>
     );
   }
 
@@ -408,18 +431,12 @@ function LeadershipCard({ member }) {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("");
-  // Reconstruct the "callsign | role | name" line the way it reads in Discord.
-  const line = [member.callsign, member.role, member.name].filter(Boolean).join(" | ");
   const href = member.discordId ? `https://discord.com/users/${member.discordId}` : null;
 
   return (
     <Card className="group relative flex items-center gap-4 p-4">
       {member.avatar ? (
-        <img
-          src={member.avatar}
-          alt=""
-          className="size-14 shrink-0 rounded-full object-cover ring-2 ring-inset ring-white/10"
-        />
+        <img src={member.avatar} alt="" className="size-14 shrink-0 rounded-full object-cover ring-2 ring-inset ring-white/10" />
       ) : (
         <span className="grid size-14 shrink-0 place-items-center rounded-full bg-primary-500/15 text-sm font-bold text-primary-300 ring-2 ring-inset ring-primary-400/20">
           {initials || "?"}
@@ -427,28 +444,102 @@ function LeadershipCard({ member }) {
       )}
       <div className="min-w-0 flex-1">
         {label && (
-          <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-primary-400">
-            {label}
-          </p>
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-primary-400">{label}</p>
         )}
-        <p className="mt-0.5 truncate text-sm font-bold text-white" title={line}>
-          {line || member.name}
+        <p className="mt-0.5 truncate text-sm font-bold text-white" title={member.name}>
+          {member.name}
         </p>
-        {member.handle && (
-          <p className="mt-0.5 truncate text-xs text-slate-500">@{member.handle}</p>
-        )}
+        {member.handle && <p className="mt-0.5 truncate text-xs text-slate-500">@{member.handle}</p>}
       </div>
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`Open ${member.name}'s Discord profile`}
+      {editable ? (
+        <button
+          type="button"
+          onClick={() => onEdit(member)}
+          aria-label={`Edit ${label}`}
           className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/[0.03] text-slate-400 ring-1 ring-inset ring-white/[0.08] transition hover:bg-primary-500/15 hover:text-primary-300"
         >
-          <ExternalLink className="size-4" />
-        </a>
+          <Pencil className="size-4" />
+        </button>
+      ) : (
+        href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${member.name}'s Discord profile`}
+            className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/[0.03] text-slate-400 ring-1 ring-inset ring-white/[0.08] transition hover:bg-primary-500/15 hover:text-primary-300"
+          >
+            <ExternalLink className="size-4" />
+          </a>
+        )
       )}
     </Card>
+  );
+}
+
+/** Ownership's editor for one leadership seat. Blank name clears it to Vacant. */
+function LeadershipEditModal({ seat, onClose, onSaved }) {
+  const [draft, setDraft] = useState({
+    name: seat.name || "",
+    handle: seat.handle || "",
+    discordId: seat.discordId || "",
+    avatarUrl: seat.avatar || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await api.updateLeadershipSeat(seat.seatKey, draft);
+      if (res?.ok && res.seat) {
+        onSaved(res.seat);
+        onClose();
+      } else {
+        setError(res?.message || "Couldn't save that.");
+      }
+    } catch (err) {
+      setError(err?.message || "Couldn't save that.");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Edit ${seat.seat}`} className="max-w-md">
+      <div className="grid gap-4">
+        <Field label="Name" hint="Leave blank to mark the seat Vacant.">
+          <TextInput value={draft.name} placeholder="e.g. Owens" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        </Field>
+        <Field label="Discord handle" hint="Without the @.">
+          <TextInput value={draft.handle} placeholder="requiire" onChange={(e) => setDraft({ ...draft, handle: e.target.value.replace(/^@/, "") })} />
+        </Field>
+        <Field label="Discord ID" hint="Optional. Adds a link to their profile.">
+          <TextInput value={draft.discordId} placeholder="000000000000000000" className="font-mono" onChange={(e) => setDraft({ ...draft, discordId: e.target.value.trim() })} />
+        </Field>
+        <Field label="Avatar URL" hint="Optional. An http(s) image link.">
+          <TextInput value={draft.avatarUrl} placeholder="https://…" onChange={(e) => setDraft({ ...draft, avatarUrl: e.target.value.trim() })} />
+        </Field>
+        {error && <p className="text-xs text-rose-300">{error}</p>}
+      </div>
+      <div className="mt-5 flex justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={saving || !draft.name.trim()}
+          onClick={() => setDraft({ name: "", handle: "", discordId: "", avatarUrl: "" })}
+        >
+          Clear seat
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
