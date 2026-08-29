@@ -15,7 +15,7 @@ export const primaryLinks = [
   { label: "Applications", href: SITE.applyUrl, external: true },
   { label: "Discord", href: SITE.discordInvite, external: true },
   { label: "Store", to: "/store" },
-  { label: "Reports / Complaints", to: "/reports" },
+  { label: "Reports", to: "/reports" },
   { label: "Support", to: "/support" },
 ];
 
