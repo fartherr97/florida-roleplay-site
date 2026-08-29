@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild } from "../lib/rosterSync.js";
+import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, leadershipDebug } from "../lib/rosterSync.js";
 import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
@@ -288,6 +288,12 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
 router.post("/pull", requirePermission("discord.roles.manage"), async (_req, res) => {
   const result = await syncRosterFromGuild();
   return res.json(result);
+});
+
+// Why is the leadership section empty? Reports which guilds were read and how
+// many members hold each leadership role, plus whether the store is writable.
+router.get("/leadership-debug", requirePermission("discord.roles.manage"), async (_req, res) => {
+  return res.json(await leadershipDebug());
 });
 
 router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>

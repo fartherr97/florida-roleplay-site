@@ -378,6 +378,51 @@ async function writeLeadership(rows, prune = true) {
   }
 }
 
+/**
+ * Diagnose why the leadership section is empty: which guilds were read, and how
+ * many members hold each leadership role the site sees. If a role shows 0
+ * holders the bot isn't seeing it (wrong guild, Members Intent off, or a role
+ * id mismatch); if holders are found but `storedCount` is 0 the write is
+ * failing (usually a missing table). Gated to staff by its route.
+ */
+export async function leadershipDebug() {
+  const guildIds = await collectGuildIds();
+  const perGuild = [];
+  const byId = new Map();
+  for (const gid of guildIds) {
+    try {
+      const members = await fetchGuildMembers(gid);
+      if (!members) {
+        perGuild.push({ guildId: gid, ok: false, error: "not-configured" });
+        continue;
+      }
+      perGuild.push({ guildId: gid, ok: true, count: members.length });
+      for (const m of members) {
+        const cur = byId.get(m.id) ?? { roles: new Set() };
+        for (const r of m.roles) cur.roles.add(String(r));
+        byId.set(m.id, cur);
+      }
+    } catch (err) {
+      perGuild.push({ guildId: gid, ok: false, error: err?.code || err?.message || "failed" });
+    }
+  }
+  const holders = {};
+  for (const role of [...LEADERSHIP_ROLES.ownership, ...LEADERSHIP_ROLES.directorSeats]) {
+    let n = 0;
+    for (const [, data] of byId) if (data.roles.has(role.id)) n += 1;
+    holders[role.label] = n;
+  }
+  let tableOk = true;
+  let storedCount = null;
+  try {
+    const rows = await query("SELECT COUNT(*)::int AS n FROM site_leadership");
+    storedCount = rows[0]?.n ?? 0;
+  } catch {
+    tableOk = false;
+  }
+  return { guildIds, perGuild, scanned: byId.size, holders, tableOk, storedCount };
+}
+
 let lastSyncAt = 0;
 let inProgress = false;
 const MIN_INTERVAL_MS = 60_000;
