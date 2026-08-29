@@ -95,7 +95,7 @@ export default function SupportHome() {
           <p className="text-sm text-slate-400">There are no ticket categories open to you right now.</p>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {types.map((type) => {
             const logo = DEPT_LOGOS[type.id];
             return (
@@ -104,31 +104,30 @@ export default function SupportHome() {
                 as={Link}
                 to={`/support/new?type=${encodeURIComponent(type.id)}`}
                 hover
-                className="group flex h-full flex-col gap-3 p-5"
+                className="group flex aspect-square flex-col items-center justify-center gap-3 p-4 text-center"
               >
-                <div className="flex items-center gap-3">
-                  {logo ? (
-                    <img
-                      src={logo}
-                      alt=""
-                      className="size-11 shrink-0 rounded-xl object-contain ring-1 ring-inset ring-white/[0.06]"
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        "grid size-11 shrink-0 place-items-center rounded-xl ring-1 ring-inset",
-                        toneTile(type.tone),
-                      )}
-                    >
-                      {createElement(iconFor(type.icon), { className: "size-5" })}
-                    </span>
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-white">{type.label}</span>
+                {logo ? (
+                  <img
+                    src={logo}
+                    alt=""
+                    className="size-16 shrink-0 object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:-translate-y-0.5"
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      "grid size-16 shrink-0 place-items-center rounded-2xl ring-1 ring-inset transition-transform duration-300 group-hover:-translate-y-0.5",
+                      toneTile(type.tone),
+                    )}
+                  >
+                    {createElement(iconFor(type.icon), { className: "size-7" })}
                   </span>
-                  <ArrowRight className="size-4 shrink-0 translate-x-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-primary-400" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-white">{type.label}</div>
+                  {type.blurb && (
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">{type.blurb}</p>
+                  )}
                 </div>
-                <p className="text-xs leading-relaxed text-slate-400">{type.blurb}</p>
               </Card>
             );
           })}
