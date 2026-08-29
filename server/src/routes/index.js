@@ -229,6 +229,33 @@ router.get("/rules", (req, res) => {
   );
 });
 
+/* ------------------------------------------------------------ leadership */
+
+/** The public leadership team, grouped, kept current by the Discord sync. */
+router.get("/leadership", (_req, res) => {
+  safe(
+    res,
+    async () => {
+      const rows = await query(
+        "SELECT discord_id, name, role_label, handle, avatar, grp, callsign FROM site_leadership ORDER BY grp DESC, sort_order, callsign, name",
+      );
+      const map = (r) => ({
+        discordId: r.discord_id,
+        name: r.name,
+        role: r.role_label,
+        handle: r.handle,
+        avatar: r.avatar,
+        callsign: r.callsign,
+      });
+      return {
+        ownership: rows.filter((r) => r.grp === "ownership").map(map),
+        directors: rows.filter((r) => r.grp === "directors").map(map),
+      };
+    },
+    { ownership: [], directors: [] },
+  );
+});
+
 /* ----------------------------------------------------------------- staff */
 
 /**

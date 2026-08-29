@@ -171,6 +171,7 @@ export async function fetchGuildMembers(guildId = process.env.DISCORD_GUILD_ID) 
     username: m.user?.username ?? "",
     displayName: m.user?.global_name || m.user?.username || "Member",
     nick: m.nick ?? null,
+    avatar: avatarUrl(m.user?.id, m.user?.avatar),
     roles: Array.isArray(m.roles) ? m.roles.map(String) : [],
   }));
 }

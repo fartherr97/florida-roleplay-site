@@ -429,6 +429,9 @@ export const api = {
     }),
   rosterSyncLog: () => get("/roster/sync-log", rosterMock.syncLog),
 
+  /** The public leadership team (ownership + directors), synced from Discord. */
+  leadership: () => get("/leadership", { ownership: [], directors: [] }),
+
   civBusinesses: () => get("/civilian-hub/businesses", civ.businesses),
   civPenalCode: (q = "") => {
     const trimmed = q.trim();

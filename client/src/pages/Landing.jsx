@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, Bot, ChevronDown, FileText, Newspaper,
-  UserPlus,
+  ArrowRight, Bot, ChevronDown, Crown, ExternalLink, FileText, Newspaper,
+  ShieldCheck, UserPlus,
 } from "lucide-react";
 import { FaDiscord } from "react-icons/fa6";
 import Section from "../components/layout/Section";
@@ -33,15 +33,17 @@ const DEPT_LOGOS = {
 export default function Landing() {
   const [departments, setDepartments] = useState(seedDepartments);
   const [latest, setLatest] = useState(patchNotes[0]);
+  const [leadership, setLeadership] = useState({ ownership: [], directors: [] });
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.departments(), api.latestPatchNote()])
-      .then(([d, p]) => {
+    Promise.all([api.departments(), api.latestPatchNote(), api.leadership()])
+      .then(([d, p, l]) => {
         if (!active) return;
         if (d?.length) setDepartments(d);
         if (p) setLatest(p);
+        if (l) setLeadership({ ownership: l.ownership ?? [], directors: l.directors ?? [] });
       })
       .catch(() => {});
     return () => {
@@ -227,6 +229,24 @@ export default function Landing() {
         </div>
       </Section>
 
+      {/* 4.5 — Leadership, synced from Discord */}
+      {(leadership.ownership.length > 0 || leadership.directors.length > 0) && (
+        <Section reveal eyebrow="The Team" title="Leadership" subtitle="The people who run Florida Roleplay, straight from Discord.">
+          <div className="space-y-8">
+            <LeadershipGroup
+              label="Ownership"
+              icon={Crown}
+              members={leadership.ownership}
+            />
+            <LeadershipGroup
+              label="Board of Directors"
+              icon={ShieldCheck}
+              members={leadership.directors}
+            />
+          </div>
+        </Section>
+      )}
+
       {/* 5 — Latest patch note */}
       {latest && (
         <Section reveal eyebrow="Changelog" title="Latest from the dev team">
@@ -288,5 +308,82 @@ export default function Landing() {
 
       <AssistantModal open={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </>
+  );
+}
+
+/** One leadership band (Ownership / Board of Directors) with a header + count. */
+function LeadershipGroup({ label, icon: Icon, members }) {
+  if (!members || members.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-3">
+        <span className="grid size-8 place-items-center rounded-lg bg-primary-500/12 text-primary-300 ring-1 ring-inset ring-primary-400/20">
+          <Icon className="size-4" />
+        </span>
+        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-white">{label}</h3>
+        <span className="h-px flex-1 bg-white/[0.06]" />
+        <span className="text-xs font-bold tabular-nums text-slate-500">
+          {String(members.length).padStart(2, "0")}
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {members.map((m) => (
+          <LeadershipCard key={m.discordId || `${m.name}-${m.role}`} member={m} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A single leader: avatar, role, their Discord nickname line, and a profile link. */
+function LeadershipCard({ member }) {
+  const initials = (member.name || "?")
+    .split(/[\s.|]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+  // Reconstruct the "callsign | role | name" line the way it reads in Discord.
+  const line = [member.callsign, member.role, member.name].filter(Boolean).join(" | ");
+  const href = member.discordId ? `https://discord.com/users/${member.discordId}` : null;
+
+  return (
+    <Card className="group relative flex items-center gap-4 p-4">
+      {member.avatar ? (
+        <img
+          src={member.avatar}
+          alt=""
+          className="size-14 shrink-0 rounded-full object-cover ring-2 ring-inset ring-white/10"
+        />
+      ) : (
+        <span className="grid size-14 shrink-0 place-items-center rounded-full bg-primary-500/15 text-sm font-bold text-primary-300 ring-2 ring-inset ring-primary-400/20">
+          {initials || "?"}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        {member.role && (
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-primary-400">
+            {member.role}
+          </p>
+        )}
+        <p className="mt-0.5 truncate text-sm font-bold text-white" title={line}>
+          {line || member.name}
+        </p>
+        {member.handle && (
+          <p className="mt-0.5 truncate text-xs text-slate-500">@{member.handle}</p>
+        )}
+      </div>
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open ${member.name}'s Discord profile`}
+          className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/[0.03] text-slate-400 ring-1 ring-inset ring-white/[0.08] transition hover:bg-primary-500/15 hover:text-primary-300"
+        >
+          <ExternalLink className="size-4" />
+        </a>
+      )}
+    </Card>
   );
 }

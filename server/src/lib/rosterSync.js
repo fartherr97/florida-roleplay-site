@@ -290,6 +290,67 @@ async function assignDeptCallsigns(deptId, members, meta) {
   }
 }
 
+/** The role segment of a "callsign | role | name" nickname, e.g. "Owner". */
+function nickRole(nick) {
+  const parts = String(nick ?? "").split("|").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 3 ? parts[1] : "";
+}
+
+/**
+ * The Discord roles that mark someone as leadership, split into the two groups
+ * the home page shows: the Ownership tier role(s), and every role mapped to the
+ * `management` department (Directorship). Read from the live role map, falling
+ * back to the seed so it works before anything is stored.
+ */
+async function loadLeadershipRoles() {
+  const ownership = new Set();
+  const directors = new Set();
+  try {
+    const rows = await query("SELECT role_id, role_key, department, kind FROM roster_role_map");
+    if (rows.length) {
+      for (const r of rows) {
+        const id = String(r.role_id);
+        if (r.role_key === "ownership" || (r.kind === "tier" && /owner/i.test(r.role_key || ""))) ownership.add(id);
+        if (r.department === "management") directors.add(id);
+      }
+      return { ownership, directors };
+    }
+  } catch {
+    // No database — fall through to the seed.
+  }
+  for (const r of seed.SPECIAL_ROLES ?? []) if (r.key === "ownership") ownership.add(String(r.roleId));
+  for (const r of seed.ROLE_MAP) if (r.department === "management") directors.add(String(r.roleId));
+  return { ownership, directors };
+}
+
+/**
+ * Replace the public leadership team from the members just read. Ownership rows
+ * sort before directors; within a group, by callsign then name. Best-effort —
+ * a write failure never fails the roster sync that already landed.
+ */
+async function writeLeadership(rows) {
+  try {
+    if (!rows.length) {
+      await query("DELETE FROM site_leadership");
+      return;
+    }
+    for (const [i, r] of rows.entries()) {
+      await query(
+        `INSERT INTO site_leadership (discord_id, name, role_label, handle, avatar, grp, callsign, sort_order, synced_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+         ON CONFLICT (discord_id) DO UPDATE SET
+           name = EXCLUDED.name, role_label = EXCLUDED.role_label, handle = EXCLUDED.handle,
+           avatar = EXCLUDED.avatar, grp = EXCLUDED.grp, callsign = EXCLUDED.callsign,
+           sort_order = EXCLUDED.sort_order, synced_at = CURRENT_TIMESTAMP`,
+        [r.discordId, r.name.slice(0, 128), r.roleLabel.slice(0, 64), r.handle.slice(0, 64), r.avatar, r.grp, r.callsign.slice(0, 16), i],
+      );
+    }
+    await query("DELETE FROM site_leadership WHERE NOT (discord_id = ANY($1))", [rows.map((r) => r.discordId)]);
+  } catch {
+    // Best-effort; a stale leadership row is harmless.
+  }
+}
+
 let lastSyncAt = 0;
 let inProgress = false;
 const MIN_INTERVAL_MS = 60_000;
@@ -334,12 +395,15 @@ export async function syncRosterFromGuild() {
       ok += 1;
       perGuild.push({ guildId: gid, ok: true, count: members.length, error: null });
       for (const m of members) {
-        const cur = byId.get(m.id) ?? { roles: new Set(), name: "", nicks: {} };
+        const cur = byId.get(m.id) ?? { roles: new Set(), name: "", nicks: {}, username: "", avatar: null };
         for (const r of m.roles) cur.roles.add(r);
         // Keep each guild's nickname so a department roster can read the name and
         // callsign from its own server.
         if (m.nick) cur.nicks[gid] = m.nick;
         if (!cur.name) cur.name = m.displayName || m.username || "";
+        // Handle and avatar for the public leadership team — first seen wins.
+        if (!cur.username) cur.username = m.username || "";
+        if (!cur.avatar && m.avatar) cur.avatar = m.avatar;
         byId.set(m.id, cur);
       }
     }
@@ -377,6 +441,39 @@ export async function syncRosterFromGuild() {
           (deptMembers[d] ??= []).push({ discordId, nickCallsign });
         }
       }
+    }
+
+    // The public leadership team: whoever holds an Ownership or Directorship
+    // role, named and pictured from Discord even if they never signed in. Only
+    // refreshed on a clean read so an outage doesn't blank the home page.
+    if (errors === 0) {
+      const lead = await loadLeadershipRoles();
+      const mainGuild = String(process.env.DISCORD_GUILD_ID ?? "").trim();
+      const leadership = [];
+      for (const [discordId, data] of byId) {
+        const held = data.roles;
+        const isOwner = [...lead.ownership].some((id) => held.has(id));
+        const isDirector = !isOwner && [...lead.directors].some((id) => held.has(id));
+        if (!isOwner && !isDirector) continue;
+        const nick = data.nicks[mainGuild] || Object.values(data.nicks)[0] || "";
+        const parsed = parseNick(nick);
+        leadership.push({
+          discordId,
+          name: parsed.name || data.name || data.username || "Member",
+          roleLabel: nickRole(nick) || (isOwner ? "Ownership" : "Director"),
+          handle: data.username || "",
+          avatar: data.avatar || null,
+          grp: isOwner ? "ownership" : "directors",
+          callsign: parsed.callsign || "",
+        });
+      }
+      leadership.sort(
+        (a, b) =>
+          (a.grp === b.grp ? 0 : a.grp === "ownership" ? -1 : 1) ||
+          String(a.callsign).localeCompare(String(b.callsign), undefined, { numeric: true }) ||
+          a.name.localeCompare(b.name),
+      );
+      await writeLeadership(leadership);
     }
 
     // Prune only on a clean full read, so a transient outage on one server does
