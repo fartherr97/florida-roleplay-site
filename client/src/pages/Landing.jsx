@@ -29,6 +29,14 @@ const DEPT_LOGOS = {
   mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
 };
 
+/** The director seats, shown as Vacant until the Discord sync fills them. */
+const DIRECTOR_SEATS = [
+  { seat: "Staff Director", vacant: true },
+  { seat: "ES Director", vacant: true },
+  { seat: "Dev. Director", vacant: true },
+  { seat: "Civilian Director", vacant: true },
+];
+
 /** The public landing page — full-bleed hero over stacked content sections. */
 export default function Landing() {
   const [departments, setDepartments] = useState(seedDepartments);
@@ -229,23 +237,20 @@ export default function Landing() {
         </div>
       </Section>
 
-      {/* 4.5 — Leadership, synced from Discord */}
-      {(leadership.ownership.length > 0 || leadership.directors.length > 0) && (
-        <Section reveal eyebrow="The Team" title="Leadership" subtitle="The people who run Florida Roleplay, straight from Discord.">
-          <div className="space-y-8">
-            <LeadershipGroup
-              label="Ownership"
-              icon={Crown}
-              members={leadership.ownership}
-            />
-            <LeadershipGroup
-              label="Board of Directors"
-              icon={ShieldCheck}
-              members={leadership.directors}
-            />
-          </div>
-        </Section>
-      )}
+      {/* 4.5 — Leadership, synced from Discord. Always shown; the director seats
+          fall back to Vacant until the sync fills them. */}
+      <Section reveal eyebrow="The Team" title="Leadership" subtitle="The people who run Florida Roleplay, straight from Discord.">
+        <div className="space-y-8">
+          {leadership.ownership.length > 0 && (
+            <LeadershipGroup label="Ownership" icon={Crown} members={leadership.ownership} />
+          )}
+          <LeadershipGroup
+            label="Board of Directors"
+            icon={ShieldCheck}
+            members={leadership.directors.length ? leadership.directors : DIRECTOR_SEATS}
+          />
+        </div>
+      </Section>
 
       {/* 5 — Latest patch note */}
       {latest && (
