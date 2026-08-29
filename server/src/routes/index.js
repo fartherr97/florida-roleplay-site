@@ -263,6 +263,8 @@ function shapeSeat(r) {
 
 /** The public leadership team — a fixed set of seats, edited by hand. */
 router.get("/leadership", (_req, res) => {
+  // Never let a CDN or browser cache this — a just-saved edit must show at once.
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
   safe(
     res,
     async () => {

@@ -432,8 +432,9 @@ export const api = {
     }),
   rosterSyncLog: () => get("/roster/sync-log", rosterMock.syncLog),
 
-  /** The public leadership team — a fixed set of seats, edited by Ownership. */
-  leadership: () => get("/leadership", { ownership: [], directors: [] }),
+  /** The public leadership team — a fixed set of seats, edited by Ownership. The
+   *  timestamp defeats any edge/CDN cache so a just-saved edit shows at once. */
+  leadership: () => get(`/leadership?t=${Date.now()}`, { ownership: [], directors: [] }),
 
   /** Ownership-only: set (or clear) who fills one leadership seat. */
   updateLeadershipSeat: (seatKey, patch) =>
