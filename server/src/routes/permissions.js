@@ -39,25 +39,32 @@ router.use(attachUser);
  * always included because they are structural, not part of the editable map.
  */
 async function grantableRoles() {
+  // The canonical role universe the catalogue itself uses — always valid, whether
+  // or not the live role map has been populated. Without this, a default grant to a
+  // department rank (DEFAULT_GRANTS spreads DEPARTMENT_ROLES) would validate as an
+  // "unknown role" on any install whose role map does not happen to list that rank,
+  // and — because the page saves the whole grant table at once — that one stale
+  // entry would block every save. So the seed set is the floor, and the live role
+  // map only ever ADDS to it.
   const keys = new Set(BASE_ROLES.map((role) => role.key));
-  try {
-    const rows = await query(
-      "SELECT role_key, kind FROM roster_role_map",
-    );
-    if (rows.length) {
-      for (const row of rows) {
-        // Ranks are grantable; among the non-rank rows only tiers are (tags
-        // like LOA describe a state, not a standing).
-        if (row.kind === "rank" || row.kind === "tier") keys.add(row.role_key);
-      }
-      return keys;
-    }
-  } catch {
-    // No database configured — fall back to the seeded ladder below.
+  for (const roles of Object.values(DEFAULT_GRANTS)) {
+    for (const key of roles) keys.add(key);
   }
   for (const role of ROLE_MAP) keys.add(role.key);
   for (const role of SPECIAL_ROLES) {
     if (role.kind === "tier") keys.add(role.key);
+  }
+
+  try {
+    const rows = await query("SELECT role_key, kind FROM roster_role_map");
+    // Ranks are grantable; among the non-rank rows only tiers are (tags like LOA
+    // describe a state, not a standing). A Discord role imported on the Access page
+    // (keys like `g_<id>`) arrives here as a rank/tier and becomes grantable at once.
+    for (const row of rows) {
+      if (row.kind === "rank" || row.kind === "tier") keys.add(row.role_key);
+    }
+  } catch {
+    // No database configured — the seeded universe above stands.
   }
   return keys;
 }
