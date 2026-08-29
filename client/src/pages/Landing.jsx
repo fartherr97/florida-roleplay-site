@@ -16,6 +16,7 @@ import Card from "../components/ui/Card";
 import { api } from "../lib/api";
 import { useAuth } from "../context/useAuth";
 import { iconFor } from "../lib/icons";
+import { cn } from "../lib/cn";
 import { accentOf } from "../lib/departmentConfig";
 import {
   SITE, features, heroCopy,
