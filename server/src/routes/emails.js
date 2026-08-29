@@ -26,8 +26,12 @@ import { permissionsFor } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { fetchMemberRoles } from "../lib/discord.js";
 import { resolveRoleKeys } from "../lib/roleSync.js";
+import { DEPARTMENT_COMMAND_KEYS } from "../lib/discipline.js";
 import { str } from "../validate.js";
 import * as seed from "../rosterSeed.js";
+
+/** The department-head role keys (fhp_colonel, bcso_sheriff, mpd_chief). */
+const DEPT_HEAD_KEYS = Object.values(DEPARTMENT_COMMAND_KEYS);
 
 const router = Router();
 
@@ -58,10 +62,14 @@ async function ensureTables() {
 }
 
 /**
- * Whether the Discord user who invoked a lookup may read the directory.
+ * Whether the Discord user who invoked a lookup (`/email check` / `/email search`)
+ * may read an email off the record.
  *
  * Off their live main-guild roles, exactly as the DA Hub authorises `/bgcheck`, so
- * the answer can never disagree with the site. Fails closed.
+ * the answer can never disagree with the site. Two ways in: holding `emails.view`
+ * (Directorship+, who also read the whole directory on the site), or being a
+ * department head — command may look a member up without the site-wide grant, the
+ * same shape department command file DAs without `discipline.file`. Fails closed.
  */
 async function actorMayViewEmails(actorDiscordId) {
   if (!/^\d{17,20}$/.test(actorDiscordId)) return false;
@@ -70,7 +78,9 @@ async function actorMayViewEmails(actorDiscordId) {
     if (membership === null) return false; // not in the guild
     const roleKeys = withOwnerOverride(actorDiscordId, await resolveRoleKeys(membership.roles));
     const permissions = permissionsFor(roleKeys, await loadGrants());
-    return permissions.has("emails.view");
+    if (permissions.has("emails.view")) return true;
+    const held = new Set(roleKeys);
+    return DEPT_HEAD_KEYS.some((key) => held.has(key));
   } catch {
     return false;
   }
