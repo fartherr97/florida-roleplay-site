@@ -284,6 +284,37 @@ router.get("/leadership", (_req, res) => {
   );
 });
 
+// Ownership-only diagnostic: what is actually stored, and can we write it? Tells
+// apart "the write never lands" from "the read is masked".
+router.get("/leadership/_diag", async (req, res) => {
+  if (!req.user?.roles?.includes("ownership")) {
+    return res.status(403).json({ ok: false, message: "Ownership only." });
+  }
+  const out = { dbHost: null, tableExists: false, rowCount: null, filled: null, rows: [], error: null, writeTest: null };
+  try {
+    out.dbHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).host : `${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || 5432}`;
+  } catch { /* ignore */ }
+  try {
+    const rows = await query("SELECT seat_key, grp, title, name, handle, discord_id, avatar_url FROM leadership_seats ORDER BY grp DESC, sort_order");
+    out.tableExists = true;
+    out.rowCount = rows.length;
+    out.filled = rows.filter((r) => (r.name || "").trim()).length;
+    out.rows = rows.map((r) => ({ seat: r.seat_key, title: r.title, name: r.name, handle: r.handle }));
+  } catch (err) {
+    out.error = err?.message || "query failed";
+  }
+  // Round-trip write test on a throwaway key, so we prove writes commit.
+  try {
+    await query("INSERT INTO leadership_seats (seat_key, grp, title, name) VALUES ('_diag', 'directors', '_diag', 'ok') ON CONFLICT (seat_key) DO UPDATE SET name = 'ok'");
+    const check = await query("SELECT name FROM leadership_seats WHERE seat_key = '_diag'");
+    await query("DELETE FROM leadership_seats WHERE seat_key = '_diag'");
+    out.writeTest = check[0]?.name === "ok" ? "ok" : "written-but-not-read-back";
+  } catch (err) {
+    out.writeTest = `failed: ${err?.message || "error"}`;
+  }
+  return res.json(out);
+});
+
 // Ownership-only: edit one seat's occupant. A seat is cleared to Vacant by
 // saving a blank name.
 router.put("/leadership/:seatKey", async (req, res) => {
