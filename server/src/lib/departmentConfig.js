@@ -27,6 +27,8 @@
  */
 
 /** Bump when a change to the shape needs `migrateConfig` to touch stored rows. */
+import { ACTION_BODY_MAP } from "./discipline.js";
+
 export const CONFIG_VERSION = 1;
 
 /* ------------------------------------------------------------------ *
@@ -169,6 +171,7 @@ export const PAGE_TYPES = [
   { type: "chain", label: "Chain of command", icon: "Network", detail: "The command tree, built from the roster's categories.", edit: "editStructure" },
   { type: "calendar", label: "Calendar", icon: "Calendar", detail: "Trainings, patrols and department events.", edit: "manageCalendar" },
   { type: "adminlog", label: "Admin log", icon: "Gavel", detail: "Disciplinary entries, commendations and rank actions.", edit: "manageLog", requires: "manageLog" },
+  { type: "dahub", label: "DA Database", icon: "Gavel", detail: "File and review this department's disciplinary actions — the same record /bgcheck reads.", edit: "manageLog", requires: "manageLog" },
   { type: "activity", label: "Activity feed", icon: "Activity", detail: "A running feed of roster and log changes." },
   { type: "hours", label: "Duty hours", icon: "Clock", detail: "Patrol hours per member for the current period.", edit: "editRoster" },
   { type: "audit", label: "Audit log", icon: "ScrollText", detail: "Config changes and version history.", requires: "viewAudit" },
@@ -328,6 +331,25 @@ export function normalizeConfig(raw, id) {
       access: Array.isArray(page.access) ? page.access.map(String) : [],
       config: page.config && typeof page.config === "object" ? page.config : {},
     }));
+
+  // Every department that can file disciplinary actions gets the DA Database page,
+  // even on a config saved before the page existed — so command can file and review
+  // their own department's DAs from the dept hub. Injected non-destructively (opening
+  // is still gated on `manageLog`); a save from the builder persists it.
+  const deptId = String(config.id || id || "department");
+  if (ACTION_BODY_MAP[deptId]?.source === "department" && !pages.some((p) => p.type === "dahub")) {
+    pages.push({
+      id: "dahub",
+      label: "DA Database",
+      type: "dahub",
+      icon: "Gavel",
+      navGroup: groupIds.has("admin") ? "admin" : navGroups[0].id,
+      locked: false,
+      restricted: false,
+      access: [],
+      config: {},
+    });
+  }
 
   return {
     version: CONFIG_VERSION,

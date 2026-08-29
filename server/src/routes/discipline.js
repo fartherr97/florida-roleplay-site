@@ -104,6 +104,39 @@ function clampWindow(value) {
   return Number.isFinite(days) ? Math.min(3650, Math.max(1, Math.trunc(days))) : DEFAULT_WINDOW_DAYS;
 }
 
+/**
+ * One department's disciplinary record — what the DA page inside a department hub
+ * reads, so command can file and review their own department's DAs in one place.
+ *
+ * Scoped to the department's own body: it returns every action filed under that
+ * department, not the whole cross-department record. Authorised by *commanding the
+ * department* (the same right that lets command file for it) or by the site-wide
+ * `discipline.view` — never by a bare membership. Because it is scoped, a department
+ * head sees all of their department's actions here without holding `discipline.view`,
+ * which stays the gate for reading the entire record.
+ */
+router.get("/dept/:deptId", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (!ctx.user) {
+    return res.status(403).json({ ok: false, code: "AUTH_SIGNED_OUT", message: "Sign in to open the DA database." });
+  }
+  const deptId = str(req.params.deptId);
+  const body = ACTION_BODY_MAP[deptId];
+  if (!body || body.source !== "department") {
+    return res.status(404).json({ ok: false, message: "That department keeps no disciplinary record." });
+  }
+  if (!canFileFor(deptId, ctx) && !canViewAll(ctx)) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: "Reading a department's record needs command of it, or discipline.view.",
+    });
+  }
+  const all = (await loadActions()).filter((a) => a.bodyId === deptId);
+  const mine = all.filter((a) => a.issuedByDiscordId === ctx.user.id);
+  res.json({ actions: all, mine, canViewAll: true, totals: { mine: mine.length, all: all.length } });
+});
+
 /* ------------------------------------------------------------------ *
  * Filing
  * ------------------------------------------------------------------ */

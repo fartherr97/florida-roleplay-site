@@ -444,8 +444,9 @@ function TabButton({ active, onClick, label, count }) {
   );
 }
 
-/** The folded summary, laid out the way the Discord embed lays it out. */
-function BackgroundPanel({ background }) {
+/** The folded summary, laid out the way the Discord embed lays it out. Exported so the
+ *  department-hub DA page renders the identical panel. */
+export function BackgroundPanel({ background }) {
   const buckets = [
     { label: "Verbal · Staff", list: background.verbal.staff },
     { label: "Verbal · Department", list: background.verbal.department },
@@ -517,7 +518,7 @@ function BackgroundPanel({ background }) {
   );
 }
 
-function VoidModal({ action, onClose, onDone }) {
+export function VoidModal({ action, onClose, onDone }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -557,7 +558,7 @@ function VoidModal({ action, onClose, onDone }) {
   );
 }
 
-function EditModal({ action, ctx, onClose, onDone }) {
+export function EditModal({ action, ctx, onClose, onDone }) {
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);

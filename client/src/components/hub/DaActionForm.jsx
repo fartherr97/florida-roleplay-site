@@ -5,7 +5,7 @@ import Field from "../ui/Field";
 import Select from "../ui/Select";
 import { TextArea, TextInput } from "../ui/TextInput";
 import { api } from "../../lib/api";
-import { ACTION_TYPES, filingBodiesFor, validateAction } from "../../lib/discipline";
+import { ACTION_TYPES, bodyLabel, filingBodiesFor, validateAction } from "../../lib/discipline";
 
 const BLANK = {
   type: "verbal_warning",
@@ -27,17 +27,22 @@ const BLANK = {
  * somebody has just looked up, so filing against the record you are reading
  * does not mean copying the ID back out of the search box.
  */
-export default function DaActionForm({ ctx, prefill, onFiled }) {
+export default function DaActionForm({ ctx, prefill, onFiled, lockBodyId }) {
   // Only the bodies this person may actually file for. Offering the rest would
   // be offering a 403.
   const bodies = useMemo(() => filingBodiesFor(ctx), [ctx]);
   // Auto-picked only when there is nothing to pick between. The body is what
   // decides whether an action reads as Staff or Department in /bgcheck, so for
   // anybody who can file for several, a default that quietly sticks is worse
-  // than one more click.
+  // than one more click. `lockBodyId` fixes it outright — the DA page inside a
+  // department hub files everything under that department.
   const blank = useMemo(
-    () => ({ ...BLANK, bodyId: bodies.length === 1 ? bodies[0].id : "", ...prefill }),
-    [bodies, prefill],
+    () => ({
+      ...BLANK,
+      bodyId: lockBodyId ?? (bodies.length === 1 ? bodies[0].id : ""),
+      ...prefill,
+    }),
+    [bodies, prefill, lockBodyId],
   );
 
   const [draft, setDraft] = useState(blank);
@@ -91,14 +96,22 @@ export default function DaActionForm({ ctx, prefill, onFiled }) {
             onChange={(type) => set({ type })}
           />
         </Field>
-        <Field label="Filed on behalf of" required error={errors.bodyId}>
-          <Select
-            value={draft.bodyId}
-            options={bodies.map((b) => ({ value: b.id, label: b.label }))}
-            placeholder="Pick a body"
-            onChange={(bodyId) => set({ bodyId })}
-          />
-        </Field>
+        {lockBodyId ? (
+          <Field label="Filed on behalf of">
+            <div className="flex h-11 items-center rounded-xl bg-black/20 px-3 text-sm font-semibold text-slate-200 ring-1 ring-inset ring-white/[0.06]">
+              {bodyLabel(lockBodyId)}
+            </div>
+          </Field>
+        ) : (
+          <Field label="Filed on behalf of" required error={errors.bodyId}>
+            <Select
+              value={draft.bodyId}
+              options={bodies.map((b) => ({ value: b.id, label: b.label }))}
+              placeholder="Pick a body"
+              onChange={(bodyId) => set({ bodyId })}
+            />
+          </Field>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

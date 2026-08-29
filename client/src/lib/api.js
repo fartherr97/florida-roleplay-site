@@ -760,6 +760,15 @@ export const api = {
       null,
     ),
 
+  /** One department's disciplinary record — what the DA page in a dept hub reads. */
+  deptDiscipline: (deptId) =>
+    get(`/discipline/dept/${encodeURIComponent(deptId)}`, {
+      actions: [],
+      mine: [],
+      canViewAll: false,
+      totals: { mine: 0, all: 0 },
+    }),
+
   /* --------------------------- Staff admin log --------------------------- */
 
   /**

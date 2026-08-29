@@ -20,6 +20,7 @@ import DeptUniforms from "../../pages/dept/DeptUniforms";
 import DeptChain from "../../pages/dept/DeptChain";
 import DeptCalendar from "../../pages/dept/DeptCalendar";
 import DeptAdminLog from "../../pages/dept/DeptAdminLog";
+import DeptDaHub from "../../pages/dept/DeptDaHub";
 import DeptActivity from "../../pages/dept/DeptActivity";
 import DeptHours from "../../pages/dept/DeptHours";
 import DeptAudit from "../../pages/dept/DeptAudit";
@@ -47,6 +48,7 @@ const PAGE_COMPONENTS = {
   chain: DeptChain,
   calendar: DeptCalendar,
   adminlog: DeptAdminLog,
+  dahub: DeptDaHub,
   activity: DeptActivity,
   hours: DeptHours,
   audit: DeptAudit,
