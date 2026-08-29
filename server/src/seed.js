@@ -528,7 +528,7 @@ export const knowledgeBase = [];
 /** Canned assistant replies, keyed by the topic a message mentions. */
 export const assistantReplies = [
   {
-    match: ["rule", "rdm", "vdm", "metagam", "powergam", "new life"],
+    match: ["rdm", "vdm", "metagam", "powergam", "new life"],
     reply:
       "The full rulebook lives on the rules page, and it's searchable. The three people ask about most are 2.2 (no RDM — violence needs build-up and motive), 2.4 (no metagaming — Discord and stream info never reaches your character) and 2.6 (New Life Rule — after you respawn you forget the scene that killed you).",
   },

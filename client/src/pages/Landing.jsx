@@ -12,12 +12,22 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { api } from "../lib/api";
 import { iconFor } from "../lib/icons";
-import { toneTile } from "../lib/tones";
+import { accentOf } from "../lib/departmentConfig";
 import {
   SITE, features, heroCopy,
   departments as seedDepartments, patchNotes,
 } from "../data/mockData";
 import { formatDate } from "../lib/format";
+
+/** The three law-enforcement departments, in reading order. */
+const LEO_IDS = ["fhp", "bcso", "mpd"];
+
+/** Department crests, hosted on the community site. */
+const DEPT_LOGOS = {
+  fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
+  bcso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
+};
 
 /** The public landing page — full-bleed hero over stacked content sections. */
 export default function Landing() {
@@ -158,33 +168,62 @@ export default function Landing() {
         title="Three agencies"
         subtitle="Every department runs its own command structure, fleet and hiring process."
       >
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {departments.map((department) => {
-            const Icon = iconFor(department.icon);
-            return (
-              <Card
-                key={department.id}
-                as={Link}
-                to={`/departments/${department.id}`}
-                hover
-                className="group block p-5"
-              >
-                <span
-                  className={`grid size-11 place-items-center rounded-xl ring-1 ring-inset ${toneTile(department.tone)}`}
+        <div className="mx-auto grid max-w-4xl gap-5 sm:grid-cols-3">
+          {LEO_IDS.map((id) => departments.find((d) => d.id === id))
+            .filter(Boolean)
+            .map((department) => {
+              const Icon = iconFor(department.icon);
+              const accent = accentOf({ accent: department.tone });
+              const logo = DEPT_LOGOS[department.id];
+              return (
+                <Card
+                  key={department.id}
+                  as={Link}
+                  to={`/departments/${department.id}`}
+                  hover
+                  className="group relative flex flex-col items-center overflow-hidden p-7 text-center"
                 >
-                  <Icon className="size-5" />
-                </span>
-                <h3 className="mt-4 text-sm font-bold text-white">{department.abbr}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  {department.name}
-                </p>
-                <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary-400">
-                  View
-                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                </p>
-              </Card>
-            );
-          })}
+                  {/* Faint accent wash from the top, deepening on hover. */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-60 transition-opacity duration-500 group-hover:opacity-100"
+                    style={{ background: `radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, ${accent.color} 22%, transparent), transparent 70%)` }}
+                  />
+                  <span
+                    className="relative grid size-20 place-items-center rounded-2xl ring-1 ring-inset transition-transform duration-500 group-hover:-translate-y-0.5"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${accent.color} 12%, transparent)`,
+                      "--tw-ring-color": `color-mix(in srgb, ${accent.color} 32%, transparent)`,
+                    }}
+                  >
+                    {logo ? (
+                      <img
+                        src={logo}
+                        alt={`${department.abbr} crest`}
+                        className="size-14 object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.4)]"
+                      />
+                    ) : (
+                      <Icon className="size-8" style={{ color: accent.color }} />
+                    )}
+                  </span>
+                  <h3 className="relative mt-5 text-lg font-black tracking-tight text-white">
+                    {department.abbr}
+                  </h3>
+                  <p className="relative mt-1 text-xs font-semibold" style={{ color: accent.soft }}>
+                    {department.name}
+                  </p>
+                  {department.tagline && (
+                    <p className="relative mt-3 line-clamp-2 text-xs leading-relaxed text-slate-400">
+                      {department.tagline}
+                    </p>
+                  )}
+                  <p className="relative mt-5 inline-flex items-center gap-1 text-xs font-bold text-primary-400">
+                    View department
+                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </p>
+                </Card>
+              );
+            })}
         </div>
       </Section>
 

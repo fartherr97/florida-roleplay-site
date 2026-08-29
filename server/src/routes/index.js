@@ -585,16 +585,105 @@ router.post("/reports/:reference/status", requirePermission("site.moderation"), 
 
 /* ------------------------------------------------------------- assistant */
 
-router.post("/assistant", (req, res) => {
+// Words too common to help retrieval — dropped before scoring a rule search.
+const ASSISTANT_STOP = new Set([
+  "the", "a", "an", "is", "are", "do", "does", "did", "can", "could", "would", "should",
+  "i", "you", "we", "they", "what", "whats", "how", "why", "when", "where", "which", "who",
+  "to", "of", "for", "and", "or", "but", "my", "me", "in", "on", "it", "its", "that", "this",
+  "about", "with", "if", "be", "was", "were", "am", "get", "got", "any", "some", "there",
+  "rule", "rules", "flrp", "florida", "roleplay", "server",
+]);
+
+/** Flatten the rule corpus (DB rows if given, else the seed) to searchable rows. */
+function flattenRules(rows) {
+  if (rows && rows.length) {
+    return rows.map((r) => ({ number: r.number || "", title: r.title || "", body: r.body || "", category: r.category || "" }));
+  }
+  return seed.rules.flatMap((g) =>
+    g.items.map((it) => ({ number: it.number || "", title: it.title || "", body: it.body || "", category: g.category || "" })),
+  );
+}
+
+/** One rule, formatted for the chat reply. */
+function formatRule(r) {
+  const head = r.number
+    ? `Rule ${r.number}${r.title ? ` — ${r.title}` : r.category ? ` (${r.category})` : ""}`
+    : r.title || r.category || "Rule";
+  return `${head}\n\n${r.body}`;
+}
+
+/** A rule referenced by number, e.g. "rule 3.2" or just "14.1". */
+function ruleByNumber(message, rules) {
+  const m = message.match(/\b(\d{1,2}(?:\.\d{1,2}){1,3})\b/) || message.match(/\brule\s+(\d{1,2})\b/);
+  if (!m) return null;
+  return rules.find((r) => r.number === m[1]) || null;
+}
+
+/** The rules whose text best covers the question. Needs at least two meaningful
+ *  terms to match (or every term, for a one- or two-word question), so a single
+ *  common word can't drag in an unrelated rule. Title/category hits weigh more. */
+function searchRules(message, rules) {
+  const terms = [
+    ...new Set(message.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !ASSISTANT_STOP.has(w))),
+  ];
+  if (!terms.length) return [];
+  const scored = rules
+    .map((r) => {
+      const hay = `${r.number} ${r.title} ${r.category} ${r.body}`.toLowerCase();
+      const head = `${r.title} ${r.category}`.toLowerCase();
+      let matched = 0;
+      let headHits = 0;
+      for (const t of terms) {
+        if (hay.includes(t)) {
+          matched += 1;
+          if (head.includes(t)) headHits += 1;
+        }
+      }
+      return { r, matched, score: matched + headHits };
+    })
+    .filter((x) => x.matched > 0);
+  const need = Math.min(2, terms.length);
+  return scored
+    .filter((x) => x.matched >= need)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((x) => x.r);
+}
+
+router.post("/assistant", async (req, res) => {
   const { errors, value } = validateAssistantMessage(req.body ?? {});
   if (errors.length > 0) return res.status(400).json({ ok: false, errors });
 
-  // TODO: hand the message to a real model. Canned topic matching for now.
   const message = value.message.toLowerCase();
+
+  // The live rulebook (DB), falling back to the seed so the assistant answers
+  // even with no database configured.
+  let rules;
+  try {
+    const rows = await query("SELECT number, title, body, category FROM rules ORDER BY category_id, sort_order, number");
+    rules = flattenRules(rows);
+  } catch {
+    rules = flattenRules(null);
+  }
+
+  // 1. A rule asked for by number wins outright.
+  const byNumber = ruleByNumber(message, rules);
+  if (byNumber) return res.json({ reply: formatRule(byNumber) });
+
+  // 2. A canned reply for the common non-rule intents (applying, the store…).
   const hit = seed.assistantReplies.find((entry) =>
     entry.match.some((keyword) => message.includes(keyword)),
   );
-  return res.json({ reply: hit ? hit.reply : seed.assistantFallback });
+  if (hit) return res.json({ reply: hit.reply });
+
+  // 3. Otherwise, answer from the rules themselves.
+  const found = searchRules(message, rules);
+  if (found.length) {
+    const body = found.map(formatRule).join("\n\n———\n\n");
+    return res.json({ reply: `${body}\n\nYou can read the full rulebook on the Rules page.` });
+  }
+
+  return res.json({ reply: seed.assistantFallback });
 });
 
 export default router;
