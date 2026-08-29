@@ -6,7 +6,6 @@ import Button from "../../components/ui/Button";
 import SocialLinks from "../../components/layout/SocialLinks";
 import Logo from "../../components/layout/Logo";
 import HubBrandMark from "../../components/hub/HubBrandMark";
-import PreviewModePanel from "../../components/hub/PreviewModePanel";
 import { useAuth } from "../../context/useAuth";
 import { api, loginUrl } from "../../lib/api";
 import { SITE, STAFF_RANKS } from "../../data/mockData";
@@ -29,7 +28,7 @@ const CHIP_TONES = {
  * portals do. One component serves both hubs; only the copy and the chips differ.
  */
 export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
-  const { user, previewRank } = useAuth();
+  const { user } = useAuth();
 
   // The site has one Discord sign-in for everything; a hub landing is just an
   // entry to it, never a second login. `configured` gates whether that OAuth is
@@ -123,11 +122,9 @@ export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
           </div>
 
           <p className="animate-fade-up delay-300 mt-4 text-sm text-slate-500">
-            {previewRank
-              ? `Previewing as ${user?.rank}. Your Discord roles will replace this once OAuth is live.`
-              : authenticated
-                ? "You're signed in — the hub opens to whatever your Discord roles grant."
-                : "One Discord sign-in covers the whole site; your roles decide what opens."}
+            {authenticated
+              ? "You're signed in — the hub opens to whatever your Discord roles grant."
+              : "One Discord sign-in covers the whole site; your roles decide what opens."}
           </p>
 
           <div className="animate-fade-up delay-400 mt-9 flex flex-wrap justify-center gap-2">
@@ -149,8 +146,6 @@ export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
               {chipNote}
             </p>
           )}
-
-          <PreviewModePanel className="animate-fade-up delay-400 mt-10 text-left sm:text-center" />
 
           <SocialLinks className="mt-12" />
         </div>

@@ -246,6 +246,33 @@ const LEADERSHIP_FALLBACK_SEATS = [
   { seatKey: "asst-civilian-director", grp: "directors", title: "Asst. Civilian Director", order: 7 },
 ];
 
+// The leadership_seats table is created and seeded here at runtime as well as in
+// schema.sql, so the feature works even on a deployment whose `db:init` didn't
+// run after this table was added. Idempotent and memoised per process.
+let leadershipTableReady = false;
+async function ensureLeadershipTable() {
+  if (leadershipTableReady) return;
+  await query(`CREATE TABLE IF NOT EXISTS leadership_seats (
+    seat_key    VARCHAR(48)  NOT NULL,
+    grp         VARCHAR(16)  NOT NULL,
+    title       VARCHAR(64)  NOT NULL,
+    name        VARCHAR(128) NOT NULL DEFAULT '',
+    handle      VARCHAR(64)  NOT NULL DEFAULT '',
+    discord_id  VARCHAR(20)  NOT NULL DEFAULT '',
+    avatar_url  TEXT         NULL,
+    sort_order  INT          NOT NULL DEFAULT 0,
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (seat_key)
+  )`);
+  for (const s of LEADERSHIP_FALLBACK_SEATS) {
+    await query(
+      "INSERT INTO leadership_seats (seat_key, grp, title, sort_order) VALUES ($1, $2, $3, $4) ON CONFLICT (seat_key) DO NOTHING",
+      [s.seatKey, s.grp, s.title, s.order],
+    );
+  }
+  leadershipTableReady = true;
+}
+
 function shapeSeat(r) {
   const name = (r.name || "").trim();
   return {
@@ -268,6 +295,7 @@ router.get("/leadership", (_req, res) => {
   safe(
     res,
     async () => {
+      await ensureLeadershipTable();
       const rows = await query(
         "SELECT seat_key, grp, title, name, handle, discord_id, avatar_url, sort_order FROM leadership_seats ORDER BY grp DESC, sort_order, title",
       );
@@ -340,6 +368,7 @@ router.put("/leadership/:seatKey", async (req, res) => {
   const def = LEADERSHIP_FALLBACK_SEATS.find((s) => s.seatKey === seatKey);
   if (!def) return res.status(404).json({ ok: false, message: "No such seat." });
   try {
+    await ensureLeadershipTable();
     const rows = await query(
       `INSERT INTO leadership_seats (seat_key, grp, title, name, handle, discord_id, avatar_url, sort_order, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
