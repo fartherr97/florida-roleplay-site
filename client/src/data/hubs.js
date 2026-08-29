@@ -190,6 +190,31 @@ export const CIVILIAN_HUB = {
   ],
 };
 
+/**
+ * The Development Hub's landing. Its inner pages live under the main site chrome
+ * (the Development nav dropdown), so it is not a HubShell hub and stays out of
+ * HUBS — but it reuses HubLanding for a matching portal entry, with a
+ * Create-a-ticket call to action.
+ */
+export const DEV_HUB = {
+  id: "development",
+  base: "/development",
+  name: "Development Hub",
+  eyebrow: "Development Hub",
+  tagline: "Development Hub",
+  description:
+    "Request a personal vehicle, department work, a livery or a build — the dev team picks it up, tracks it and ships it, all from here.",
+  action: { label: "Create a ticket", to: "/development/new", icon: "Plus" },
+};
+
+/** Chips shown on the Development Hub landing — what you can open a ticket for. */
+export const DEV_CHIPS = [
+  { id: "vehicles", label: "Personal Vehicles", tone: "primary" },
+  { id: "dept", label: "Department Work", tone: "brand" },
+  { id: "liveries", label: "Liveries", tone: "green" },
+  { id: "builds", label: "Builds & Scripts", tone: "amber" },
+];
+
 export const HUBS = [STAFF_HUB, CIVILIAN_HUB];
 
 

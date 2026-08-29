@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Zap } from "lucide-react";
 import { FaDiscord } from "react-icons/fa6";
@@ -6,6 +6,7 @@ import Button from "../../components/ui/Button";
 import SocialLinks from "../../components/layout/SocialLinks";
 import Logo from "../../components/layout/Logo";
 import HubBrandMark from "../../components/hub/HubBrandMark";
+import { iconFor } from "../../lib/icons";
 import { useAuth } from "../../context/useAuth";
 import { api, loginUrl } from "../../lib/api";
 import { SITE, STAFF_RANKS } from "../../data/mockData";
@@ -109,10 +110,18 @@ export default function HubLanding({ hub, chips = STAFF_RANKS, chipNote }) {
 
           <div className="animate-fade-up delay-300 mt-8 space-y-3">
             {authenticated ? (
-              <Button as={Link} to={enterTo} variant="primary" size="lg" block>
-                {enterLabel}
-                <ArrowRight className="size-5" />
-              </Button>
+              <>
+                <Button as={Link} to={enterTo} variant="primary" size="lg" block>
+                  {enterLabel}
+                  <ArrowRight className="size-5" />
+                </Button>
+                {hub.action && (
+                  <Button as={Link} to={hub.action.to} variant="secondary" size="lg" block>
+                    {createElement(iconFor(hub.action.icon, ArrowRight), { className: "size-5" })}
+                    {hub.action.label}
+                  </Button>
+                )}
+              </>
             ) : (
               <Button as="a" href={signInHref} {...signInProps} variant="discord" size="lg" block>
                 <FaDiscord className="size-5" />

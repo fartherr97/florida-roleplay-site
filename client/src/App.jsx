@@ -45,7 +45,7 @@ import DevFeedback from "./pages/development/DevFeedback";
 import DevQueue from "./pages/development/DevQueue";
 import DevTypes from "./pages/development/DevTypes";
 import HubLanding from "./pages/hub/HubLanding";
-import { CIVILIAN_HUB, STAFF_HUB } from "./data/hubs";
+import { CIVILIAN_HUB, DEV_CHIPS, DEV_HUB, STAFF_HUB } from "./data/hubs";
 import { CIVILIAN_RANKS } from "./data/mockData";
 
 import HubHome from "./pages/hub/HubHome";
@@ -136,7 +136,7 @@ export default function App() {
             {/* The Development Hub. Members open requests for vehicles, liveries
                 and builds; the dev team works them from the queue. Named routes
                 sit above /requests/:id so a reference can never shadow them. */}
-            <Route path="development" element={<DevHome />} />
+            <Route path="development/home" element={<DevHome />} />
             <Route path="development/new" element={<DevNew />} />
             <Route path="development/requests" element={<DevRequests />} />
             <Route path="development/requests/:id" element={<DevRequestDetail />} />
@@ -212,6 +212,20 @@ export default function App() {
             <Route path="login" element={<Navigate to="/sign-in" replace />} />
             <Route path="register" element={<Navigate to="/create-account" replace />} />
           </Route>
+
+          {/* Development Hub landing — a portal entry like the other hubs. Its
+              inner pages keep the main-site chrome (the Development dropdown),
+              so only this entry is a standalone full-screen shell. */}
+          <Route
+            path="/development"
+            element={
+              <HubLanding
+                hub={DEV_HUB}
+                chips={DEV_CHIPS}
+                chipNote="Open a ticket for anything the dev team builds — the categories are on the hub home."
+              />
+            }
+          />
 
           {/* Staff Hub — its own shell, so neither the public TopBar nor the
               Footer wraps it. The landing page is public (it is the sign-in
