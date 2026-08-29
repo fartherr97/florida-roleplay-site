@@ -104,8 +104,6 @@ export const navGroups = [
       hover: "hover:bg-rose-500/10 hover:text-rose-300 focus-visible:bg-rose-500/10",
     },
     items: [
-      { label: "Leadership", to: "/management/leadership", icon: "Crown" },
-      { label: "Department Heads", to: "/management/department-heads", icon: "UserCog" },
       { label: "Site Administration", to: "/staff-hub/administration", icon: "SlidersHorizontal" },
       { label: "Access & Roles", to: "/staff-hub/access", icon: "KeyRound" },
       { label: "Image Hosting Administration", to: "/management/image-hosting", icon: "Image" },

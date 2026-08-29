@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LayoutDashboard, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../../context/useAuth";
 import { PREVIEW_RANKS } from "../../data/mockData";
 import Button from "../ui/Button";
@@ -14,7 +15,7 @@ import { cn } from "../../lib/cn";
  * bare avatar on narrow phones.
  */
 export default function UserChip({ className, showRank = false }) {
-  const { user, loading, hasPermission, previewRank, signOut } = useAuth();
+  const { user, loading, previewRank, signOut } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -71,7 +72,6 @@ export default function UserChip({ className, showRank = false }) {
   // The band a rank sits in, for the line under the name. Read off the ladder
   // rather than hard-coded, so a tier added above Ownership needs nothing here.
   const tier = tierFor(rank);
-  const staff = hasPermission("staff.view");
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -120,44 +120,40 @@ export default function UserChip({ className, showRank = false }) {
         </span>
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-52 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d1220] p-1.5 shadow-xl shadow-black/40"
-        >
-          <div className="px-2.5 py-2">
-            <p className="truncate text-sm font-medium text-slate-200">
-              {user.displayName || user.username}
-            </p>
-            {rank && (
-              <p className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-primary-400">
-                {rank}
-              </p>
-            )}
-          </div>
-          <div className="my-1 h-px bg-white/[0.06]" />
-          {staff && (
-            <Link
-              to="/staff"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
-            >
-              <LayoutDashboard className="size-4 text-slate-500" />
-              Staff Hub
-            </Link>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={handleSignOut}
-            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-slate-300 transition hover:bg-rose-500/10 hover:text-rose-200"
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            style={{ transformOrigin: "top right" }}
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-52 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d1220] p-1.5 shadow-xl shadow-black/40"
           >
-            <LogOut className="size-4 text-slate-500" />
-            Sign out
-          </button>
-        </div>
-      )}
+            <div className="px-2.5 py-2">
+              <p className="truncate text-sm font-medium text-slate-200">
+                {user.displayName || user.username}
+              </p>
+              {rank && (
+                <p className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-primary-400">
+                  {rank}
+                </p>
+              )}
+            </div>
+            <div className="my-1 h-px bg-white/[0.06]" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleSignOut}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-slate-300 transition hover:bg-rose-500/10 hover:text-rose-200"
+            >
+              <LogOut className="size-4 text-slate-500" />
+              Sign out
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

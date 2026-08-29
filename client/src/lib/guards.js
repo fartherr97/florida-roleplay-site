@@ -17,12 +17,6 @@ export const GUARDS = [
   { path: "/staff", permission: "site.staff_directory" },
   { path: "/staff/moderation", permission: "site.moderation" },
   { path: "/staff/support", permission: "site.support" },
-  { path: "/management/leadership", permission: "site.leadership" },
-  {
-    path: "/management/department-heads",
-    permission: "site.department_heads",
-    reason: "department",
-  },
   { path: "/management/image-hosting", permission: "media.manage" },
 
   // Staff Hub

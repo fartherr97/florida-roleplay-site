@@ -75,8 +75,6 @@ import CivGuides from "./pages/civ/CivGuides";
 import CivForms from "./pages/civ/CivForms";
 import Moderation from "./pages/staff/Moderation";
 import Support from "./pages/staff/Support";
-import Leadership from "./pages/management/Leadership";
-import DepartmentHeads from "./pages/management/DepartmentHeads";
 import Contact from "./pages/management/Contact";
 import BotShell from "./components/bot/BotShell";
 import BotOverview from "./pages/management/bot/BotOverview";
@@ -171,9 +169,6 @@ export default function App() {
             <Route path="staff" element={<Staff />} />
             <Route path="staff/moderation" element={<Moderation />} />
             <Route path="staff/support" element={<Support />} />
-            <Route path="management/leadership" element={<Leadership />} />
-            <Route path="management/department-heads" element={<DepartmentHeads />} />
-            {/* Public: reaching leadership should not require a role. */}
             <Route path="management/contact" element={<Contact />} />
 
             {/* The bot dashboard. Deliberately not behind this site's guard
