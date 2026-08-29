@@ -292,7 +292,9 @@ function shapeSeat(r) {
 router.get("/leadership", (_req, res) => {
   // Never let a CDN or browser cache this — a just-saved edit must show at once.
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  safe(
+  // safeOne, not safe: this endpoint returns an object, and safe()'s
+  // rows.length check would discard it and serve the vacant fallback forever.
+  safeOne(
     res,
     async () => {
       await ensureLeadershipTable();
