@@ -296,6 +296,17 @@ router.get("/leadership-debug", requirePermission("discord.roles.manage"), async
   return res.json(await leadershipDebug());
 });
 
+// Ownership-only: force a full Discord sync, which rebuilds the home page's
+// leadership team. Gated on the ownership role rather than a permission so only
+// owners see and use it.
+router.post("/leadership-resync", async (req, res) => {
+  if (!req.user?.roles?.includes("ownership")) {
+    return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Ownership only." });
+  }
+  const result = await syncRosterFromGuild();
+  return res.json(result);
+});
+
 router.get("/sync-log", requirePermission("roster.view"), (_req, res) =>
   (async () => {
     try {

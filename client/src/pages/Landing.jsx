@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight, Bot, ChevronDown, Crown, ExternalLink, FileText, Newspaper,
-  ShieldCheck, UserPlus,
+  RefreshCw, ShieldCheck, UserPlus,
 } from "lucide-react";
 import { FaDiscord } from "react-icons/fa6";
 import Section from "../components/layout/Section";
@@ -11,6 +11,7 @@ import AssistantModal from "../components/landing/AssistantModal";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { api } from "../lib/api";
+import { useAuth } from "../context/useAuth";
 import { iconFor } from "../lib/icons";
 import { accentOf } from "../lib/departmentConfig";
 import {
@@ -47,6 +48,30 @@ export default function Landing() {
   const [latest, setLatest] = useState(patchNotes[0]);
   const [leadership, setLeadership] = useState({ ownership: [], directors: [] });
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [resync, setResync] = useState({ state: "idle", message: "" });
+  const { hasRole } = useAuth();
+  const isOwner = hasRole(["ownership"]);
+
+  const runResync = async () => {
+    setResync({ state: "loading", message: "" });
+    try {
+      const result = await api.leadershipResync();
+      const l = await api.leadership();
+      setLeadership({ ownership: l.ownership ?? [], directors: l.directors ?? [] });
+      const count = typeof result?.leadership === "number" ? result.leadership : null;
+      setResync({
+        state: "done",
+        message:
+          result?.configured === false
+            ? "No Discord bot token is set on the server, so it can't read roles."
+            : count != null
+              ? `Synced — ${count} leader${count === 1 ? "" : "s"} found.`
+              : "Sync finished.",
+      });
+    } catch {
+      setResync({ state: "done", message: "Couldn't run the sync." });
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -244,6 +269,15 @@ export default function Landing() {
       {/* 4.5 — Leadership, synced from Discord. Always shown; the director seats
           fall back to Vacant until the sync fills them. */}
       <Section reveal eyebrow="The Team" title="Leadership" subtitle="The people who run Florida Roleplay, straight from Discord.">
+        {isOwner && (
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+            <Button variant="ghost" size="sm" onClick={runResync} disabled={resync.state === "loading"}>
+              <RefreshCw className={`size-4 ${resync.state === "loading" ? "animate-spin" : ""}`} />
+              {resync.state === "loading" ? "Resyncing…" : "Resync from Discord"}
+            </Button>
+            {resync.message && <span className="text-xs text-slate-500">{resync.message}</span>}
+          </div>
+        )}
         <div className="space-y-8">
           {leadership.ownership.length > 0 && (
             <LeadershipGroup label="Ownership" icon={Crown} members={leadership.ownership} />

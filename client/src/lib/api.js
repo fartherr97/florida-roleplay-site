@@ -432,6 +432,9 @@ export const api = {
   /** The public leadership team (ownership + directors), synced from Discord. */
   leadership: () => get("/leadership", { ownership: [], directors: [] }),
 
+  /** Ownership-only: force a Discord sync that rebuilds the leadership team. */
+  leadershipResync: () => post("/roster/leadership-resync", {}, () => ({ ok: false, message: NOT_PERSISTED })),
+
   civBusinesses: () => get("/civilian-hub/businesses", civ.businesses),
   civPenalCode: (q = "") => {
     const trimmed = q.trim();
