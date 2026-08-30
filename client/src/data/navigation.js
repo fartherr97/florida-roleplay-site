@@ -113,6 +113,7 @@ export const navGroups = [
       // who isn't management so the tab doesn't leak to signed-out visitors.
       { label: "Bot Dashboard", to: "/management/bot", icon: "Bot", permission: "permissions.manage" },
       { label: "Email Directory", to: "/management/emails", icon: "Mail", permission: "emails.view" },
+      { label: "Broadcast", to: "/management/broadcast", icon: "Megaphone", permission: "truthsocial.post" },
     ],
   },
 ];

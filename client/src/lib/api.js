@@ -772,6 +772,17 @@ export const api = {
   /** The community email directory — every member's email with roster context. */
   emails: () => get("/emails", { members: [], departments: [] }),
 
+  /* ----------------------------- Broadcast ------------------------------- */
+
+  /** The saved broadcast webhook (ownership only). */
+  truthSocialConfig: () => get("/truth-social/config", { webhookUrl: "" }),
+  /** Save (or clear) the broadcast webhook URL. Throws on a bad URL. */
+  saveTruthSocialWebhook: (webhookUrl) =>
+    request("/truth-social/config", { method: "POST", body: JSON.stringify({ webhookUrl }) }),
+  /** Send a broadcast to the configured channel. Throws with the reason on failure. */
+  sendTruthSocialPost: (payload) =>
+    request("/truth-social/post", { method: "POST", body: JSON.stringify(payload) }),
+
   /* --------------------------- Staff admin log --------------------------- */
 
   /**

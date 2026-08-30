@@ -18,6 +18,7 @@ import promotionsRouter from "./promotions.js";
 import transfersRouter from "./transfers.js";
 import disciplineRouter from "./discipline.js";
 import emailsRouter from "./emails.js";
+import truthSocialRouter from "./truthSocial.js";
 import staffLogRouter from "./staffLog.js";
 import supportRouter from "./support.js";
 import devHubRouter from "./devHub.js";
@@ -61,6 +62,7 @@ router.use("/transfers", transfersRouter);
 // record rather than an incomplete one.
 router.use("/discipline", disciplineRouter);
 router.use("/emails", emailsRouter);
+router.use("/truth-social", truthSocialRouter);
 router.use("/staff-log", staffLogRouter);
 // The support portal. Members open tickets here; the support team works them.
 router.use("/support", supportRouter);

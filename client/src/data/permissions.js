@@ -198,6 +198,21 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "truthsocial",
+    label: "Broadcast",
+    description:
+      "Posting a community broadcast to a Discord channel through a webhook. Ownership only.",
+    permissions: [
+      {
+        key: "truthsocial.post",
+        label: "Post broadcasts",
+        detail:
+          "Configure the broadcast webhook and send posts to the channel it points at. Ownership only.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "transfers",
     label: "Transfer portal",
     description:
@@ -420,6 +435,7 @@ export const DEFAULT_GRANTS = {
   "discipline.manage": ["head_admin", "directorship", "ownership"],
 
   "emails.view": ["directorship", "ownership"],
+  "truthsocial.post": ["ownership"],
 
   // Opening a ticket needs nothing but a Discord account — support that only
   // answers people who already hold a role is not support. These decide who

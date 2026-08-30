@@ -19,6 +19,7 @@ export const GUARDS = [
   { path: "/staff/support", permission: "site.support" },
   { path: "/management/image-hosting", permission: "media.manage" },
   { path: "/management/emails", permission: "emails.view" },
+  { path: "/management/broadcast", permission: "truthsocial.post" },
 
   // Staff Hub
   { path: "/staff-hub/home", permission: "staff.view" },
