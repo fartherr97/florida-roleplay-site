@@ -233,6 +233,18 @@ export const api = {
     return get(`/rules${trimmed ? `?q=${encodeURIComponent(trimmed)}` : ""}`, fallback);
   },
 
+  // Rules editing (gated server-side by rules.manage — Ownership).
+  addRule: (payload) => post("/rules", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  updateRule: (id, payload) =>
+    put(`/rules/${encodeURIComponent(id)}`, payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  deleteRule: (id) =>
+    del(`/rules/${encodeURIComponent(id)}`, () => ({ ok: false, message: NOT_PERSISTED })),
+  updateRuleCategory: (categoryId, payload) =>
+    put(`/rules/category/${encodeURIComponent(categoryId)}`, payload, () => ({
+      ok: false,
+      message: NOT_PERSISTED,
+    })),
+
   staff: () => get("/staff", mock.staff),
 
   patchNotes: () => get("/patch-notes", mock.patchNotes),

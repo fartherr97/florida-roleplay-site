@@ -3,8 +3,10 @@
  * site works end-to-end before a database is provisioned: try the query, and on
  * any failure (or an empty result) serve the seed shape instead.
  */
+import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { changedRows, execute, query } from "../db.js";
+import { str } from "../validate.js";
 import * as seed from "../seed.js";
 import { attachUser } from "../middleware/requireRole.js";
 import { requirePermission } from "../middleware/requirePermission.js";
@@ -233,6 +235,137 @@ router.get("/rules", (req, res) => {
     },
     fallback,
   );
+});
+
+/* --------------------------------------------------------- rules editing */
+
+/**
+ * The rules table is the source of truth for editing, but a fresh deploy renders the seed
+ * through the GET fallback without ever writing a row. Editing into an empty table would
+ * then leave the page showing the seed while the edits sit in rows nobody reads — so the
+ * first write seeds the table from the shipped rules, once, and edits build on that.
+ */
+async function ensureRulesSeeded() {
+  const [{ count }] = await query("SELECT COUNT(*)::int AS count FROM rules");
+  if (count > 0) return;
+  for (const group of seed.rules) {
+    let order = 0;
+    for (const item of group.items) {
+      await execute(
+        `INSERT INTO rules (id, category_id, category, category_description, number, title, body, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING`,
+        [item.id, group.id, group.category, group.description ?? null, item.number ?? "", item.title, item.body, order],
+      );
+      order += 1;
+    }
+  }
+}
+
+/** Shared validation for a rule's editable fields. */
+function validateRule(body) {
+  const number = str(body?.number).slice(0, 16);
+  const title = str(body?.title).slice(0, 255);
+  const text = str(body?.body).slice(0, 20000);
+  const errors = [];
+  if (!title) errors.push("A title is required.");
+  if (!text) errors.push("Rule text is required.");
+  return { errors, value: { number, title, body: text } };
+}
+
+/** Add a rule to an existing category, or to a new one when a category name is given. */
+router.post("/rules", requirePermission("rules.manage"), async (req, res) => {
+  const { errors, value } = validateRule(req.body ?? {});
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+  const categoryId = str(req.body?.categoryId).slice(0, 64);
+  const newCategory = str(req.body?.category).slice(0, 128);
+  const newCategoryDesc = str(req.body?.categoryDescription).slice(0, 2000);
+
+  try {
+    await ensureRulesSeeded();
+
+    let catId = categoryId;
+    let category = newCategory;
+    let categoryDescription = newCategoryDesc;
+
+    if (categoryId) {
+      // Adding to an existing category: inherit its display name/description.
+      const [existing] = await query(
+        "SELECT category, category_description FROM rules WHERE category_id = $1 LIMIT 1",
+        [categoryId],
+      );
+      if (existing) {
+        category = newCategory || existing.category;
+        categoryDescription = newCategoryDesc || existing.category_description || "";
+      }
+    }
+    if (!catId) catId = `cat-${randomUUID().slice(0, 12)}`;
+    if (!category) return res.status(400).json({ ok: false, errors: ["A category is required."] });
+
+    const [{ max }] = await query(
+      "SELECT COALESCE(MAX(sort_order), -1)::int AS max FROM rules WHERE category_id = $1",
+      [catId],
+    );
+    const id = `rule-${randomUUID().slice(0, 12)}`;
+    await execute(
+      `INSERT INTO rules (id, category_id, category, category_description, number, title, body, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, catId, category, categoryDescription || null, value.number, value.title, value.body, max + 1],
+    );
+    return res.json({ ok: true, id, categoryId: catId });
+  } catch {
+    return res.status(503).json({ ok: false, message: "Not saved — no database is configured." });
+  }
+});
+
+/** Edit a rule's number, title and body. */
+router.put("/rules/:id", requirePermission("rules.manage"), async (req, res) => {
+  const id = str(req.params.id).slice(0, 64);
+  if (!id) return res.status(400).json({ ok: false, errors: ["A rule id is required."] });
+  const { errors, value } = validateRule(req.body ?? {});
+  if (errors.length) return res.status(400).json({ ok: false, errors });
+  try {
+    await ensureRulesSeeded();
+    const result = await execute(
+      "UPDATE rules SET number = $1, title = $2, body = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4",
+      [value.number, value.title, value.body, id],
+    );
+    if (!changedRows(result)) return res.status(404).json({ ok: false, message: "No such rule." });
+    return res.json({ ok: true, id, ...value });
+  } catch {
+    return res.status(503).json({ ok: false, message: "Not saved — no database is configured." });
+  }
+});
+
+/** Delete a rule. */
+router.delete("/rules/:id", requirePermission("rules.manage"), async (req, res) => {
+  const id = str(req.params.id).slice(0, 64);
+  if (!id) return res.status(400).json({ ok: false, errors: ["A rule id is required."] });
+  try {
+    await ensureRulesSeeded();
+    await execute("DELETE FROM rules WHERE id = $1", [id]);
+    return res.json({ ok: true, id });
+  } catch {
+    return res.status(503).json({ ok: false, message: "Not saved — no database is configured." });
+  }
+});
+
+/** Rename a category (its title and description), across every rule in it. */
+router.put("/rules/category/:categoryId", requirePermission("rules.manage"), async (req, res) => {
+  const categoryId = str(req.params.categoryId).slice(0, 64);
+  const category = str(req.body?.category).slice(0, 128);
+  const description = str(req.body?.description).slice(0, 2000);
+  if (!categoryId) return res.status(400).json({ ok: false, errors: ["A category id is required."] });
+  if (!category) return res.status(400).json({ ok: false, errors: ["A category name is required."] });
+  try {
+    await ensureRulesSeeded();
+    await execute(
+      "UPDATE rules SET category = $1, category_description = $2, updated_at = CURRENT_TIMESTAMP WHERE category_id = $3",
+      [category, description || null, categoryId],
+    );
+    return res.json({ ok: true, categoryId, category, description });
+  } catch {
+    return res.status(503).json({ ok: false, message: "Not saved — no database is configured." });
+  }
 });
 
 /* ------------------------------------------------------------ leadership */

@@ -194,6 +194,20 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "rules",
+    label: "Server rules",
+    description: "Editing the public server rulebook. Ownership only.",
+    permissions: [
+      {
+        key: "rules.manage",
+        label: "Edit the rules",
+        detail:
+          "Add, edit, reorder and remove rules and their categories on the public Rules page. Ownership only.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "truthsocial",
     label: "Broadcast",
     description:
@@ -432,6 +446,7 @@ export const DEFAULT_GRANTS = {
 
   "emails.view": ["directorship", "ownership"],
   "truthsocial.post": ["ownership"],
+  "rules.manage": ["ownership"],
 
   // Opening a ticket needs nothing but a Discord account — support that only
   // answers people who already hold a role is not support. These decide who
