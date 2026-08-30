@@ -182,9 +182,14 @@ export function cleanWebhookUrl(raw) {
     return "";
   }
   if (url.protocol !== "https:") return "";
-  if (url.hostname !== "discord.com" && url.hostname !== "discordapp.com") return "";
-  if (!url.pathname.startsWith("/api/webhooks/")) return "";
-  return url.toString();
+  // Accept discord.com, discordapp.com and the canary/ptb build subdomains.
+  if (!/^(canary\.|ptb\.)?(discord\.com|discordapp\.com)$/.test(url.hostname)) return "";
+  // Must be a complete webhook URL: /api/webhooks/{id}/{token}. Rejecting a half-pasted URL
+  // (id but no token) here means a clear "not a valid webhook" at save time instead of a
+  // confusing 404 from Discord when the post is actually sent.
+  if (!/^\/api\/webhooks\/\d+\/[\w-]+$/.test(url.pathname)) return "";
+  // Return just the canonical webhook URL, dropping any ?query (e.g. a stale thread_id).
+  return `${url.origin}${url.pathname}`;
 }
 
 /**

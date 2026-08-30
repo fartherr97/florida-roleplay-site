@@ -121,7 +121,22 @@ router.post("/post", requirePermission("truthsocial.post"), async (req, res) => 
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok) {
-      return res.status(502).json({ message: `Discord rejected the post (${response.status}).` });
+      const detail = await response.text().catch(() => "");
+      if (response.status === 404) {
+        return res.status(400).json({
+          message:
+            "Discord couldn't find that webhook (404). It was deleted or the URL is wrong — " +
+            "re-copy it from the channel's Integrations → Webhooks and save it again.",
+        });
+      }
+      if (response.status === 401 || response.status === 403) {
+        return res.status(400).json({
+          message: "Discord refused that webhook (bad token). Re-copy the webhook URL and save it again.",
+        });
+      }
+      return res.status(502).json({
+        message: `Discord rejected the post (${response.status}).${detail ? ` ${detail.slice(0, 200)}` : ""}`,
+      });
     }
     return res.json({ ok: true });
   } catch {
