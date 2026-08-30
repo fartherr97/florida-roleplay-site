@@ -51,9 +51,14 @@ export default function BotTransfers() {
   const config = useBotResource("/transfers/config", { skip: !canManage && !canExecute });
 
   const guilds = useMemo(() => config.data?.guilds ?? [], [config.data]);
-  // Only departments with a configured role set can be an endpoint of a move.
-  const endpoints = useMemo(
-    () => guilds.filter((g) => (g.transferRoleIds ?? []).length > 0),
+  // A department can be transferred OUT of only if it has a "roles removed" set, and
+  // transferred INTO only if it has a "roles added" set — the two are independent.
+  const fromEndpoints = useMemo(
+    () => guilds.filter((g) => (g.stripRoleIds ?? []).length > 0),
+    [guilds],
+  );
+  const toEndpoints = useMemo(
+    () => guilds.filter((g) => (g.grantRoleIds ?? []).length > 0),
     [guilds],
   );
 
@@ -73,7 +78,11 @@ export default function BotTransfers() {
   return (
     <div className="space-y-10">
       {canExecute && (
-        <ProcessTransfer endpoints={endpoints} onDone={config.reload} />
+        <ProcessTransfer
+          fromEndpoints={fromEndpoints}
+          toEndpoints={toEndpoints}
+          onDone={config.reload}
+        />
       )}
 
       {canManage && (
@@ -91,7 +100,7 @@ export default function BotTransfers() {
 
 const TERMINAL = new Set(["completed", "failed", "partial", "expired"]);
 
-function ProcessTransfer({ endpoints, onDone }) {
+function ProcessTransfer({ fromEndpoints, toEndpoints, onDone }) {
   const [discordUserId, setDiscordUserId] = useState("");
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
@@ -116,7 +125,8 @@ function ProcessTransfer({ endpoints, onDone }) {
     return map;
   }, [fromRoles.data, toRoles.data]);
 
-  const options = endpoints.map((g) => ({ value: g.id, label: g.name ?? g.id }));
+  const fromOptions = fromEndpoints.map((g) => ({ value: g.id, label: g.name ?? g.id }));
+  const toOptions = toEndpoints.map((g) => ({ value: g.id, label: g.name ?? g.id }));
   const ready = discordUserId.trim() && fromId && toId && fromId !== toId;
 
   // Any change to the request invalidates a stale preview, so clear it from the
@@ -150,7 +160,12 @@ function ProcessTransfer({ endpoints, onDone }) {
     }
   };
 
-  if (endpoints.length < 2) {
+  const canTransfer =
+    fromOptions.length > 0 &&
+    toOptions.length > 0 &&
+    new Set([...fromOptions, ...toOptions].map((o) => o.value)).size >= 2;
+
+  if (!canTransfer) {
     return (
       <section>
         <SectionHeading
@@ -159,7 +174,8 @@ function ProcessTransfer({ endpoints, onDone }) {
           subtitle="Move a member from one department to another."
         />
         <Empty title="Not enough departments configured">
-          A transfer needs at least two departments with a configured role set.
+          A transfer needs a department with a &ldquo;roles removed&rdquo; set to move out
+          of, and a different one with a &ldquo;roles added&rdquo; set to move into.
           Configure them below first.
         </Empty>
       </section>
@@ -191,7 +207,7 @@ function ProcessTransfer({ endpoints, onDone }) {
               value={fromId}
               onChange={changeFrom}
               placeholder="Outgoing"
-              options={options}
+              options={fromOptions.filter((o) => o.value !== toId)}
             />
           </Field>
           <div className="hidden pb-2.5 text-slate-500 sm:block">
@@ -203,7 +219,7 @@ function ProcessTransfer({ endpoints, onDone }) {
               value={toId}
               onChange={changeTo}
               placeholder="Incoming"
-              options={options.filter((o) => o.value !== fromId)}
+              options={toOptions.filter((o) => o.value !== fromId)}
             />
           </Field>
         </div>
@@ -472,7 +488,7 @@ function DepartmentConfig({ guilds, onSaved }) {
       <SectionHeading
         icon={Pencil}
         title="Department transfer roles"
-        subtitle="The Discord roles that define membership in each department. These are what a transfer strips and grants."
+        subtitle="Two separate sets per department: the roles stripped when a member leaves it, and the roles added when a member joins it."
       />
 
       {guilds.length === 0 ? (
@@ -482,18 +498,24 @@ function DepartmentConfig({ guilds, onSaved }) {
       ) : (
         <Card className="divide-y divide-white/[0.06]">
           {guilds.map((guild) => {
-            const count = (guild.transferRoleIds ?? []).length;
+            const strip = (guild.stripRoleIds ?? []).length;
+            const grant = (guild.grantRoleIds ?? []).length;
             return (
               <div key={guild.id} className="flex items-center gap-4 px-5 py-3.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white">{guild.name}</p>
                   <p className="truncate text-xs text-slate-500">
-                    {count === 0
+                    {strip === 0 && grant === 0
                       ? "No transfer roles set"
-                      : `${count} transfer role${count === 1 ? "" : "s"}`}
+                      : `Removes ${strip} · adds ${grant}`}
                   </p>
                 </div>
-                {count > 0 && <Badge tone="primary">{count}</Badge>}
+                {strip > 0 && (
+                  <Badge tone="rose">{strip} out</Badge>
+                )}
+                {grant > 0 && (
+                  <Badge tone="green">{grant} in</Badge>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setEditing(guild)}>
                   <Pencil className="size-4" />
                   Edit
@@ -519,13 +541,14 @@ function DepartmentConfig({ guilds, onSaved }) {
 }
 
 function EditRolesDialog({ guild, onClose, onSaved }) {
-  const [selected, setSelected] = useState(guild.transferRoleIds ?? []);
+  const [strip, setStrip] = useState(guild.stripRoleIds ?? []);
+  const [grant, setGrant] = useState(guild.grantRoleIds ?? []);
   const [reason, setReason] = useState("");
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const toggle = (role) => {
-    setSelected((current) =>
+  const toggle = (setter) => (role) => {
+    setter((current) =>
       current.some((id) => String(id) === String(role.id))
         ? current.filter((id) => String(id) !== String(role.id))
         : [...current, role.id],
@@ -541,7 +564,8 @@ function EditRolesDialog({ guild, onClose, onSaved }) {
         method: "POST",
         body: {
           guildId: guild.id,
-          roleIds: selected,
+          stripRoleIds: strip,
+          grantRoleIds: grant,
           reason: reason.trim() || undefined,
         },
       });
@@ -553,14 +577,59 @@ function EditRolesDialog({ guild, onClose, onSaved }) {
   };
 
   return (
-    <Modal open onClose={onClose} title={`Transfer roles — ${guild.name}`}>
-      <form onSubmit={submit} className="space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      title={`Transfer roles — ${guild.name}`}
+      className="max-w-2xl"
+    >
+      <form onSubmit={submit} className="space-y-5">
         <p className="text-sm text-slate-400">
-          Pick every role that defines membership in this department. On a transfer
-          they are removed from members leaving it and added to members joining it.
+          Two independent sets. The first is stripped from a member{" "}
+          <span className="font-semibold text-rose-300">leaving</span> this department; the
+          second is granted to a member{" "}
+          <span className="font-semibold text-emerald-300">joining</span> it. They can be
+          the same or different.
         </p>
 
-        <DiscordRolePicker guildId={guild.id} value={selected} onChange={toggle} multiple />
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-rose-300">
+              Roles removed when leaving
+            </p>
+            <span className="text-xs text-slate-500">{strip.length} selected</span>
+          </div>
+          <DiscordRolePicker
+            guildId={guild.id}
+            value={strip}
+            onChange={toggle(setStrip)}
+            multiple
+          />
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-300">
+              Roles added when joining
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setGrant(strip)}
+                className="text-xs text-slate-400 underline-offset-2 hover:text-white hover:underline"
+              >
+                Copy from removed
+              </button>
+              <span className="text-xs text-slate-500">{grant.length} selected</span>
+            </div>
+          </div>
+          <DiscordRolePicker
+            guildId={guild.id}
+            value={grant}
+            onChange={toggle(setGrant)}
+            multiple
+          />
+        </div>
 
         <Field label="Reason" htmlFor="c-reason">
           <TextInput
@@ -575,18 +644,13 @@ function EditRolesDialog({ guild, onClose, onSaved }) {
           <p className="text-sm text-rose-300">{error.message ?? "Couldn't save."}</p>
         )}
 
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <span className="text-xs text-slate-500">
-            {selected.length} selected
-          </span>
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save roles"}
-            </Button>
-          </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save roles"}
+          </Button>
         </div>
       </form>
     </Modal>
