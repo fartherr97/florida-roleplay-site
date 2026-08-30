@@ -24,7 +24,7 @@ import { loadGrants, requirePermission } from "../middleware/requirePermission.j
 import { withOwnerOverride } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { fetchMemberRoles } from "../lib/discord.js";
+import { fetchMemberRoles, fetchGuildMembers } from "../lib/discord.js";
 import { resolveRoleKeys } from "../lib/roleSync.js";
 import { DEPARTMENT_COMMAND_KEYS } from "../lib/discipline.js";
 import { str } from "../validate.js";
@@ -184,6 +184,32 @@ router.get("/bot/:discordId", requireBot, async (req, res) => {
  * The site
  * ------------------------------------------------------------------ */
 
+/**
+ * Each member's MAIN-guild display name (their nickname there, or their global name when
+ * they have none), keyed by Discord id. Read live from the main guild and cached, because
+ * the roster's own display_name is whichever guild synced most recently — often a
+ * department server, not the main one — so it is the wrong name to show here.
+ */
+let nameCache = { at: 0, map: null };
+const NAME_CACHE_MS = 120_000;
+async function mainGuildNames() {
+  if (nameCache.map && Date.now() - nameCache.at < NAME_CACHE_MS) return nameCache.map;
+  const map = new Map();
+  try {
+    const members = await fetchGuildMembers(); // defaults to DISCORD_GUILD_ID (the main guild)
+    if (members) {
+      for (const m of members) {
+        const name = (m.nick && m.nick.trim()) || m.displayName || null;
+        if (name) map.set(String(m.id), name);
+      }
+      nameCache = { at: Date.now(), map };
+    }
+  } catch {
+    // Members intent off, or no bot token — fall back to the cached/roster name below.
+  }
+  return map;
+}
+
 /** The whole directory, joined to the roster for name, department and rank. */
 router.get("/", requirePermission("emails.view"), async (req, res) => {
   const departments = seed.DEPARTMENTS.map((d) => ({ id: d.id, label: d.label, abbr: d.abbr }));
@@ -195,10 +221,15 @@ router.get("/", requirePermission("emails.view"), async (req, res) => {
       SELECT DISTINCT ON (e.discord_id)
         e.discord_id AS "discordId", e.email, e.name, e.updated_at AS "updatedAt",
         r.character_name AS "characterName", r.display_name AS "displayName",
-        r.department, r.rank_label AS "rank", r.callsign, r.status
+        r.department, r.rank_label AS "rank", r.callsign, r.status,
+        u.display_name AS "userDisplayName"
       FROM member_emails e
       LEFT JOIN roster_members r ON r.discord_id = e.discord_id
+      LEFT JOIN users u ON u.id = e.discord_id
       ORDER BY e.discord_id, r.synced_at DESC NULLS LAST`);
+
+    // The main-guild display name, read live where the intent allows it.
+    const nameMap = await mainGuildNames();
 
     const hist = await query(
       'SELECT discord_id AS "discordId", email, replaced_at AS "replacedAt" FROM member_email_history ORDER BY replaced_at DESC',
@@ -213,7 +244,15 @@ router.get("/", requirePermission("emails.view"), async (req, res) => {
       .map((r) => ({
         discordId: r.discordId,
         email: r.email,
-        name: r.displayName || r.characterName || r.name || null,
+        // Prefer the live main-guild display name, then the cached one on the user record,
+        // then what they typed on /email add, then the roster projection as a last resort.
+        name:
+          nameMap.get(r.discordId) ||
+          r.userDisplayName ||
+          r.name ||
+          r.displayName ||
+          r.characterName ||
+          null,
         department: r.department || null,
         rank: r.rank || null,
         callsign: r.callsign || null,
