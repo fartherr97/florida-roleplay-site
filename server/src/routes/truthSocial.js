@@ -24,7 +24,7 @@ import { str } from "../validate.js";
 
 const router = Router();
 
-const SITE_NAME = "Florida Roleplay";
+const SITE_NAME = "The White House";
 const MAX_TITLE = 256;
 const MAX_BODY = 4000;
 const BRAND_COLOR = 0x2f81f7;

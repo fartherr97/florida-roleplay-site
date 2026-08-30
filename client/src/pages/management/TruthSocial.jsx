@@ -8,7 +8,7 @@ import Field from "../../components/ui/Field";
 import { TextInput, TextArea } from "../../components/ui/TextInput";
 import { api } from "../../lib/api";
 
-const SITE_NAME = "Florida Roleplay";
+const SITE_NAME = "The White House";
 const MAX_TITLE = 256;
 const MAX_BODY = 4000;
 
@@ -193,7 +193,7 @@ function DiscordPreview({ title, body }) {
     <div className="rounded-xl bg-[#313338] p-4 ring-1 ring-inset ring-black/40">
       <div className="flex gap-3">
         <div className="grid size-10 shrink-0 place-items-center rounded-full bg-rose-500/90 text-sm font-black text-white">
-          FL
+          WH
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
