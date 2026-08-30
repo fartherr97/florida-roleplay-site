@@ -176,6 +176,40 @@ export async function fetchGuildMembers(guildId = process.env.DISCORD_GUILD_ID) 
   }));
 }
 
+/**
+ * Adds a Discord role to a member in a given guild, with the bot token.
+ *
+ * `PUT .../roles/{role}` is idempotent — adding a role the member already holds returns 204
+ * all the same — so callers do not have to check membership first. Returns true on success.
+ * A member who is not in the guild (404) or a role the bot cannot manage (403) resolves to
+ * false rather than throwing, so one failed role never aborts a whole transfer.
+ */
+export async function addMemberRole(guildId, userId, roleId, reason) {
+  return editMemberRole("PUT", guildId, userId, roleId, reason);
+}
+
+/** Removes a Discord role from a member in a given guild. Idempotent, same contract as add. */
+export async function removeMemberRole(guildId, userId, roleId, reason) {
+  return editMemberRole("DELETE", guildId, userId, roleId, reason);
+}
+
+async function editMemberRole(method, guildId, userId, roleId, reason) {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token || !guildId || !userId || !roleId) return false;
+  const res = await fetch(
+    `${API_BASE}/guilds/${guildId}/members/${userId}/roles/${roleId}`,
+    {
+      method,
+      headers: {
+        Authorization: `Bot ${token}`,
+        ...(reason ? { "X-Audit-Log-Reason": String(reason).slice(0, 480) } : {}),
+      },
+    },
+  );
+  // 204 = applied; 404 = member/role gone; 403 = bot lacks Manage Roles or is below the role.
+  return res.ok;
+}
+
 /** A CDN avatar URL, or null so the UI falls back to initials. */
 function avatarUrl(id, hash) {
   if (!hash) return null;
@@ -191,4 +225,6 @@ export default {
   fetchMemberRoles,
   fetchGuildRoles,
   fetchGuildMembers,
+  addMemberRole,
+  removeMemberRole,
 };

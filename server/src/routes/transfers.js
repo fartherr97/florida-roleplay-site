@@ -43,6 +43,7 @@ import { resolveUser } from "../middleware/requireRole.js";
 import { str } from "../validate.js";
 import { loadActions } from "../lib/disciplineData.js";
 import { backgroundFor } from "../lib/discipline.js";
+import { applyProcessedTransfer } from "../lib/transferRoles.js";
 import {
   DEFAULT_WEBHOOK_CFG,
   DEPT_KEYS,
@@ -802,19 +803,59 @@ router.patch("/:id", async (req, res) => {
       details: `Processed by ${actorName} · assigned rank: ${assignedRank || "N/A"}, ${empLabel}`,
       timestamp: nowIso(),
     });
+
+    // Apply the Discord roles: strip the outgoing department, grant the incoming one — but
+    // only the single rank the member was processed as, not every rank. Best-effort: a
+    // Discord hiccup must never leave the ticket stuck un-processed, so its result is
+    // recorded in the history rather than thrown.
+    let roleResult = null;
+    try {
+      roleResult = await applyProcessedTransfer({
+        discordUserId: transfer.createdById,
+        fromDept: transfer.fromDept,
+        toDept: transfer.toDept,
+        assignedRank,
+        reason: `Transfer ${transfer.fromDept} → ${transfer.toDept} · ${assignedRank}`,
+      });
+    } catch {
+      roleResult = { applied: false, reason: "error" };
+    }
+
+    if (roleResult?.applied) {
+      history.push({
+        action: "roles_applied",
+        actor: "System",
+        details:
+          `Roles updated: removed ${roleResult.removed.length}, added ${roleResult.added.length}` +
+          (roleResult.rankMatched ? "" : " · rank role not matched") +
+          (roleResult.failed.length ? ` · ${roleResult.failed.length} failed` : ""),
+        timestamp: nowIso(),
+      });
+    } else {
+      history.push({
+        action: "roles_skipped",
+        actor: "System",
+        details: `Roles not applied automatically (${roleResult?.reason ?? "unknown"}); apply them manually.`,
+        timestamp: nowIso(),
+      });
+    }
+
     await query(`UPDATE transfers
           SET status = 'completed', assigned_rank = $1, retired_member = FALSE,
               employment_type = $2, history = $3
         WHERE id = $4`,
       [assignedRank, employmentType, JSON.stringify(history), id],
     );
+    const rolesLine = roleResult?.applied
+      ? "Your roles have been updated"
+      : "Your roles will be updated by management shortly";
     await tryAddMessage({
       transferId: id,
       internal: false,
       authorId: null,
       author: "System",
       authorAvatar: null,
-      message: `Hey @${transfer.member},\n\nYour transfer has been processed and your roles have been updated. Welcome to ${transfer.toDept}!\n\nThis ticket will now be closed out by management.`,
+      message: `Hey @${transfer.member},\n\nYour transfer has been processed as **${assignedRank}**. ${rolesLine}. Welcome to ${transfer.toDept}!\n\nThis ticket will now be closed out by management.`,
     });
     return res.json(await getTransfer(id));
   }
