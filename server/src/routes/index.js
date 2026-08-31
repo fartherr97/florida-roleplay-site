@@ -674,8 +674,9 @@ router.post("/whitelist", async (req, res) => {
     });
   }
 
+  const endpoint = `${botUrl.replace(/\/$/, "")}/api/whitelist/submissions`;
   try {
-    const response = await fetch(`${botUrl.replace(/\/$/, "")}/api/whitelist/submissions`, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json", "x-service-token": token },
       body: JSON.stringify({
@@ -688,6 +689,7 @@ router.post("/whitelist", async (req, res) => {
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
+      console.warn(`[whitelist] bot API ${endpoint} responded ${response.status}`);
       return res.status(502).json({
         ok: false,
         message: body?.error?.message ?? body?.message ?? "Your application could not be submitted. Please try again.",
@@ -696,7 +698,12 @@ router.post("/whitelist", async (req, res) => {
 
     const data = await response.json().catch(() => ({}));
     return res.status(201).json({ ok: true, id: data.id ?? null });
-  } catch {
+  } catch (err) {
+    // The fetch never got a response: DNS, refused connection, TLS, or the 10s
+    // timeout. Log the real reason so a misconfigured BOT_API_URL is diagnosable
+    // from the server logs rather than a generic "could not reach" to the user.
+    const reason = err?.name === "TimeoutError" ? "timed out after 10s" : (err?.cause?.code || err?.code || err?.message || "failed");
+    console.warn(`[whitelist] could not reach bot API ${endpoint}: ${reason}`);
     return res.status(502).json({ ok: false, message: "Could not reach the whitelist service. Please try again shortly." });
   }
 });
