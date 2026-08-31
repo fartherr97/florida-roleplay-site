@@ -114,8 +114,33 @@ export default function RosterTab({ config }) {
                 onChange={(e) => updateSub(sub.id, { name: e.target.value })}
               />
             </Field>
-            {sub.main && <Badge tone="brand">Main roster</Badge>}
+            {sub.main ? (
+              <Badge tone="brand">Main roster</Badge>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Delete the "${sub.name}" unit? Its bands go with it.`)) {
+                    setRoster({
+                      subdivisions: subdivisions.filter((entry) => entry.id !== sub.id),
+                    });
+                  }
+                }}
+                aria-label={`Delete ${sub.name}`}
+                title="Delete this unit"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            )}
           </div>
+
+          {!sub.main && (
+            <p className="mb-3 text-xs text-slate-500">
+              This unit shows only the ranks its bands claim — members appear here on top of
+              their spot on the main roster.
+            </p>
+          )}
 
           <div className="space-y-3">
             {sub.categories.map((category, catIndex) => (
@@ -251,6 +276,34 @@ export default function RosterTab({ config }) {
           </Button>
         </Card>
       ))}
+
+      <div className="mb-5">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            setRoster({
+              subdivisions: [
+                ...subdivisions,
+                {
+                  id: `sub-${Date.now()}`,
+                  name: "New unit",
+                  main: false,
+                  roleKeys: [],
+                  categories: [],
+                },
+              ],
+            })
+          }
+        >
+          <Plus className="size-4" />
+          Add a unit
+        </Button>
+        <p className="mt-1 text-xs text-slate-500">
+          A unit is its own roster view — a subdivision like SWAT or a detective bureau. Add
+          bands to it and assign the ranks that belong there.
+        </p>
+      </div>
 
       <MemberFields config={config} onChange={setRoster} />
       <RosterStats config={config} onChange={setRoster} />

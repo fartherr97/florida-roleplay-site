@@ -99,8 +99,18 @@ export function projectRoster(config, roster, roleMap) {
   const members = (roster || []).filter((entry) => entry.department === config.id);
   const rankOrder = config.roster?.rankOrder || null;
   return (config.roster?.subdivisions || []).map((subdivision) => {
-    const scoped = subdivision.roleKeys?.length
-      ? members.filter((entry) => subdivision.roleKeys.includes(roleKeyFor(entry, roleMap)))
+    // Explicit roleKeys win. Otherwise the main roster takes everyone, while a
+    // non-main unit scopes itself to the ranks its bands claim — so a freshly
+    // built unit (say, SWAT) shows only its assigned ranks instead of dumping
+    // the whole department into "Unassigned".
+    const explicit = subdivision.roleKeys?.length ? subdivision.roleKeys : null;
+    const keys =
+      explicit ??
+      (subdivision.main
+        ? null
+        : [...new Set((subdivision.categories || []).flatMap((cat) => cat.roleKeys || []))]);
+    const scoped = keys
+      ? members.filter((entry) => keys.includes(roleKeyFor(entry, roleMap)))
       : members;
     return {
       ...subdivision,
