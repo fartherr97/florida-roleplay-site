@@ -47,13 +47,12 @@ export default function BotRosterDetail() {
 
   const data = roster.data;
 
-  // A roster is bound to one Discord server; resolve its platform guild id (and name) so
-  // the rank binder can offer that server's real roles instead of a pasted snowflake.
+  // A roster is bound to one Discord server; its platform guild id comes straight off the
+  // read, so the rank binder can offer that server's real roles instead of a pasted
+  // snowflake. The server name is looked up from the guild list for display.
   const guilds = useBotResource("/guilds");
-  const guildRow = (guilds.data?.items ?? []).find(
-    (g) => String(g.discordGuildId) === String(data?.discordGuildId ?? ""),
-  );
-  const internalGuildId = guildRow?.id ?? null;
+  const internalGuildId = data?.approvedGuildId ?? null;
+  const guildRow = (guilds.data?.items ?? []).find((g) => String(g.id) === String(internalGuildId));
   const guildName = guildRow?.name ?? null;
 
   const sync = async (isDryRun) => {
@@ -156,7 +155,7 @@ export default function BotRosterDetail() {
         </div>
         <Card className="grid gap-4 p-5 sm:grid-cols-3">
           <Detail label="Slug" value={data.slug} mono />
-          <Detail label="Discord server" value={guildName ?? data.discordGuildId} mono={!guildName} />
+          <Detail label="Discord server" value={guildName ?? guildRow?.discordGuildId ?? "—"} mono={!guildName} />
           <Detail label="Position" value={String(data.position ?? 0)} />
           <Detail
             label="Updated"
