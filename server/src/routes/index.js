@@ -708,6 +708,91 @@ router.post("/whitelist", async (req, res) => {
   }
 });
 
+/**
+ * Ownership-only connectivity check for the whitelist wiring. Probes the bot API
+ * from the site server and reports exactly what happens, so a broken BOT_API_URL
+ * or token can be diagnosed from the browser without server-log access. Never
+ * returns the token itself. Gated on the (ownership-only) Truth Social
+ * permission purely as an ownership gate — there is no whitelist-specific one.
+ */
+router.get("/whitelist/diagnostics", requirePermission("truthsocial.post"), async (_req, res) => {
+  const botUrl = process.env.BOT_API_URL;
+  const token = process.env.WHITELIST_INGEST_TOKEN;
+
+  const out = {
+    ok: true,
+    env: {
+      botUrlSet: Boolean(botUrl),
+      tokenSet: Boolean(token),
+      botUrl: botUrl || null,
+      hasScheme: botUrl ? /^https?:\/\//i.test(botUrl) : false,
+    },
+  };
+
+  if (!botUrl || !token) {
+    out.summary = "BOT_API_URL and/or WHITELIST_INGEST_TOKEN are not set on the website.";
+    return res.json(out);
+  }
+  if (!out.env.hasScheme) {
+    out.summary = "BOT_API_URL is missing http(s):// — set it to a full URL like https://api.example.com.";
+    return res.json(out);
+  }
+
+  const base = botUrl.replace(/\/$/, "");
+
+  // 1) Can we reach the bot API at all? /health needs no token.
+  out.health = await probe(`${base}/health`, { method: "GET" });
+
+  // 2) Does the submissions endpoint exist and does our token work? An empty
+  //    probe body is rejected by the bot's validation (400) without creating a
+  //    submission, so a 400 means "reachable, route found, token accepted".
+  out.ingest = await probe(`${base}/api/whitelist/submissions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-service-token": token },
+    body: JSON.stringify({ discordUserId: "0", username: "diagnostic", answers: [] }),
+  });
+
+  out.summary = interpret(out);
+  return res.json(out);
+});
+
+/** One probe: returns {status} on any HTTP response, or {error} if it never got one. */
+async function probe(url, init) {
+  try {
+    const r = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+    return { status: r.status };
+  } catch (err) {
+    const reason = err?.name === "TimeoutError" ? "timed out" : (err?.cause?.code || err?.code || err?.message || "failed");
+    return { error: String(reason) };
+  }
+}
+
+/** Turn the two probes into a one-line plain-English verdict. */
+function interpret({ health, ingest }) {
+  if (ingest?.status === 400 || ingest?.status === 201) {
+    return "Connected. The bot API is reachable and the token is accepted — whitelist submissions should work.";
+  }
+  if (ingest?.status === 401) {
+    return "Reached the bot, but the token was rejected. Make WHITELIST_INGEST_TOKEN identical on the website and the bot.";
+  }
+  if (ingest?.status === 404) {
+    return "Reached the host, but /api/whitelist/submissions was not found — BOT_API_URL points at the wrong service (use the bot's API service, not the frontend).";
+  }
+  if (ingest?.status === 503) {
+    return "Reached the bot, but it reports whitelist ingest is not configured — set WHITELIST_INGEST_TOKEN on the bot too.";
+  }
+  if (ingest?.error) {
+    if (health?.status) return `The host answers /health but the submissions call failed (${ingest.error}).`;
+    const e = ingest.error;
+    if (/ENOTFOUND|EAI_AGAIN/.test(e)) return "DNS could not resolve BOT_API_URL — the domain is wrong or not live.";
+    if (/ECONNREFUSED/.test(e)) return "Connection refused — the host resolves but nothing is listening. Check the API service is public and on the right port.";
+    if (/timed out/.test(e)) return "The bot did not respond in time — it may be private/firewalled from the website, or down.";
+    if (/certificate|TLS|SSL/i.test(e)) return "TLS/certificate error — the domain has no valid HTTPS certificate.";
+    return `Could not reach the bot API (${e}).`;
+  }
+  return `Unexpected response from the bot API (status ${ingest?.status}).`;
+}
+
 /* -------------------------------------------------------------------- me */
 
 router.get("/me", (req, res) => res.json(req.user ?? null));
