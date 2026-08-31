@@ -21,6 +21,7 @@ import * as seed from "../supportSeed.js";
 import { loadGrants } from "../middleware/requirePermission.js";
 import { rankFor, resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
+import { fetchGuildMembers } from "../lib/discord.js";
 import { str } from "../validate.js";
 import {
   DEFAULT_TICKET_TYPES,
@@ -485,6 +486,78 @@ router.post("/:id/presence", async (req, res) => {
 // to its own "Support Team" role sees those people here without renaming a thing.
 const ASSIGNABLE_PERMISSIONS = ["support.work", "support.manage", "support.escalated"];
 
+/**
+ * Discord roles whose holders can be assigned a support ticket. The reassign picker lists
+ * everyone in the main guild holding any of these, by their main-guild display name.
+ */
+const ASSIGNABLE_ROLE_IDS = [
+  "1534380748247666796",
+  "1534911171319042159",
+  "1542234301322629130",
+];
+
+let staffCache = { at: 0, list: null };
+const STAFF_CACHE_MS = 60_000;
+
+/**
+ * The assignable staff, read live from the main guild so it is everyone holding one of the
+ * roles — not only people who have signed into the site — and named by their real main-guild
+ * display name ("100 | Owner | Mike"). Cached briefly. Returns null when the member list
+ * cannot be read (no bot token, or the Server Members Intent is off), so the caller falls
+ * back to what the database knows.
+ */
+async function assignableFromGuild() {
+  if (staffCache.list && Date.now() - staffCache.at < STAFF_CACHE_MS) return staffCache.list;
+  const members = await fetchGuildMembers().catch(() => null); // main guild (DISCORD_GUILD_ID)
+  if (!members) return null;
+
+  const wanted = new Set(ASSIGNABLE_ROLE_IDS);
+  const staff = members
+    .filter((m) => (m.roles ?? []).some((r) => wanted.has(String(r))))
+    .map((m) => {
+      const name = (m.nick && m.nick.trim()) || m.displayName || m.username || "Unknown";
+      return { discordId: String(m.id), name, rank: null, avatar: m.avatar ?? null, label: name };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  staffCache = { at: Date.now(), list: staff };
+  return staff;
+}
+
+/** Fallback when the guild can't be read live: the permission-holders the database knows. */
+async function assignableFromDatabase() {
+  const grants = await loadGrants();
+  const roleKeys = new Set(["ownership"]); // ownership implicitly holds everything
+  for (const perm of ASSIGNABLE_PERMISSIONS) {
+    for (const key of grants[perm] ?? []) roleKeys.add(key);
+  }
+
+  const rows = await query(
+    `SELECT u.id AS "discordId", u.display_name AS "displayName", u.username, u.avatar,
+            ARRAY(SELECT role FROM user_roles WHERE user_id = u.id) AS roles,
+            (SELECT display_name FROM roster_members
+               WHERE discord_id = u.id AND display_name IS NOT NULL AND display_name <> ''
+               ORDER BY synced_at DESC LIMIT 1) AS "rosterName"
+       FROM users u
+      WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ANY($1))`,
+    [[...roleKeys]],
+  );
+
+  return rows
+    .map((row) => {
+      const rank = rankFor(row.roles ?? []) ?? null;
+      const name = row.displayName ?? row.username ?? "Unknown";
+      return {
+        discordId: row.discordId,
+        name,
+        rank,
+        avatar: row.avatar ?? null,
+        label: row.rosterName || (rank ? `${rank} | ${name}` : name),
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
 router.get("/staff/list", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
@@ -493,47 +566,11 @@ router.get("/staff/list", async (req, res) => {
   }
 
   try {
-    // Resolve which role keys currently grant any support-work permission, from
-    // the live grants (stored overrides on top of the shipped defaults). Then
-    // list the members who hold one of those roles — the people who can actually
-    // work a ticket, whatever the roles are named.
-    const grants = await loadGrants();
-    const roleKeys = new Set(["ownership"]); // ownership implicitly holds everything
-    for (const perm of ASSIGNABLE_PERMISSIONS) {
-      for (const key of grants[perm] ?? []) roleKeys.add(key);
-    }
-
-    const rows = await query(
-      `SELECT u.id AS "discordId", u.display_name AS "displayName", u.username, u.avatar,
-              ARRAY(SELECT role FROM user_roles WHERE user_id = u.id) AS roles,
-              (SELECT display_name FROM roster_members
-                 WHERE discord_id = u.id AND display_name IS NOT NULL AND display_name <> ''
-                 ORDER BY synced_at DESC LIMIT 1) AS "rosterName"
-         FROM users u
-        WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ANY($1))`,
-      [[...roleKeys]],
-    );
-
-    const staff = rows
-      .map((row) => {
-        const roles = row.roles ?? [];
-        const rank = rankFor(roles) ?? null;
-        const name = row.displayName ?? row.username ?? "Unknown";
-        return {
-          discordId: row.discordId,
-          name,
-          rank,
-          avatar: row.avatar ?? null,
-          // Their guild display name — the "100 | Owner | Mike" the bot keeps —
-          // which is also what the ticket records as the assignee.
-          label: row.rosterName || (rank ? `${rank} | ${name}` : name),
-        };
-      })
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-    return res.json({ staff });
+    const live = await assignableFromGuild();
+    if (live) return res.json({ staff: live });
+    return res.json({ staff: await assignableFromDatabase() });
   } catch {
-    // No database — no directory to offer.
+    // No database and no live read — nothing to offer.
     return res.json({ staff: [] });
   }
 });
