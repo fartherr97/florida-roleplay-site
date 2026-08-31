@@ -417,6 +417,150 @@ export async function syncRosterFromGuild() {
 }
 
 /**
+ * Refresh ONE department's roster: reads only that department's own server plus the main
+ * community server, and touches only that department's rows.
+ *
+ * Deliberately conservative, because roster_members is one global row per member:
+ *   - only members holding one of this department's mapped rank roles are considered;
+ *   - a member currently stored under ANOTHER department is never pulled over (their
+ *     higher rank may live in a server this scoped read did not open — the full sync is
+ *     the only reader with the whole picture);
+ *   - pruning removes only this department's members who no longer hold one of its roles,
+ *     and only when every scoped server read cleanly.
+ */
+export async function syncRosterForDept(deptId) {
+  if (inProgress) return { skipped: "in-progress" };
+  inProgress = true;
+  try {
+    const deptMeta = await loadDeptMeta();
+    const meta = deptMeta[deptId];
+    const main = String(process.env.DISCORD_GUILD_ID ?? "").trim();
+    const guildIds = [
+      ...new Set([meta?.guildId, main].map((g) => String(g ?? "").trim()).filter((g) => SNOWFLAKE.test(g))),
+    ];
+    if (guildIds.length === 0) return { configured: false };
+
+    // Read the scoped servers, merging each member's roles across them.
+    const byId = new Map();
+    const perGuild = [];
+    let errors = 0;
+    let ok = 0;
+    for (const gid of guildIds) {
+      let members;
+      try {
+        members = await fetchGuildMembers(gid);
+      } catch (err) {
+        errors += 1;
+        perGuild.push({ guildId: gid, ok: false, count: 0, error: err?.code || err?.message || "failed" });
+        continue;
+      }
+      if (!members) {
+        perGuild.push({ guildId: gid, ok: false, count: 0, error: "not-configured" });
+        continue;
+      }
+      ok += 1;
+      perGuild.push({ guildId: gid, ok: true, count: members.length, error: null });
+      for (const m of members) {
+        const cur = byId.get(m.id) ?? { roles: new Set(), name: "", nicks: {} };
+        for (const r of m.roles) cur.roles.add(r);
+        if (m.nick) cur.nicks[gid] = m.nick;
+        if (!cur.name) cur.name = m.displayName || m.username || "";
+        byId.set(m.id, cur);
+      }
+    }
+    if (ok === 0) return { configured: true, error: errors ? "unreadable" : "no-guilds", perGuild };
+
+    const roleMap = await loadRankMap();
+    const dRoleIds = new Set(
+      roleMap.filter((r) => r.department === deptId).map((r) => String(r.roleId)),
+    );
+    const mappedRoleIds = new Set(roleMap.map((r) => String(r.roleId)));
+
+    // This department's current synced members, so leavers can be pruned afterward.
+    let existingD = new Set();
+    try {
+      const rows = await query(
+        "SELECT discord_id FROM roster_members WHERE department = $1 AND source = 'discord-sync'",
+        [deptId],
+      );
+      existingD = new Set(rows.map((r) => r.discord_id));
+    } catch {
+      // No database — the upserts below will no-op the same way.
+    }
+
+    const seen = new Set();
+    const deptMembersList = [];
+    for (const [discordId, data] of byId) {
+      const held = [...data.roles].map(String);
+      if (!held.some((id) => dRoleIds.has(id))) continue; // not in this department
+
+      // Never steal a member from another department on a partial read.
+      if (!existingD.has(discordId)) {
+        try {
+          const prior = await query(
+            "SELECT department FROM roster_members WHERE discord_id = $1 LIMIT 1",
+            [discordId],
+          );
+          if (prior[0]?.department && prior[0].department !== deptId) continue;
+        } catch {
+          // No database — nothing stored to protect.
+        }
+      }
+
+      const resolved = resolveMember(
+        { discordId, characterName: data.name || "Member", roles: held, callsign: "" },
+        roleMap,
+        seed.DEPARTMENTS,
+      );
+      if (resolved.action !== "upsert" || resolved.entry.department !== deptId) continue;
+
+      const roleIds = held.filter((id) => mappedRoleIds.has(id));
+      await applyUpsert(resolved, null, roleIds, data.nicks);
+      seen.add(discordId);
+      const gid = meta?.guildId;
+      const nickCallsign = gid && data.nicks[gid] ? parseNick(data.nicks[gid]).callsign : "";
+      deptMembersList.push({ discordId, nickCallsign });
+    }
+
+    // Prune only this department, and only on a clean scoped read.
+    if (errors === 0) {
+      const gone = [...existingD].filter((id) => !seen.has(id));
+      if (gone.length) {
+        try {
+          await query(
+            "DELETE FROM roster_members WHERE source = 'discord-sync' AND department = $1 AND discord_id = ANY($2)",
+            [deptId, gone],
+          );
+        } catch {
+          // Best-effort; a failed delete just leaves a stale row for the full sync.
+        }
+      }
+      if (meta?.auto && meta.min > 0 && meta.max >= meta.min) {
+        await assignDeptCallsigns(deptId, deptMembersList, meta);
+      }
+    }
+
+    return {
+      configured: true,
+      scoped: true,
+      dept: deptId,
+      guilds: guildIds.length,
+      scanned: byId.size,
+      matched: seen.size,
+      byDept: { [deptId]: seen.size },
+      errors,
+      perGuild,
+    };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[roster-sync:dept]", deptId, err?.code || err?.message || err);
+    return { error: err?.code || "failed" };
+  } finally {
+    inProgress = false;
+  }
+}
+
+/**
  * Kick a background sync if one has not run recently — called from the roster
  * reads, so viewing a roster shortly after mapping roles fills it in without
  * waiting for the interval. Throttled and fire-and-forget.

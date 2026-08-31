@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild } from "../lib/rosterSync.js";
+import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, syncRosterForDept } from "../lib/rosterSync.js";
 import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
@@ -285,8 +285,11 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
  * read (a missing bot, the Server Members Intent, a bad token) — so the person
  * who just mapped the roles can see and fix the cause.
  */
-router.post("/pull", requirePermission("discord.roles.manage"), async (_req, res) => {
-  const result = await syncRosterFromGuild();
+router.post("/pull", requirePermission("discord.roles.manage"), async (req, res) => {
+  // A department page passes its id so its Refresh only reads that department's server
+  // (plus the main one) and touches only that department's rows; no dept = the full sync.
+  const dept = typeof req.body?.dept === "string" ? req.body.dept.trim().slice(0, 64) : "";
+  const result = dept ? await syncRosterForDept(dept) : await syncRosterFromGuild();
   return res.json(result);
 });
 

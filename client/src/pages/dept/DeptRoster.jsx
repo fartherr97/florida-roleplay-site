@@ -96,7 +96,9 @@ export default function DeptRoster({ page, config }) {
     setSyncing(true);
     setNotice("");
     try {
-      const result = await api.pullRoster();
+      // Scoped to this department: reads its own server plus the main one, and only
+      // touches this department's members.
+      const result = await api.pullRoster(id);
       setNotice(describeSync(result, guildNames, id, config.branding.shortName));
     } catch (err) {
       setNotice(err?.message || "Could not pull the roster from Discord.");

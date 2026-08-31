@@ -391,8 +391,10 @@ export const api = {
     })),
 
   /** Pull the roster from Discord now, returning the per-guild sync outcome. */
-  pullRoster: () =>
-    post("/roster/pull", {}, () => ({ configured: false, perGuild: [] })),
+  // Pass a department id to refresh only that department (its server + the main one);
+  // omit it for the full cross-server sync.
+  pullRoster: (deptId) =>
+    post("/roster/pull", deptId ? { dept: deptId } : {}, () => ({ configured: false, perGuild: [] })),
 
   /** Add or edit a manual (hand-maintained) department roster member. */
   saveManualMember: (deptId, payload) =>
