@@ -6,6 +6,7 @@ import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Modal from "../../../components/ui/Modal";
 import Field from "../../../components/ui/Field";
+import Select from "../../../components/ui/Select";
 import { TextArea, TextInput } from "../../../components/ui/TextInput";
 import BotError from "../../../components/bot/BotError";
 import Loading from "../../../components/bot/Loading";
@@ -109,6 +110,13 @@ function CreateRoster({ onClose, onCreated }) {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // The servers the bot is in, so the guild is picked by name instead of a pasted id.
+  const guilds = useBotResource("/guilds");
+  const guildOptions = (guilds.data?.items ?? []).map((g) => ({
+    value: g.discordGuildId,
+    label: g.name ? `${g.name}` : g.discordGuildId,
+  }));
+
   const set = (changes) => setValues((current) => ({ ...current, ...changes }));
 
   const submit = async (event) => {
@@ -145,12 +153,28 @@ function CreateRoster({ onClose, onCreated }) {
         <Field label="Slug" htmlFor="r-slug" required hint="Used in the roster's address.">
           <TextInput id="r-slug" value={values.slug} onChange={(e) => set({ slug: e.target.value })} />
         </Field>
-        <Field label="Discord server ID" htmlFor="r-guild" required>
-          <TextInput
-            id="r-guild"
-            value={values.discordGuildId}
-            onChange={(e) => set({ discordGuildId: e.target.value })}
-          />
+        <Field
+          label="Discord server"
+          htmlFor="r-guild"
+          required
+          hint="The server this roster reads roles from. Add servers on the Servers screen."
+        >
+          {guildOptions.length > 0 ? (
+            <Select
+              id="r-guild"
+              value={values.discordGuildId}
+              onChange={(value) => set({ discordGuildId: value })}
+              placeholder="Choose a server"
+              options={guildOptions}
+            />
+          ) : (
+            <TextInput
+              id="r-guild"
+              value={values.discordGuildId}
+              onChange={(e) => set({ discordGuildId: e.target.value })}
+              placeholder="Server ID"
+            />
+          )}
         </Field>
         <Field label="Description" htmlFor="r-desc">
           <TextArea

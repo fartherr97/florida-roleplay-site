@@ -19,6 +19,7 @@ import PageHeader from "../../../components/layout/PageHeader";
 import BotError from "../../../components/bot/BotError";
 import Loading from "../../../components/bot/Loading";
 import JobProgress from "../../../components/bot/JobProgress";
+import DiscordRolePicker from "../../../components/bot/DiscordRolePicker";
 import { useBotResource } from "../../../lib/useBotResource";
 import { api } from "../../../lib/botApi";
 import { formatDate, plural } from "../../../lib/format";
@@ -44,6 +45,15 @@ export default function BotRosterDetail() {
   const [actionError, setActionError] = useState(null);
 
   const data = roster.data;
+
+  // A roster is bound to one Discord server; resolve its platform guild id (and name) so
+  // the rank binder can offer that server's real roles instead of a pasted snowflake.
+  const guilds = useBotResource("/guilds");
+  const guildRow = (guilds.data?.items ?? []).find(
+    (g) => String(g.discordGuildId) === String(data?.discordGuildId ?? ""),
+  );
+  const internalGuildId = guildRow?.id ?? null;
+  const guildName = guildRow?.name ?? null;
 
   const sync = async (isDryRun) => {
     setActionError(null);
@@ -145,7 +155,7 @@ export default function BotRosterDetail() {
         </div>
         <Card className="grid gap-4 p-5 sm:grid-cols-3">
           <Detail label="Slug" value={data.slug} mono />
-          <Detail label="Discord server" value={data.discordGuildId} mono />
+          <Detail label="Discord server" value={guildName ?? data.discordGuildId} mono={!guildName} />
           <Detail label="Position" value={String(data.position ?? 0)} />
           <Detail
             label="Updated"
@@ -284,6 +294,7 @@ export default function BotRosterDetail() {
       {addingRank && (
         <RankModal
           slug={slug}
+          guildId={internalGuildId}
           onClose={() => setAddingRank(false)}
           onSaved={() => {
             setAddingRank(false);
@@ -296,6 +307,7 @@ export default function BotRosterDetail() {
         <RankModal
           key={editingRank.discordRoleId}
           slug={slug}
+          guildId={internalGuildId}
           rank={editingRank}
           onClose={() => setEditingRank(null)}
           onSaved={() => {
@@ -411,7 +423,7 @@ function EditRoster({ roster, slug, onClose, onSaved }) {
  * so editing keeps that role fixed and re-binds it in place — which is why the
  * role ID is locked once a rank exists.
  */
-function RankModal({ slug, rank = null, onClose, onSaved }) {
+function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
   const isEdit = Boolean(rank);
   const [values, setValues] = useState({
     discordRoleId: rank?.discordRoleId ?? "",
@@ -470,11 +482,24 @@ function RankModal({ slug, rank = null, onClose, onSaved }) {
   return (
     <Modal open onClose={onClose} title={isEdit ? `Edit ${rank.name}` : "Bind a Discord role to a rank"}>
       <form onSubmit={submit} className="space-y-4">
+        {!isEdit && guildId && (
+          <Field label="Discord role" hint="Pick a role from this roster's server, or paste an ID below.">
+            <DiscordRolePicker
+              guildId={guildId}
+              value={values.discordRoleId}
+              onChange={(role) => setValues((v) => ({ ...v, discordRoleId: role.id }))}
+            />
+          </Field>
+        )}
         <Field
           label="Discord role ID"
           htmlFor="b-role"
           required={!isEdit}
-          hint={isEdit ? "A rank is tied to its Discord role and cannot be moved to another." : undefined}
+          hint={
+            isEdit
+              ? "A rank is tied to its Discord role and cannot be moved to another."
+              : "Filled in when you pick a role above; paste one here to bind a role from another server."
+          }
         >
           <TextInput
             id="b-role"
