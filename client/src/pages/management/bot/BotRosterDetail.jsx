@@ -40,6 +40,7 @@ export default function BotRosterDetail() {
   const [dryRun, setDryRun] = useState(null);
   const [editing, setEditing] = useState(false);
   const [addingRank, setAddingRank] = useState(false);
+  const [quickAdd, setQuickAdd] = useState(false);
   const [editingRank, setEditingRank] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [actionError, setActionError] = useState(null);
@@ -169,10 +170,18 @@ export default function BotRosterDetail() {
           <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-slate-400">
             Ranks and members
           </h2>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setAddingRank(true)}>
-            <Plus className="size-4" />
-            Bind a rank
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            {internalGuildId && (
+              <Button variant="secondary" size="sm" onClick={() => setQuickAdd(true)}>
+                <Plus className="size-4" />
+                Quick add from roles
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setAddingRank(true)}>
+              <Plus className="size-4" />
+              Bind a rank
+            </Button>
+          </div>
         </div>
 
         {(data.ranks ?? []).length === 0 ? (
@@ -286,6 +295,19 @@ export default function BotRosterDetail() {
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false);
+            roster.reload();
+          }}
+        />
+      )}
+
+      {quickAdd && (
+        <QuickAddRanks
+          slug={slug}
+          guildId={internalGuildId}
+          existing={data.ranks ?? []}
+          onClose={() => setQuickAdd(false)}
+          onSaved={() => {
+            setQuickAdd(false);
             roster.reload();
           }}
         />
@@ -414,6 +436,99 @@ function EditRoster({ roster, slug, onClose, onSaved }) {
           </Button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/**
+ * Bind several ranks at once by picking roles from the roster's server. Each selected role
+ * becomes a rank named after the role, ordered by the role's own Discord position (so the
+ * seniority already reflects the server). The finer settings — short name, callsign block,
+ * nickname priority — are left at their defaults and tuned per rank afterward. Roles already
+ * bound on this roster are skipped rather than overwritten.
+ */
+function QuickAddRanks({ slug, guildId, existing = [], onClose, onSaved }) {
+  const existingIds = new Set(existing.map((r) => String(r.discordRoleId)));
+  const [selected, setSelected] = useState([]);
+  const [roleById, setRoleById] = useState(new Map());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const toggle = (role) => {
+    setRoleById((m) => {
+      const next = new Map(m);
+      next.set(String(role.id), role);
+      return next;
+    });
+    setSelected((cur) =>
+      cur.includes(String(role.id))
+        ? cur.filter((id) => id !== String(role.id))
+        : [...cur, String(role.id)],
+    );
+  };
+
+  const toAdd = selected.filter((id) => !existingIds.has(id));
+  const skipped = selected.length - toAdd.length;
+
+  const submit = async () => {
+    setError(null);
+    setSaving(true);
+    const failed = [];
+    let added = 0;
+    for (const id of toAdd) {
+      const role = roleById.get(id);
+      try {
+        await api(`/rosters/manage/${encodeURIComponent(slug)}/ranks`, {
+          method: "POST",
+          body: {
+            discordRoleId: id,
+            name: role?.name || `Role ${id}`,
+            position: Number(role?.position) || 0,
+            callsignRangeStart: null,
+            callsignRangeEnd: null,
+            nicknamePriority: "NONE",
+          },
+        });
+        added += 1;
+      } catch {
+        failed.push(role?.name || id);
+      }
+    }
+    setSaving(false);
+    if (failed.length && added === 0) {
+      setError(new Error(`Couldn't add: ${failed.join(", ")}`));
+      return;
+    }
+    onSaved();
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Quick add ranks from roles" className="max-w-xl">
+      <div className="space-y-4">
+        <p className="text-sm text-slate-400">
+          Pick every role that should be a rank. Each becomes a rank named after the role,
+          ordered by its Discord position. You can set short names, callsign blocks and
+          nickname priority on each afterward.
+        </p>
+
+        <DiscordRolePicker guildId={guildId} value={selected} onChange={toggle} multiple />
+
+        {error && <BotError error={error} />}
+
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <span className="text-xs text-slate-500">
+            {toAdd.length} to add{skipped > 0 ? ` · ${skipped} already bound` : ""}
+          </span>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" onClick={submit} disabled={saving || toAdd.length === 0}>
+              {saving ? "Adding…" : `Add ${toAdd.length || ""} rank${toAdd.length === 1 ? "" : "s"}`.trim()}
+            </Button>
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 }
