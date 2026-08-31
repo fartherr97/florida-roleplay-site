@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
-import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, syncRosterForDept } from "../lib/rosterSync.js";
+import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, syncRosterForDept, scheduleMemberSync } from "../lib/rosterSync.js";
 import { fetchGuildRoles } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
@@ -285,6 +285,21 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
  * read (a missing bot, the Server Members Intent, a bad token) — so the person
  * who just mapped the roles can see and fix the cause.
  */
+/**
+ * The Discord bot pings this the moment a member's roles or nickname change, so
+ * the site roster follows Discord instantly instead of waiting for the interval
+ * sync. The ping carries only the member's id — the site reads their live roles
+ * itself, so a forged or stale ping can never write anything wrong.
+ */
+router.post("/event", requireBot, (req, res) => {
+  const discordId = String(req.body?.discordId ?? "").trim();
+  if (!isDiscordId(discordId)) {
+    return res.status(400).json({ ok: false, errors: ["discordId must be a Discord id."] });
+  }
+  scheduleMemberSync(discordId);
+  return res.status(202).json({ ok: true, queued: true });
+});
+
 router.post("/pull", requirePermission("discord.roles.manage"), async (req, res) => {
   // A department page passes its id so its Refresh only reads that department's server
   // (plus the main one) and touches only that department's rows; no dept = the full sync.

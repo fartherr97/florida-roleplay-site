@@ -177,6 +177,30 @@ export async function fetchGuildMembers(guildId = process.env.DISCORD_GUILD_ID) 
 }
 
 /**
+ * One member of one guild, read with the bot token — the single-member
+ * counterpart of fetchGuildMembers, for the instant roster path where reading a
+ * whole guild to update one person would be waste. Returns `null` when the
+ * member is not in that guild (404) or nothing is configured.
+ */
+export async function fetchGuildMember(guildId, userId) {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token || !guildId || !userId) return null;
+  const res = await fetch(`${API_BASE}/guilds/${guildId}/members/${userId}`, {
+    headers: { Authorization: `Bot ${token}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Discord member lookup failed (${res.status})`);
+  const m = await res.json();
+  return {
+    id: String(m.user?.id ?? userId),
+    username: m.user?.username ?? "",
+    displayName: m.user?.global_name || m.user?.username || "Member",
+    nick: m.nick ?? null,
+    roles: Array.isArray(m.roles) ? m.roles.map(String) : [],
+  };
+}
+
+/**
  * Adds a Discord role to a member in a given guild, with the bot token.
  *
  * `PUT .../roles/{role}` is idempotent — adding a role the member already holds returns 204
@@ -225,6 +249,7 @@ export default {
   fetchMemberRoles,
   fetchGuildRoles,
   fetchGuildMembers,
+  fetchGuildMember,
   addMemberRole,
   removeMemberRole,
 };

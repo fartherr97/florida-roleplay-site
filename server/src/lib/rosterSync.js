@@ -16,7 +16,7 @@ import * as seed from "../rosterSeed.js";
 import { DEPARTMENT_CONFIGS } from "../departmentSeed.js";
 import { normalizeConfig } from "./departmentConfig.js";
 import { resolveRole, buildNickname, renderDisplayName } from "./roster.js";
-import { fetchGuildMembers } from "./discord.js";
+import { fetchGuildMembers, fetchGuildMember } from "./discord.js";
 
 /**
  * Pull a callsign and a display name out of a server nickname.
@@ -558,6 +558,121 @@ export async function syncRosterForDept(deptId) {
   } finally {
     inProgress = false;
   }
+}
+
+/**
+ * Reconcile ONE member, instantly — the path behind the bot's role-change ping.
+ *
+ * Reads just that member from every guild the roster spans (a handful of cheap
+ * single-member GETs, not a guild scan), merges their roles exactly as the full
+ * sync would, and upserts or removes their row. Because every guild is read,
+ * this has the whole picture and none of the scoped sync's "never steal"
+ * caution is needed. Their department's callsigns are then re-settled from the
+ * stored rows, so a new joiner gets a number straight away.
+ */
+export async function syncRosterMember(discordUserId) {
+  const id = String(discordUserId ?? "").trim();
+  if (!SNOWFLAKE.test(id)) return { error: "bad-id" };
+  try {
+    const guildIds = await collectGuildIds();
+    if (guildIds.length === 0) return { configured: false };
+
+    const cur = { roles: new Set(), name: "", nicks: {} };
+    let present = 0;
+    let errors = 0;
+    await Promise.all(
+      guildIds.map(async (gid) => {
+        let member;
+        try {
+          member = await fetchGuildMember(gid, id);
+        } catch {
+          errors += 1;
+          return;
+        }
+        if (!member) return; // not in this guild
+        present += 1;
+        for (const r of member.roles) cur.roles.add(r);
+        if (member.nick) cur.nicks[gid] = member.nick;
+        if (!cur.name) cur.name = member.displayName || member.username || "";
+      }),
+    );
+
+    const roleMap = await loadRankMap();
+    const deptMeta = await loadDeptMeta();
+    const mappedRoleIds = new Set(roleMap.map((r) => String(r.roleId)));
+    const held = [...cur.roles].map(String);
+    const resolved = resolveMember(
+      { discordId: id, characterName: cur.name || "Member", roles: held, callsign: "" },
+      roleMap,
+      seed.DEPARTMENTS,
+    );
+
+    if (resolved.action !== "upsert") {
+      // They resolve nowhere. Remove their synced row — but only when every
+      // guild answered, so one server's outage cannot look like a resignation.
+      if (errors === 0) {
+        try {
+          await query(
+            "DELETE FROM roster_members WHERE source = 'discord-sync' AND discord_id = $1",
+            [id],
+          );
+        } catch {
+          // Best-effort; the interval sync prunes stale rows anyway.
+        }
+      }
+      return { configured: true, member: id, action: "remove", errors };
+    }
+
+    const roleIds = held.filter((rid) => mappedRoleIds.has(rid));
+    await applyUpsert(resolved, null, roleIds, cur.nicks);
+
+    // Re-settle callsigns for the department they landed in, from the stored
+    // rows: each member's nickname callsign is in roster_members.nicks, so the
+    // full allocator can run without another guild scan.
+    const dept = resolved.entry.department;
+    const meta = deptMeta[dept];
+    if (meta?.auto && meta.min > 0 && meta.max >= meta.min) {
+      try {
+        const rows = await query(
+          "SELECT discord_id, nicks FROM roster_members WHERE department = $1 AND source = 'discord-sync'",
+          [dept],
+        );
+        const members = rows.map((r) => {
+          const nicks = typeof r.nicks === "object" && r.nicks ? r.nicks : {};
+          const nick = meta.guildId ? nicks[meta.guildId] : "";
+          return { discordId: r.discord_id, nickCallsign: nick ? parseNick(nick).callsign : "" };
+        });
+        await assignDeptCallsigns(dept, members, meta);
+      } catch {
+        // Callsigns are a convenience; the interval sync settles them regardless.
+      }
+    }
+
+    return { configured: true, member: id, action: "upsert", department: dept, present, errors };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[roster-sync:member]", id, err?.code || err?.message || err);
+    return { error: err?.code || "failed" };
+  }
+}
+
+const pendingMemberSyncs = new Map(); // discordId -> timeout
+
+/**
+ * Debounced entry point for the bot's change pings. One Discord change often
+ * arrives as a burst of events (the bot mirrors roles across guilds), so waiting
+ * three seconds and syncing once reads the settled state instead of each step.
+ */
+export function scheduleMemberSync(discordUserId) {
+  const id = String(discordUserId ?? "").trim();
+  if (!SNOWFLAKE.test(id)) return;
+  clearTimeout(pendingMemberSyncs.get(id));
+  const t = setTimeout(() => {
+    pendingMemberSyncs.delete(id);
+    syncRosterMember(id).catch(() => {});
+  }, 3000);
+  t.unref?.();
+  pendingMemberSyncs.set(id, t);
 }
 
 /**
