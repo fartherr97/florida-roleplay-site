@@ -17,7 +17,7 @@ import { requirePermission, loadGrants } from "../middleware/requirePermission.j
 import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, syncRosterForDept, scheduleMemberSync } from "../lib/rosterSync.js";
-import { fetchGuildRoles } from "../lib/discord.js";
+import { fetchGuildRoles, fetchGuildMembers } from "../lib/discord.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
 const router = Router();
@@ -298,6 +298,45 @@ router.post("/event", requireBot, (req, res) => {
   }
   scheduleMemberSync(discordId);
   return res.status(202).json({ ok: true, queued: true });
+});
+
+/**
+ * Diagnostic: who actually holds a Discord role, straight from Discord over REST.
+ * Answers "the roster says nobody has this role - is that true?" independently of
+ * the bot's gateway path, since this read uses the same token but a different
+ * transport. ?roleId=... required; ?guildId=... optional (defaults to the main guild).
+ */
+router.get("/role-holders", requirePermission("discord.roles.manage"), async (req, res) => {
+  const roleId = String(req.query.roleId ?? "").trim();
+  const guildId = String(req.query.guildId ?? "").trim() || process.env.DISCORD_GUILD_ID;
+  if (!SNOWFLAKE.test(roleId)) {
+    return res.status(400).json({ ok: false, message: "roleId must be a Discord role id." });
+  }
+  if (!SNOWFLAKE.test(String(guildId ?? ""))) {
+    return res.status(400).json({ ok: false, message: "No guild configured." });
+  }
+  try {
+    const members = await fetchGuildMembers(guildId);
+    if (!members) {
+      return res.status(503).json({ ok: false, message: "No bot token configured on the site." });
+    }
+    const holders = members.filter((m) => m.roles.includes(roleId));
+    return res.json({
+      ok: true,
+      guildId,
+      roleId,
+      scanned: members.length,
+      holders: holders.length,
+      sample: holders.slice(0, 10).map((m) => m.nick || m.displayName || m.username),
+    });
+  } catch (err) {
+    return res.status(502).json({
+      ok: false,
+      message: err?.code === "MEMBERS_INTENT"
+        ? "Discord refused the member list - enable the Server Members Intent."
+        : (err?.message ?? "Discord read failed."),
+    });
+  }
 });
 
 router.post("/pull", requirePermission("discord.roles.manage"), async (req, res) => {
