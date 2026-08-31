@@ -14,7 +14,7 @@ import { cn } from "../../lib/cn";
  * session server-side. The username drops away below `sm` so the chip stays a
  * bare avatar on narrow phones.
  */
-export default function UserChip({ className, showRank = false }) {
+export default function UserChip({ className }) {
   const { user, loading, previewRank, signOut } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -69,9 +69,6 @@ export default function UserChip({ className, showRank = false }) {
     .join("");
 
   const rank = PREVIEW_RANKS.find((r) => r.id === previewRank)?.label ?? user.rank ?? null;
-  // The band a rank sits in, for the line under the name. Read off the ladder
-  // rather than hard-coded, so a tier added above Ownership needs nothing here.
-  const tier = tierFor(rank);
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -105,18 +102,13 @@ export default function UserChip({ className, showRank = false }) {
           )}
           <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-[#0a0e1a]" />
         </span>
-        {/* The rank line only appears where there is room for it and where it
-            means something — inside a hub. On the public site the chip stays a
-            name, because a visitor's rank is not what they are there for. */}
+        {/* Just the member's Discord main-guild display name — no rank prefix
+            or tier line. The name is the member's own; their rank is on their
+            roster, not stamped in front of them here. */}
         <span className="hidden min-w-0 sm:block text-left">
           <span className="block max-w-[11rem] truncate text-sm font-medium leading-tight text-slate-200">
-            {showRank && rank ? `${rank} · ${user.displayName || user.username}` : user.displayName || user.username}
+            {user.displayName || user.username}
           </span>
-          {showRank && tier && (
-            <span className="block truncate text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-primary-400">
-              {tier}
-            </span>
-          )}
         </span>
       </button>
 
@@ -156,17 +148,4 @@ export default function UserChip({ className, showRank = false }) {
       </AnimatePresence>
     </div>
   );
-}
-
-/** Which band a rank belongs to, for the line under the name in a hub. */
-const TIERS = [
-  { label: "Ownership", ranks: ["Ownership"] },
-  { label: "Leadership", ranks: ["Directorship", "Head Admin"] },
-  { label: "Administration", ranks: ["Sr. Admin", "Admin", "Jr. Admin"] },
-  { label: "Moderation", ranks: ["Sr. Mod", "Mod", "Trial Mod"] },
-];
-
-function tierFor(rank) {
-  if (!rank) return null;
-  return TIERS.find((tier) => tier.ranks.includes(rank))?.label ?? null;
 }

@@ -246,7 +246,7 @@ export default function HubTopBar({ hub }) {
               </Button>
             </span>
 
-            <UserChip showRank />
+            <UserChip />
 
             <button
               type="button"
