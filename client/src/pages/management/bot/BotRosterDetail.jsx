@@ -209,6 +209,7 @@ export default function BotRosterDetail() {
                   {rank.nicknamePriority === "DEPARTMENT" && (
                     <Badge tone="green">Dept name</Badge>
                   )}
+                  {rank.requiresRoleId && <Badge tone="violet">Requires 2 roles</Badge>}
                   <code className="text-xs text-slate-600">{rank.discordRoleId}</code>
                   <span className="ml-auto text-xs text-slate-500">
                     {plural(rank.members?.length ?? 0, "member")}
@@ -547,6 +548,7 @@ function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
     callsignStart: rank?.callsignRangeStart ?? "",
     callsignEnd: rank?.callsignRangeEnd ?? "",
     nicknamePriority: rank?.nicknamePriority ?? "NONE",
+    requiresRoleId: rank?.requiresRoleId ?? "",
   });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -583,6 +585,8 @@ function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
           callsignRangeStart: start,
           callsignRangeEnd: end,
           nicknamePriority: values.nicknamePriority,
+          // null clears the gate; a value sets it. Always sent so clearing sticks.
+          requiresRoleId: values.requiresRoleId.trim() || null,
         },
       });
       onSaved();
@@ -675,6 +679,36 @@ function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
                 value={values.callsignEnd}
                 onChange={(e) => setValues((v) => ({ ...v, callsignEnd: e.target.value }))}
                 className="max-w-28"
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
+            Also requires role <span className="font-medium normal-case tracking-normal text-slate-500">— optional</span>
+          </p>
+          <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+            When set, someone only gets this rank if they hold the rank’s role <em>and</em> this
+            one. Use it for a combined rank — e.g. an <strong>Auxiliary Staff</strong> rank bound
+            to the Server Staff role that only applies to Department Heads. Leave empty for a
+            normal rank.
+          </p>
+          {guildId && (
+            <div className="mt-3">
+              <DiscordRolePicker
+                guildId={guildId}
+                value={values.requiresRoleId}
+                onChange={(role) => setValues((v) => ({ ...v, requiresRoleId: role.id }))}
+              />
+            </div>
+          )}
+          <div className="mt-3">
+            <Field label="Required role ID" htmlFor="b-req" hint="Filled in when you pick a role above, or paste one here. Clear it to remove the requirement.">
+              <TextInput
+                id="b-req"
+                value={values.requiresRoleId}
+                onChange={(e) => setValues((v) => ({ ...v, requiresRoleId: e.target.value }))}
               />
             </Field>
           </div>
