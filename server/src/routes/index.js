@@ -240,12 +240,36 @@ router.get("/rules", (req, res) => {
 /* --------------------------------------------------------- rules editing */
 
 /**
+ * Creates the rules table if a database predates it. Editing rules failed on any deploy
+ * whose schema was applied before the rules feature shipped: the table simply was not
+ * there, so every write threw and surfaced as the misleading "no database" error. Making
+ * it self-creating — the same pattern the newer tables use — means the feature works on
+ * an older database without a manual migration.
+ */
+async function ensureRulesTable() {
+  await query(`CREATE TABLE IF NOT EXISTS rules (
+      id                    VARCHAR(64)  NOT NULL,
+      category_id           VARCHAR(64)  NOT NULL,
+      category              VARCHAR(128) NOT NULL,
+      category_description  TEXT         NULL,
+      number                VARCHAR(16)  NOT NULL DEFAULT '',
+      title                 VARCHAR(255) NOT NULL DEFAULT '',
+      body                  TEXT         NOT NULL,
+      sort_order            INT          NOT NULL DEFAULT 0,
+      created_at            TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at            TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    )`);
+}
+
+/**
  * The rules table is the source of truth for editing, but a fresh deploy renders the seed
  * through the GET fallback without ever writing a row. Editing into an empty table would
  * then leave the page showing the seed while the edits sit in rows nobody reads — so the
  * first write seeds the table from the shipped rules, once, and edits build on that.
  */
 async function ensureRulesSeeded() {
+  await ensureRulesTable();
   const [{ count }] = await query("SELECT COUNT(*)::int AS count FROM rules");
   if (count > 0) return;
   for (const group of seed.rules) {
