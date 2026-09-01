@@ -379,7 +379,7 @@ function RuleEditorModal({ modal, onClose, onSaved }) {
                 placeholder="e.g. 1.1"
               />
             </Field>
-            <Field label="Title" htmlFor="r-title" required>
+            <Field label="Title" htmlFor="r-title" hint="Optional — a short heading. Leave blank for a rule that is just its number and text.">
               <TextInput id="r-title" value={title} onChange={(e) => setTitle(e.target.value)} />
             </Field>
             <Field label="Rule text" htmlFor="r-body" required>

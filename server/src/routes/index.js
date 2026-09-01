@@ -267,7 +267,9 @@ function validateRule(body) {
   const title = str(body?.title).slice(0, 255);
   const text = str(body?.body).slice(0, 20000);
   const errors = [];
-  if (!title) errors.push("A title is required.");
+  // Title is optional: plenty of rules are just a number and their text, with no
+  // heading (the seed ships many that way), so requiring one would reject a
+  // legitimate edit with a 400.
   if (!text) errors.push("Rule text is required.");
   return { errors, value: { number, title, body: text } };
 }
