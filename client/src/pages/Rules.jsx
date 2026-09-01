@@ -345,7 +345,9 @@ function RuleEditorModal({ modal, onClose, onSaved }) {
       if (res && res.ok === false) throw new Error(res.message || "Couldn't save.");
       await onSaved();
     } catch (err) {
-      setError(err?.message ?? (err?.errors ? err.errors.join(" ") : "Couldn't save."));
+      // Validation failures carry their reasons in `errors`; the generic message
+      // ("Request failed (400)") is the fallback, not the headline.
+      setError(err?.errors?.length ? err.errors.join(" ") : err?.message ?? "Couldn't save.");
       setSaving(false);
     }
   };

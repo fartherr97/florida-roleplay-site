@@ -175,7 +175,32 @@ router.get("/departments/:id", (req, res) =>
 
 /* ----------------------------------------------------------------- rules */
 
-/** Groups flat rule rows back into the category shape the client renders. */
+/**
+ * A rule number as comparable numeric parts: "18.2" → [18, 2]. Null when the number is
+ * empty or not dotted digits, so custom labels are left to their saved order.
+ */
+function ruleNumberParts(value) {
+  const s = String(value ?? "").trim();
+  return /^\d+(\.\d+)*$/.test(s) ? s.split(".").map(Number) : null;
+}
+
+/** Numeric part-by-part compare, so 2 < 10 and 18.2 < 18.10 (unlike string order). */
+function compareNumberParts(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+/**
+ * Groups flat rule rows back into the category shape the client renders, in reading
+ * order. The SQL sorts `category_id` as a string — "cat-10" before "cat-2" — which
+ * scrambled the sections the moment the database took over from the seed, so the real
+ * ordering happens here: sections by the number their name starts with (unnumbered ones
+ * like the disclaimers first, as shipped), and rules inside each by their number
+ * (18 < 18.2 < 18.10), with unnumbered rules keeping their saved order at the end.
+ */
 function groupRules(rows) {
   const groups = new Map();
   rows.forEach((row) => {
@@ -194,7 +219,26 @@ function groupRules(rows) {
       body: row.body,
     });
   });
-  return [...groups.values()];
+
+  const list = [...groups.values()];
+  for (const group of list) {
+    group.items.sort((a, b) => {
+      const left = ruleNumberParts(a.number);
+      const right = ruleNumberParts(b.number);
+      if (left && right) return compareNumberParts(left, right);
+      if (left) return -1; // numbered rules read before unnumbered ones
+      if (right) return 1;
+      return 0; // both unnumbered: stable sort keeps their saved order
+    });
+  }
+  list.sort((a, b) => {
+    const left = /^(\d+)/.exec(String(a.category ?? ""));
+    const right = /^(\d+)/.exec(String(b.category ?? ""));
+    const l = left ? Number(left[1]) : -1;
+    const r = right ? Number(right[1]) : -1;
+    return l - r;
+  });
+  return list;
 }
 
 /** Mirrors the client's fallback filter so both paths behave identically. */
