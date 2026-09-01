@@ -66,6 +66,9 @@ On the **site** service:
 | `DISCORD_GUILD_ID` | the community's server ID | Only members of this guild can sign in. |
 | `DISCORD_REDIRECT_URI` | `https://flrp.us/api/auth/callback` | Must match a redirect added in the Discord portal **verbatim**. |
 | `DB_CONNECTION_LIMIT` | `5` | Times the number of running instances, this has to stay under the plan's connection cap. |
+| `FIVEM_CONFIG_SECRET` | a long random string | The FiveM server presents this as `X-FLRP-Secret` to pull `GET /api/fivem/config`. Must equal the game server's `flrp_site_api_secret`. Unset ⇒ that endpoint refuses with 503. |
+| `FXSERVER_SYNC_URL` | `http://<fivem-host>:30120/flrp_api` | Base URL of the game server's `flrp_api`. On every FiveM-config edit the site POSTs `<url>/sync` so the change goes live with no restart. Optional — without it, the game server's background reconcile still pulls changes. |
+| `FXSERVER_SYNC_SECRET` | a long random string | Sent as `X-FLRP-Secret` when calling the game server webhook. Must equal the game server's `flrp_api_shared_secret`. |
 
 `PORT` is injected by Railway; do not set it.
 

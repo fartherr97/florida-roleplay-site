@@ -1379,3 +1379,104 @@ CREATE TABLE IF NOT EXISTS event_attendance (
   PRIMARY KEY (dept_id, event_id, discord_id)
 );
 CREATE INDEX IF NOT EXISTS event_attendance_dept_idx ON event_attendance (dept_id);
+
+-- ==========================================================================
+-- FiveM in-game config (source of truth for the FiveM server's live sync).
+-- The FiveM server pulls GET /api/fivem/config and re-applies to online
+-- players with no restart. See routes/fivem.js and the flrp-server repo's
+-- docs/LIVE_CONFIG_SYNC.md. Seed-fallback: fivemSeed.js serves defaults when
+-- these are empty. Discord→group mapping is NOT here — it lives in pCore.
+-- ==========================================================================
+
+-- FLRP groups (roles). `inherits_key` is a self-reference by key (nullable).
+CREATE TABLE IF NOT EXISTS fivem_roles (
+  key           VARCHAR(64)  NOT NULL,
+  name          VARCHAR(128) NOT NULL,
+  kind          VARCHAR(24)  NOT NULL DEFAULT 'base',
+  priority      INTEGER      NOT NULL DEFAULT 0,
+  is_department BOOLEAN      NOT NULL DEFAULT false,
+  inherits_key  VARCHAR(64)  NULL,
+  enabled       BOOLEAN      NOT NULL DEFAULT true,
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (key)
+);
+
+-- Every in-game permission string.
+CREATE TABLE IF NOT EXISTS fivem_permissions (
+  key            VARCHAR(128) NOT NULL,
+  description    VARCHAR(255) NULL,
+  category       VARCHAR(48)  NOT NULL DEFAULT 'general',
+  default_effect VARCHAR(8)   NOT NULL DEFAULT 'deny',
+  updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (key),
+  CONSTRAINT fivem_perm_effect_chk CHECK (default_effect IN ('allow', 'deny'))
+);
+
+-- Role × permission matrix (allow/deny). The FiveM side applies inheritance.
+CREATE TABLE IF NOT EXISTS fivem_role_permissions (
+  role_key       VARCHAR(64)  NOT NULL,
+  permission_key VARCHAR(128) NOT NULL,
+  effect         VARCHAR(8)   NOT NULL DEFAULT 'allow',
+  updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (role_key, permission_key),
+  CONSTRAINT fivem_rp_effect_chk CHECK (effect IN ('allow', 'deny'))
+);
+
+-- Hourly pay per role (cents).
+CREATE TABLE IF NOT EXISTS fivem_pay_rates (
+  role_key     VARCHAR(64) NOT NULL,
+  hourly_cents BIGINT      NOT NULL DEFAULT 0,
+  enabled      BOOLEAN     NOT NULL DEFAULT true,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (role_key)
+);
+
+-- Weapon registry (authoritative prices/eligibility).
+CREATE TABLE IF NOT EXISTS fivem_weapons (
+  weapon_name         VARCHAR(64)  NOT NULL,
+  display_name        VARCHAR(128) NOT NULL,
+  enabled             BOOLEAN      NOT NULL DEFAULT true,
+  gunstore_available  BOOLEAN      NOT NULL DEFAULT false,
+  price_cents         BIGINT       NOT NULL DEFAULT 0,
+  cert_required       VARCHAR(64)  NULL,
+  required_permission VARCHAR(128) NULL,
+  vmenu_spawnable     BOOLEAN      NOT NULL DEFAULT false,
+  notes               VARCHAR(255) NULL,
+  updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (weapon_name)
+);
+
+-- Vehicle registry.
+CREATE TABLE IF NOT EXISTS fivem_vehicles (
+  spawn_name          VARCHAR(64)  NOT NULL,
+  display_name        VARCHAR(128) NOT NULL,
+  resource            VARCHAR(128) NULL,
+  department          VARCHAR(16)  NULL,
+  category            VARCHAR(48)  NULL,
+  min_rank            VARCHAR(48)  NULL,
+  certification       VARCHAR(64)  NULL,
+  required_permission VARCHAR(128) NULL,
+  enabled             BOOLEAN      NOT NULL DEFAULT true,
+  notes               VARCHAR(255) NULL,
+  updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (spawn_name)
+);
+
+DROP TRIGGER IF EXISTS touch_fivem_roles ON fivem_roles;
+CREATE TRIGGER touch_fivem_roles BEFORE UPDATE ON fivem_roles
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_fivem_permissions ON fivem_permissions;
+CREATE TRIGGER touch_fivem_permissions BEFORE UPDATE ON fivem_permissions
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_fivem_role_permissions ON fivem_role_permissions;
+CREATE TRIGGER touch_fivem_role_permissions BEFORE UPDATE ON fivem_role_permissions
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_fivem_pay_rates ON fivem_pay_rates;
+CREATE TRIGGER touch_fivem_pay_rates BEFORE UPDATE ON fivem_pay_rates
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_fivem_weapons ON fivem_weapons;
+CREATE TRIGGER touch_fivem_weapons BEFORE UPDATE ON fivem_weapons
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+DROP TRIGGER IF EXISTS touch_fivem_vehicles ON fivem_vehicles;
+CREATE TRIGGER touch_fivem_vehicles BEFORE UPDATE ON fivem_vehicles
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();

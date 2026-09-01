@@ -333,6 +333,27 @@ export const PERMISSION_GROUPS = [
       },
     ],
   },
+  {
+    id: "fivem",
+    label: "FiveM (in-game)",
+    description:
+      "The in-game FiveM server config — groups, permissions, pay, weapons and vehicles. Edits apply to the live server with no restart.",
+    permissions: [
+      {
+        key: "fivem.view",
+        label: "View FiveM config",
+        detail:
+          "Read the in-game permission matrix, pay rates, and the weapon and vehicle registries.",
+      },
+      {
+        key: "fivem.manage",
+        label: "Manage FiveM config",
+        detail:
+          "Edit in-game permissions, pay, weapons and vehicles. Changes push to the game server and take effect live, with no restart.",
+        sensitive: true,
+      },
+    ],
+  },
 ];
 
 /** Flat lookup of every permission key to its definition. */
@@ -393,6 +414,10 @@ const DEPARTMENT_ROLES = [
  * configuration page — these are only the defaults.
  */
 export const DEFAULT_GRANTS = {
+  // FiveM in-game config: reading is for admins+, editing for the top only.
+  "fivem.view": staffFrom("admin"),
+  "fivem.manage": ["head_admin", "directorship", "ownership"],
+
   "roster.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
   "roster.edit_status": [...staffFrom("senior_mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
   "roster.manage_loa": [...staffFrom("senior_mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],

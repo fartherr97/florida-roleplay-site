@@ -26,6 +26,7 @@ import supportRouter from "./support.js";
 import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
 import authRouter from "./auth.js";
+import fivemRouter from "./fivem.js";
 import {
   validateApplication,
   validateAssistantMessage,
@@ -45,6 +46,10 @@ router.use("/civilian-hub", civilianHubRouter);
 router.use("/roster", rosterRouter);
 // Access control is itself configurable, so it gets its own router.
 router.use("/permissions", permissionsRouter);
+// The in-game FiveM server config (groups, permissions, pay, weapons, vehicles).
+// Read by the game server (machine secret) and edited by staff with fivem.manage;
+// every edit pushes the change to the live game server. See routes/fivem.js.
+router.use("/fivem", fivemRouter);
 // The department sites. Mounted at /dept rather than /departments because the
 // public site already owns that path for its department directory — this one
 // serves the config documents behind each department's own hub.
