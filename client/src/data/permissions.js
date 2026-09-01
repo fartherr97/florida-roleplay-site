@@ -219,6 +219,21 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "store",
+    label: "Store",
+    description:
+      "The Tebex-backed storefront: package display, entitlement mappings, purchases and fulfillment. Ownership only.",
+    permissions: [
+      {
+        key: "store.manage",
+        label: "Manage the store",
+        detail:
+          "Sync packages from Tebex, set how each appears on the site, map the FLRP entitlements a package grants, and see purchases, fulfillment and the store audit log. Whoever holds it decides what buying a package grants, so it sits with Ownership only.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "truthsocial",
     label: "Broadcast",
     description:
@@ -458,6 +473,7 @@ export const DEFAULT_GRANTS = {
   "emails.view": ["directorship", "ownership"],
   "truthsocial.post": ["ownership"],
   "rules.manage": ["ownership"],
+  "store.manage": ["ownership"],
 
   // Opening a ticket needs nothing but a Discord account — support that only
   // answers people who already hold a role is not support. These decide who

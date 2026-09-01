@@ -25,6 +25,7 @@ import staffLogRouter from "./staffLog.js";
 import supportRouter from "./support.js";
 import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
+import storeRouter from "./store.js";
 import authRouter from "./auth.js";
 import {
   validateApplication,
@@ -76,6 +77,10 @@ router.use("/development", devHubRouter);
 // serves the bytes is mounted at /images in index.js, outside this /api prefix,
 // so a hosted image has a clean URL.
 router.use("/media", mediaRouter);
+// The Tebex-backed storefront: the public store, Ownership-only management, and
+// Tebex's payment webhook. The webhook verifies its own signature; every
+// management route is gated by store.manage.
+router.use("/store", storeRouter);
 // Discord OAuth. Mounted here with the rest so it shares the /api prefix and the
 // same-origin cookie; the handshake itself needs no session, and attachUser
 // above never blocks, so a signed-out visitor reaches /auth/login fine.

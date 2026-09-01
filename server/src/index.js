@@ -35,7 +35,17 @@ const origins = (process.env.CORS_ORIGIN || "http://localhost:5173")
 app.set("trust proxy", Number(process.env.TRUST_PROXY || 0));
 
 app.use(cors({ origin: origins, credentials: true }));
-app.use(express.json({ limit: "256kb" }));
+// Keep the exact received bytes on `req.rawBody`. The Tebex store webhook signs
+// the raw JSON, and a re-serialised body would hash differently — so the
+// signature must be checked against what actually arrived, not a re-encode.
+app.use(
+  express.json({
+    limit: "256kb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 
 /**
  * Liveness and readiness in one.

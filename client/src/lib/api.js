@@ -290,6 +290,38 @@ export const api = {
   storeTiers: () => get("/store/tiers", mock.storeTiers),
   events: () => get("/events", mock.events),
 
+  /* ------------------------------------------------------------ Store */
+  // Public storefront and checkout. The player store lists enabled packages; a
+  // checkout hands back Tebex's hosted checkout URL — the browser navigates
+  // there, and only Tebex's webhook grants anything.
+  storePackages: () => get("/store/packages", { configured: false, packages: [], storeUrl: "" }),
+  storeCheckout: (packageId) =>
+    post("/store/checkout", { packageId }, () => ({ ok: false, message: NOT_PERSISTED })),
+  storeMyPurchases: () => get("/store/purchases/me", { purchases: [] }),
+
+  // Ownership-only Store Management. Every one of these hits a store.manage-gated
+  // endpoint; the server is the boundary, these are just the calls the page makes.
+  storeOverview: () => get("/store/manage/overview", null),
+  storeManagePackages: () => get("/store/manage/packages", { packages: [], storeUrl: "" }),
+  storeSync: () => post("/store/manage/sync", {}, () => ({ ok: false, message: NOT_PERSISTED })),
+  storePackage: (id) => get(`/store/manage/packages/${encodeURIComponent(id)}`, null),
+  storeUpdatePackage: (id, fields) =>
+    patchJson(`/store/manage/packages/${encodeURIComponent(id)}`, fields, () => ({ ok: false, message: NOT_PERSISTED })),
+  storeAddEntitlement: (id, body) =>
+    post(`/store/manage/packages/${encodeURIComponent(id)}/entitlements`, body, () => ({ ok: false, message: NOT_PERSISTED })),
+  storeUpdateEntitlement: (entId, body) =>
+    patchJson(`/store/manage/entitlements/${encodeURIComponent(entId)}`, body, () => ({ ok: false, message: NOT_PERSISTED })),
+  storeDeleteEntitlement: (entId) =>
+    del(`/store/manage/entitlements/${encodeURIComponent(entId)}`, () => ({ ok: false, message: NOT_PERSISTED })),
+  storePurchases: (params = "") => get(`/store/manage/purchases${params}`, { purchases: [], total: 0 }),
+  storePurchase: (id) => get(`/store/manage/purchases/${encodeURIComponent(id)}`, null),
+  storeRetryFulfillment: (id) =>
+    post(`/store/manage/purchases/${encodeURIComponent(id)}/retry`, {}, () => ({ ok: false, message: NOT_PERSISTED })),
+  storeRevokePurchase: (id) =>
+    post(`/store/manage/purchases/${encodeURIComponent(id)}/revoke`, {}, () => ({ ok: false, message: NOT_PERSISTED })),
+  storeAudit: () => get("/store/manage/audit", { entries: [] }),
+  storeDiscordRoles: () => get("/store/manage/discord-roles", { roles: [] }),
+
   knowledgeBase: (q = "") => {
     const trimmed = q.trim();
     const fallback = trimmed
