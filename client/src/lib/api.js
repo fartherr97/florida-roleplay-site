@@ -389,6 +389,9 @@ export const api = {
       message:
         "Accepted, but not persisted — no database is configured, so this will reset on reload.",
     })),
+  /** Refresh every mapped rank's display label from the live Discord role names. */
+  refreshRoleMapLabels: () =>
+    request("/roster/role-map/refresh-labels", { method: "POST" }),
 
   /** Pull the roster from Discord now, returning the per-guild sync outcome. */
   // Pass a department id to refresh only that department (its server + the main one);

@@ -59,7 +59,7 @@ async function loadRankMap() {
 }
 
 /** A department's Discord guild id, from its stored config, falling back to the seed. */
-async function guildIdForDept(deptId) {
+export async function guildIdForDept(deptId) {
   try {
     const rows = await query("SELECT config FROM department_configs WHERE id = $1", [deptId]);
     if (rows.length) {
