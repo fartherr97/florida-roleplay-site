@@ -649,6 +649,6 @@ export const heroCopy = {
   headline: "Welcome to",
   brand: "Florida Roleplay",
   subtitle:
-    "A whitelisted FiveM community built around serious, character-driven roleplay on Florida's South Florida — custom scripts, four emergency services and a story that keeps running when you log off.",
+    "A whitelisted FiveM community built around serious, character-driven roleplay in South Florida — custom scripts, four emergency services and a story that keeps running when you log off.",
   tagline: "Serious RP · Custom Framework · Active Every Night",
 };
