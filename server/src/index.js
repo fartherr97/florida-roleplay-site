@@ -50,6 +50,16 @@ app.get("/healthz", async (_req, res) => {
   res.json({ ok: true, service: "florida-rp-api", database });
 });
 
+// API payloads are dynamic and per-user, and a just-saved edit must never be masked by a
+// stale copy held anywhere between here and the browser. The browser already asks with
+// `cache: no-store`, but that does not bind a CDN or reverse proxy in front of the API —
+// only an origin cache directive does. Send one on every API response so no shared cache
+// (edge, proxy or browser) may serve an old read after a write.
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store, max-age=0");
+  next();
+});
+
 app.use("/api", router);
 
 // The image host's public read side. Serves hosted image bytes straight from the
