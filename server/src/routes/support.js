@@ -18,10 +18,11 @@
 import { Router } from "express";
 import { execute, query, changedRows } from "../db.js";
 import * as seed from "../supportSeed.js";
-import { loadGrants } from "../middleware/requirePermission.js";
+import { loadGrants, requirePermission } from "../middleware/requirePermission.js";
 import { rankFor, resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { fetchGuildMembers } from "../lib/discord.js";
+import { loadSupportWebhooks, saveSupportWebhooks, notifyTicketOpened } from "../lib/supportWebhooks.js";
 import { str } from "../validate.js";
 import {
   DEFAULT_TICKET_TYPES,
@@ -185,6 +186,45 @@ router.get("/", async (req, res) => {
   res.json({ tickets: queue, mine, scope: "queue", agent: true, lead: isSupportLead(ctx) });
 });
 
+/* ------------------------------------------------------------------ *
+ * Webhooks — ownership only. Defined above the /:id routes so "webhooks"
+ * is never captured as a ticket id.
+ * ------------------------------------------------------------------ */
+
+/** The ticket-announcement webhook settings, plus the type list the UI needs. */
+router.get("/webhooks", requirePermission("support.webhooks"), async (req, res) => {
+  const ctx = await contextFor(req);
+  const settings = await loadSupportWebhooks();
+  res.json({
+    ...settings,
+    // Only enabled types can receive a ticket, so only those are worth a webhook.
+    types: (ctx.types ?? [])
+      .filter((type) => type.enabled !== false)
+      .map((type) => ({ id: type.id, label: type.label })),
+  });
+});
+
+/** Save the webhook settings. Each URL is sanitised to a real Discord webhook or dropped. */
+router.post("/webhooks", requirePermission("support.webhooks"), async (req, res) => {
+  const body = req.body ?? {};
+  const deptWebhooks =
+    body.deptWebhooks && typeof body.deptWebhooks === "object" ? body.deptWebhooks : {};
+  try {
+    const saved = await saveSupportWebhooks({
+      supportWebhookUrl: str(body.supportWebhookUrl, 400),
+      supportPingRoleId: str(body.supportPingRoleId, 32),
+      deptWebhooks: Object.fromEntries(
+        Object.entries(deptWebhooks)
+          .slice(0, 100)
+          .map(([id, url]) => [str(id, 64), str(url, 400)]),
+      ),
+    });
+    res.json({ ok: true, ...saved });
+  } catch {
+    res.status(500).json({ ok: false, message: "Could not save the webhook settings." });
+  }
+});
+
 /** One ticket, with what this caller may do to it. */
 router.get("/:id", async (req, res) => {
   const ctx = await contextFor(req);
@@ -245,6 +285,11 @@ router.post("/", async (req, res) => {
   } catch {
     return noStore(res);
   }
+
+  // Announce the new ticket to Discord — the department's own webhook for a department
+  // queue, or the support team's (with a ping) for everything else. Fire-and-forget: the
+  // ticket is already saved, and a webhook problem must not turn its creation into a 500.
+  notifyTicketOpened({ id }, type).catch(() => {});
 
   res.status(201).json({ ok: true, ticket: { id, ...draft, details, status: "open", priority: "normal", openedByName: name, history } });
 });

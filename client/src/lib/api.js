@@ -674,6 +674,13 @@ export const api = {
       message: NOT_PERSISTED,
     })),
 
+  /** The ticket-announcement webhook settings and the queue list (ownership only). */
+  supportWebhooks: () =>
+    get("/support/webhooks", { supportWebhookUrl: "", supportPingRoleId: "", deptWebhooks: {}, types: [] }),
+  /** Save the webhook settings. Throws with the reason on failure. */
+  saveSupportWebhooks: (payload) =>
+    request("/support/webhooks", { method: "POST", body: JSON.stringify(payload) }),
+
   /* --------------------------- Development Hub ---------------------------- */
 
   /** Requests: reads fall back to seeds; writes do not. */

@@ -35,6 +35,7 @@ import SupportQueue from "./pages/support/SupportQueue";
 import SupportFlows from "./pages/support/SupportFlows";
 import SupportTicket from "./pages/support/SupportTicket";
 import SupportTypes from "./pages/support/SupportTypes";
+import SupportWebhooks from "./pages/support/SupportWebhooks";
 import SupportLayout from "./pages/support/SupportLayout";
 import DevHome from "./pages/development/DevHome";
 import DevNew from "./pages/development/DevNew";
@@ -133,6 +134,7 @@ export default function App() {
               <Route path="support/queue" element={<SupportQueue />} />
               <Route path="support/flows" element={<SupportFlows />} />
               <Route path="support/types" element={<SupportTypes />} />
+              <Route path="support/webhooks" element={<SupportWebhooks />} />
               <Route path="support/:id" element={<SupportTicket />} />
             </Route>
 

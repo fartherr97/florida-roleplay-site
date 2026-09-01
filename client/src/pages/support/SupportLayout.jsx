@@ -14,6 +14,7 @@ import {
   Plus,
   SlidersHorizontal,
   UserCheck,
+  Webhook,
   Workflow,
   X,
 } from "lucide-react";
@@ -87,6 +88,7 @@ function SupportDrawer({ open, onClose }) {
     return (types ?? []).some((t) => (t.workPermissions ?? []).some((p) => hasPermission(p)));
   }, [types, hasPermission]);
   const isLead = hasPermission("support.manage");
+  const canWebhooks = hasPermission("support.webhooks");
 
   // Close on navigation and on Escape; lock the page behind the scrim.
   useEffect(() => {
@@ -168,11 +170,14 @@ function SupportDrawer({ open, onClose }) {
                 </DrawerSection>
               )}
 
-              {(isLead || canConfigure) && (
+              {(isLead || canConfigure || canWebhooks) && (
                 <DrawerSection title="Staff tools">
                   {isLead && <DrawerLink to="/support/flows" icon={Workflow} label="Response flows" />}
                   {canConfigure && (
                     <DrawerLink to="/support/types" icon={SlidersHorizontal} label="Ticket categories" />
+                  )}
+                  {canWebhooks && (
+                    <DrawerLink to="/support/webhooks" icon={Webhook} label="Ticket webhooks" />
                   )}
                 </DrawerSection>
               )}

@@ -140,6 +140,13 @@ export const PERMISSION_GROUPS = [
           "Add, edit, reorder and remove the categories a member picks when opening a ticket, and set who opens and who works each. Whoever holds it decides how every ticket is routed, so it sits with Directorship and Ownership.",
         sensitive: true,
       },
+      {
+        key: "support.webhooks",
+        label: "Configure ticket webhooks",
+        detail:
+          "Set the Discord webhooks a new ticket is announced to — the support team's, and each department's own — and the role pinged for support tickets. Ownership only.",
+        sensitive: true,
+      },
     ],
   },
   {
@@ -459,6 +466,7 @@ export const DEFAULT_GRANTS = {
   "support.escalated": ["directorship", "ownership"],
   "support.manage": ["head_admin", "directorship", "ownership"],
   "support.configure": ["directorship", "ownership"],
+  "support.webhooks": ["ownership"],
 
   // Each department's own queue is worked by that department's command. The
   // central support team (support.work) and Directorship still see every queue.
