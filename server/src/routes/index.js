@@ -241,44 +241,39 @@ function groupRules(rows) {
   return list;
 }
 
-/** Mirrors the client's fallback filter so both paths behave identically. */
-function filterSeedRules(q) {
+/** Case-insensitive search over grouped rules; used for the DB rows and the seed alike. */
+function filterRuleGroups(groups, q) {
   const needle = q.toLowerCase();
-  return seed.rules
+  return groups
     .map((group) => ({
       ...group,
       items: group.items.filter(
         (item) =>
-          item.title.toLowerCase().includes(needle) ||
-          item.body.toLowerCase().includes(needle) ||
-          item.number.includes(needle) ||
-          group.category.toLowerCase().includes(needle),
+          String(item.title ?? "").toLowerCase().includes(needle) ||
+          String(item.body ?? "").toLowerCase().includes(needle) ||
+          String(item.number ?? "").includes(needle) ||
+          String(group.category ?? "").toLowerCase().includes(needle),
       ),
     }))
     .filter((group) => group.items.length > 0);
 }
 
-router.get("/rules", (req, res) => {
+router.get("/rules", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-  const fallback = q ? filterSeedRules(q) : seed.rules;
-
-  safe(
-    res,
-    async () => {
-      if (!q) {
-        const rows = await query("SELECT * FROM rules ORDER BY category_id, sort_order, number");
-        return groupRules(rows);
-      }
-      const like = `%${q}%`;
-      const rows = await query(`SELECT * FROM rules
-          WHERE title LIKE $1 OR body LIKE $2 OR number LIKE $3 OR category LIKE $4
-          ORDER BY category_id, sort_order, number`,
-        [like, like, like, like],
-      );
-      return groupRules(rows);
-    },
-    fallback,
-  );
+  try {
+    const rows = await query("SELECT * FROM rules ORDER BY category_id, sort_order, number");
+    // An entirely empty table means the database was never seeded (fresh install);
+    // fall back to the shipped rules. But once the database has rules, it is the
+    // single source of truth: a search with no matches returns an empty result
+    // rather than resurrecting deleted rules from the built-in seed — that phantom
+    // is exactly what made "deleted" rules reappear in search and 404 on save.
+    const groups = rows.length ? groupRules(rows) : seed.rules;
+    return res.json(q ? filterRuleGroups(groups, q) : groups);
+  } catch {
+    // No reachable database at all: serve the read-only seed so the page still renders.
+    const groups = seed.rules;
+    return res.json(q ? filterRuleGroups(groups, q) : groups);
+  }
 });
 
 /* --------------------------------------------------------- rules editing */

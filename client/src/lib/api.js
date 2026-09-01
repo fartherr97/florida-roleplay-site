@@ -113,7 +113,7 @@ async function post(path, body, fallback) {
   try {
     return await request(path, { method: "POST", body: JSON.stringify(body) });
   } catch (err) {
-    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    if (err instanceof ApiForbiddenError || err.status === 400 || err.status === 404) throw err;
     return fallback();
   }
 }
@@ -128,7 +128,7 @@ async function put(path, body, fallback) {
   try {
     return await request(path, { method: "PUT", body: JSON.stringify(body) });
   } catch (err) {
-    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    if (err instanceof ApiForbiddenError || err.status === 400 || err.status === 404) throw err;
     return fallback();
   }
 }
@@ -139,7 +139,7 @@ async function patchJson(path, body, fallback) {
   try {
     return await request(path, { method: "PATCH", body: JSON.stringify(body) });
   } catch (err) {
-    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    if (err instanceof ApiForbiddenError || err.status === 400 || err.status === 404) throw err;
     return fallback();
   }
 }
@@ -150,7 +150,7 @@ async function del(path, fallback) {
   try {
     return await request(path, { method: "DELETE" });
   } catch (err) {
-    if (err instanceof ApiForbiddenError || err.status === 400) throw err;
+    if (err instanceof ApiForbiddenError || err.status === 400 || err.status === 404) throw err;
     return fallback();
   }
 }
