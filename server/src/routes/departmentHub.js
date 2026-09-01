@@ -276,22 +276,83 @@ function normalizeRankLabel(value) {
 }
 
 /**
- * The role-map entry a nickname's rank segment names, or null. Matches on either the
- * short rank or the full label, so the rank the bot actually wrote into someone's
- * nickname — its single source of truth — wins over re-deriving one from a role map that
- * may have drifted.
+ * Common rank abbreviations, expanded so a nickname's short form lines up with the
+ * role map's full label — "Asst." is "Assistant", "Sgt" is "Sergeant", and so on.
+ * The bot writes an abbreviated rank into a nickname while the map stores the long
+ * name, so without this "Asst. Chief" never matches "Assistant Chief of Police".
+ */
+const RANK_ABBREV = {
+  asst: "assistant",
+  assist: "assistant",
+  sr: "senior",
+  jr: "junior",
+  dep: "deputy",
+  dpty: "deputy",
+  sgt: "sergeant",
+  lt: "lieutenant",
+  lieut: "lieutenant",
+  cpl: "corporal",
+  capt: "captain",
+  cpt: "captain",
+  ofc: "officer",
+  off: "officer",
+  po: "officer",
+  det: "detective",
+  cmdr: "commander",
+  cmd: "command",
+  dir: "director",
+  supt: "superintendent",
+  mstr: "master",
+  chf: "chief",
+};
+
+/** A rank label as normalised, abbreviation-expanded word tokens. */
+function rankTokens(value) {
+  return normalizeRankLabel(value)
+    .split(" ")
+    .filter(Boolean)
+    .map((t) => RANK_ABBREV[t] ?? t);
+}
+
+/**
+ * The role-map entry a nickname's rank segment names, or null. The rank the bot actually
+ * wrote into someone's nickname is its single source of truth, so it wins over re-deriving
+ * one from a role map that may have drifted. Matching is two-pass:
+ *   1. an exact match on the expanded short or full label; then
+ *   2. a UNIQUE token-subset match, so an abbreviated "Asst. Chief" lines up with
+ *      "Assistant Chief of Police" — but an ambiguous "Officer" that could be I, II or III
+ *      matches several ranks, so it stays unresolved and falls back to the role sort rather
+ *      than guessing a grade.
  */
 function matchRankFromNick(nick, deptRoleMap) {
   const rankText = parseNick(nick).rank;
   if (!rankText) return null;
-  const wanted = normalizeRankLabel(rankText);
-  if (!wanted) return null;
-  return (
-    (deptRoleMap || []).find(
-      (role) =>
-        normalizeRankLabel(role.rank) === wanted || normalizeRankLabel(role.rankFull) === wanted,
-    ) ?? null
+  const wanted = rankTokens(rankText);
+  if (!wanted.length) return null;
+  const wantedKey = wanted.join(" ");
+  const roles = deptRoleMap || [];
+
+  const exact = roles.find(
+    (role) => rankTokens(role.rank).join(" ") === wantedKey || rankTokens(role.rankFull).join(" ") === wantedKey,
   );
+  if (exact) return exact;
+
+  // A unique ordered prefix: "Chief" is the start of "Chief of Police" but not of
+  // "Deputy Chief of Police", so a bare "Chief" resolves cleanly where a plain
+  // subset test would call it ambiguous.
+  const startsWith = (arr) => wanted.every((t, i) => arr[i] === t);
+  const prefixed = roles.filter(
+    (role) => startsWith(rankTokens(role.rankFull)) || startsWith(rankTokens(role.rank)),
+  );
+  if (prefixed.length === 1) return prefixed[0];
+
+  const covers = (role) => {
+    const full = new Set(rankTokens(role.rankFull));
+    const short = new Set(rankTokens(role.rank));
+    return wanted.every((t) => full.has(t)) || wanted.every((t) => short.has(t));
+  };
+  const supersets = roles.filter(covers);
+  return supersets.length === 1 ? supersets[0] : null;
 }
 
 async function loadRosterAndMap(deptId, deptGuildId = "") {
