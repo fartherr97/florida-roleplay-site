@@ -260,6 +260,40 @@ function mapMemberRow(row) {
  * Rows synced before the roles were recorded fall back to their stored primary
  * department, so nobody vanishes between a schema upgrade and the next sync.
  */
+/**
+ * Normalises a rank label for matching a nickname's rank segment against the role map:
+ * lower-cased, a leading "XXX | " department prefix dropped, periods and extra spaces
+ * flattened. So "Asst. Chief", "MPD | Assistant Chief" and "assistant chief" all compare
+ * equal enough to line a bot-written nickname up with its mapped rank.
+ */
+function normalizeRankLabel(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/^[a-z0-9]+\s*\|\s*/, "")
+    .replace(/[.]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * The role-map entry a nickname's rank segment names, or null. Matches on either the
+ * short rank or the full label, so the rank the bot actually wrote into someone's
+ * nickname — its single source of truth — wins over re-deriving one from a role map that
+ * may have drifted.
+ */
+function matchRankFromNick(nick, deptRoleMap) {
+  const rankText = parseNick(nick).rank;
+  if (!rankText) return null;
+  const wanted = normalizeRankLabel(rankText);
+  if (!wanted) return null;
+  return (
+    (deptRoleMap || []).find(
+      (role) =>
+        normalizeRankLabel(role.rank) === wanted || normalizeRankLabel(role.rankFull) === wanted,
+    ) ?? null
+  );
+}
+
 async function loadRosterAndMap(deptId, deptGuildId = "") {
   let roster = rosterSeed.filter((entry) => entry.department === deptId);
   let roleMap = ROLE_MAP.filter((role) => role.department === deptId);
@@ -316,7 +350,12 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
           .map((rid) => byRoleId.get(rid))
           .filter((role) => role && role.department === deptId);
         if (deptRoles.length) {
-          const top = deptRoles.sort((a, b) => (b.order ?? 0) - (a.order ?? 0))[0];
+          // The rank the bot wrote into this member's department nickname is the single
+          // source of truth — the same rank Discord shows. When it lines up with a mapped
+          // rank, it wins over re-deriving one from stacked roles, so the site can never
+          // disagree with the bot (which was the "Kilo shows as the wrong rank" drift).
+          const fromNick = nick ? matchRankFromNick(nick, roleMap) : null;
+          const top = fromNick ?? deptRoles.sort((a, b) => (b.order ?? 0) - (a.order ?? 0))[0];
           built.push({ ...base, department: deptId, rank: top.rank, rankFull: top.rankFull, rankColor: top.color || "" });
         } else if (held === null && base.department === deptId) {
           // Legacy row with no recorded roles yet — keep it under its stored rank.

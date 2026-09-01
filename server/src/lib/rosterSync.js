@@ -29,15 +29,20 @@ import { fetchGuildMembers, fetchGuildMember } from "./discord.js";
  */
 export function parseNick(nick) {
   const raw = String(nick ?? "").trim();
-  if (!raw) return { callsign: "", name: "" };
+  if (!raw) return { callsign: "", name: "", rank: "" };
   const parts = raw.split("|").map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const first = parts[0];
     // A callsign is a short number, optionally with a one-letter prefix (A-12).
     const callsign = /^[A-Za-z]?\d{1,4}$/.test(first) ? first : "";
-    return { callsign, name: parts[parts.length - 1] };
+    // The rank is whatever sits between the callsign and the name — the middle
+    // segment(s) the bot wrote, e.g. "Deputy Chief" in "702 | Deputy Chief | Kilo".
+    // With no leading callsign it is everything before the name.
+    const start = callsign ? 1 : 0;
+    const rank = parts.slice(start, -1).join(" | ");
+    return { callsign, name: parts[parts.length - 1], rank };
   }
-  return { callsign: "", name: raw };
+  return { callsign: "", name: raw, rank: "" };
 }
 
 /**
