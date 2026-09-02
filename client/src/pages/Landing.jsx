@@ -25,12 +25,12 @@ import {
 import { formatDate } from "../lib/format";
 
 /** The three law-enforcement departments, in reading order. */
-const LEO_IDS = ["fhp", "bcso", "mpd"];
+const LEO_IDS = ["fhp", "bso", "mpd"];
 
 /** Department crests, hosted on the community site. */
 const DEPT_LOGOS = {
   fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
-  bcso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  bso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
   mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
 };
 

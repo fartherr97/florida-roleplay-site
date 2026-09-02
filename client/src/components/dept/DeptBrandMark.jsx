@@ -17,7 +17,7 @@ export default function DeptBrandMark({ config, className = "size-9" }) {
     );
   }
 
-  // Three characters at most: "FHP" and "MPD" are the whole name, while "BCSO"
+  // Three characters at most: "FHP" and "MPD" are the whole name, while "BSO"
   // at this size is a smudge — so it clips, and the tighter type keeps three
   // letters from overflowing the tile.
   const letters = (shortName || name || "?").replace(/[^A-Za-z0-9]/g, "").toUpperCase();

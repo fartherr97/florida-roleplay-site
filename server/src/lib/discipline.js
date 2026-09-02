@@ -173,7 +173,7 @@ function commandRoleKeys(bodyId) {
 /** The rank that runs each department. Matches the applications and transfer engines. */
 export const DEPARTMENT_COMMAND_KEYS = {
   fhp: "fhp_colonel",
-  bcso: "bcso_sheriff",
+  bso: "bso_sheriff",
   mpd: "mpd_chief",
 };
 

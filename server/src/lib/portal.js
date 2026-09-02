@@ -19,19 +19,19 @@
 import { ROLE_MAP } from "../rosterSeed.js";
 
 /** The departments a member can transfer between — emergency services only. */
-export const TRANSFER_DEPT_IDS = ["fhp", "bcso", "mpd"];
+export const TRANSFER_DEPT_IDS = ["fhp", "bso", "mpd"];
 
 /** Abbreviation → department id, the key the rest of the site uses. */
 export const DEPTS = {
   FHP: "fhp",
-  BCSO: "bcso",
+  BSO: "bso",
   MPD: "mpd",
 };
 
 /** The Discord role key that commands each department. */
 export const DEPT_COMMAND_KEYS = {
   FHP: "fhp_colonel",
-  BCSO: "bcso_sheriff",
+  BSO: "bso_sheriff",
   MPD: "mpd_chief",
 };
 

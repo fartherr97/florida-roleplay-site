@@ -170,14 +170,14 @@ export const departments = [
     applicationType: "fhp",
   },
   {
-    id: "bcso",
+    id: "bso",
     name: "Broward County Sheriff's Office",
-    abbr: "BCSO",
+    abbr: "BSO",
     tone: "green",
     icon: "Shield",
     tagline: "County patrol, K9, marine and aviation units.",
     mission:
-      "BCSO covers unincorporated Broward County with a full patrol division, a K9 detail, marine patrol on the bay and an aviation unit supporting county-wide operations.",
+      "BSO covers unincorporated Broward County with a full patrol division, a K9 detail, marine patrol on the bay and an aviation unit supporting county-wide operations.",
     roster: 56,
     hiring: true,
     ranks: ["Deputy", "Master Deputy", "Corporal", "Sergeant", "Lieutenant", "Major", "Sheriff"],
@@ -187,7 +187,7 @@ export const departments = [
       "Marine Patrol Boat",
       "Air-1 Helicopter",
     ],
-    applicationType: "bcso",
+    applicationType: "bso",
   },
   {
     id: "mpd",
@@ -538,9 +538,9 @@ export const assistantReplies = [
       "Start with the community whitelist application — everything else needs an approved whitelist behind it. Reviews take 24 to 48 hours and the outcome arrives as a Discord DM. Read the rules first; the interview references them directly.",
   },
   {
-    match: ["department", "police", "fhp", "bcso", "mpd"],
+    match: ["department", "police", "fhp", "bso", "mpd"],
     reply:
-      "We run three agencies: FHP, BCSO and MPD. Each department page lists its rank structure, fleet and a direct link to its application.",
+      "We run three agencies: FHP, BSO and MPD. Each department page lists its rank structure, fleet and a direct link to its application.",
   },
   {
     match: ["crash", "fps", "lag", "performance", "connect"],

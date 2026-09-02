@@ -9,7 +9,7 @@
  * Discord id, which is what folds it into the right person's record. Promotions
  * and commendations are not discipline and are never filed.
  *
- * The department id is the body id: fhp/bcso/mpd are both a department config id
+ * The department id is the body id: fhp/bso/mpd are both a department config id
  * and an ACTION_BODY, so a filing lands under the department that made it. The
  * issuer is the signed-in editor, never the form — a record filed under someone
  * else's name is not a record.
@@ -53,7 +53,7 @@ function entryDetail(entry) {
  * throws — a filing failure must not fail the save that already landed.
  */
 export async function fileAdminLogDiscipline(deptId, before, after, user) {
-  // The department must be a disciplinary body (fhp/bcso/mpd…). Staff/management
+  // The department must be a disciplinary body (fhp/bso/mpd…). Staff/management
   // file through the DA Hub itself, not a department admin log.
   if (!ACTION_BODY_MAP[deptId] || ACTION_BODY_MAP[deptId].source !== "department") return;
   if (!user?.id) return;

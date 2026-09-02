@@ -26,7 +26,7 @@
 import { DEPARTMENTS, ROLE_MAP } from "../../data/rosterData";
 
 /** The departments a member can transfer between — emergency services only. */
-const TRANSFER_DEPT_IDS = ["fhp", "bcso", "mpd"];
+const TRANSFER_DEPT_IDS = ["fhp", "bso", "mpd"];
 
 /**
  * Each department's brand hex.
@@ -37,7 +37,7 @@ const TRANSFER_DEPT_IDS = ["fhp", "bcso", "mpd"];
  */
 const DEPT_COLORS = {
   fhp: "#d2b48c",
-  bcso: "#1f8b4c",
+  bso: "#1f8b4c",
   mpd: "#2e69f1",
 };
 
@@ -51,7 +51,7 @@ const DEPT_COLORS = {
  */
 const DEPT_SHORT = {
   fhp: "Highway Patrol",
-  bcso: "Sheriff's Office",
+  bso: "Sheriff's Office",
   mpd: "Police Dept",
 };
 
@@ -62,7 +62,7 @@ const DEPT_SHORT = {
  */
 const DEPT_LOGOS = {
   fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
-  bcso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  bso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
   mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
 };
 
@@ -117,7 +117,7 @@ export const ALL_RANKS = Object.values(RANKS)
 /** The Discord role key that commands each department, for dept-head resolution. */
 export const DEPT_COMMAND_KEYS = {
   FHP: "fhp_colonel",
-  BCSO: "bcso_sheriff",
+  BSO: "bso_sheriff",
   MPD: "mpd_chief",
 };
 

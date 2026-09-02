@@ -280,12 +280,12 @@ const FHP = department({
   ],
 });
 
-const BCSO = department({
-  id: "bcso",
+const BSO = department({
+  id: "bso",
   guildId: "1534487473206595718",
   callsignRange: [501, 599],
   name: "Broward County Sheriff's Office",
-  shortName: "BCSO",
+  shortName: "BSO",
   accent: "green",
   tagline: "",
   description:
@@ -297,7 +297,7 @@ const BCSO = department({
       "Roster, districts, fleet and the current general orders for every deputy on the road.",
     blocks: [
       {
-        id: "bcso-b0",
+        id: "bso-b0",
         type: "links",
         kicker: "Quick access",
         title: "On shift",
@@ -312,13 +312,13 @@ const BCSO = department({
     ],
   },
   categories: [
-    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["bcso_sheriff", "bcso_major"] },
-    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["bcso_lieutenant", "bcso_sergeant", "bcso_corporal"] },
-    { id: "cat-deputies", name: "Deputies", color: "#22c55e", roleKeys: ["bcso_master_deputy", "bcso_deputy"] },
+    { id: "cat-command", name: "Command", color: "#f59e0b", roleKeys: ["bso_sheriff", "bso_major"] },
+    { id: "cat-supervisors", name: "Supervisors", color: "#3b82f6", roleKeys: ["bso_lieutenant", "bso_sergeant", "bso_corporal"] },
+    { id: "cat-deputies", name: "Deputies", color: "#22c55e", roleKeys: ["bso_master_deputy", "bso_deputy"] },
   ],
-  grants: access("bcso_sheriff", "Sheriff", [
-    { key: "bcso_major", label: "Major" },
-    { key: "bcso_lieutenant", label: "Lieutenant" },
+  grants: access("bso_sheriff", "Sheriff", [
+    { key: "bso_major", label: "Major" },
+    { key: "bso_lieutenant", label: "Lieutenant" },
   ]),
 });
 
@@ -363,7 +363,7 @@ const MPD = department({
   ]),
 });
 
-export const DEPARTMENT_CONFIGS = { fhp: FHP, bcso: BCSO, mpd: MPD };
+export const DEPARTMENT_CONFIGS = { fhp: FHP, bso: BSO, mpd: MPD };
 
 export const DEPARTMENT_IDS = Object.keys(DEPARTMENT_CONFIGS);
 

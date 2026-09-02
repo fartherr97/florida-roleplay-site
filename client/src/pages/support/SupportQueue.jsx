@@ -39,7 +39,7 @@ import {
 /** Department categories carry their emblem rather than a lucide glyph. */
 const DEPT_LOGOS = {
   dept_fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
-  dept_bcso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  dept_bso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
   dept_mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
 };
 

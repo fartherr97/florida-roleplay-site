@@ -740,7 +740,7 @@ function VehicleModal({ vehicle, onClose, onSave }) {
           <TextInput value={form.display_name} onChange={(e) => set("display_name", e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Department" hint="bcso / fhp / mpd, blank for civilian">
+          <Field label="Department" hint="bso / fhp / mpd, blank for civilian">
             <TextInput value={form.department} onChange={(e) => set("department", e.target.value)} />
           </Field>
           <Field label="Category">

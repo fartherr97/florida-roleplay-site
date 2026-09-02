@@ -27,7 +27,7 @@ import { addMemberRole, removeMemberRole } from "./discord.js";
 
 const SNOWFLAKE = /^\d{17,20}$/;
 
-/** Maps a ticket's department (abbreviation like "BCSO", or an id) to the config id. */
+/** Maps a ticket's department (abbreviation like "BSO", or an id) to the config id. */
 function deptIdOf(dept) {
   if (!dept) return null;
   return DEPTS[dept] ?? String(dept).toLowerCase();

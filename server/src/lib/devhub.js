@@ -74,7 +74,7 @@ export const DEFAULT_REQUEST_TYPES = [
     fields: [
       { id: "tebex_email", label: "Tebex email", type: "short", required: true, help: "The email tied to your Tebex purchases." },
       { id: "vehicle_link", label: "Vehicle link", type: "short", required: true, help: "Link to the vehicle you want." },
-      { id: "department", label: "Department", type: "select", options: ["FHP", "BCSO", "MPD"], required: true },
+      { id: "department", label: "Department", type: "select", options: ["FHP", "BSO", "MPD"], required: true },
       { id: "liveries", label: "Requested liveries", type: "short", required: false, help: "e.g. MARKED FHP, MARKED CIU." },
     ],
   },
@@ -117,7 +117,7 @@ export const DEFAULT_REQUEST_TYPES = [
     enabled: true,
     openPermission: null,
     fields: [
-      { id: "department", label: "Department", type: "select", options: ["FHP", "BCSO", "MPD", "Civilian"], required: true },
+      { id: "department", label: "Department", type: "select", options: ["FHP", "BSO", "MPD", "Civilian"], required: true },
       { id: "work_type", label: "Type of work", type: "select", options: ["Livery", "Fleet vehicle", "MLO / map", "Script", "Other"], required: true },
       { id: "vehicle_link", label: "Vehicle / asset link", type: "short", required: false },
       { id: "liveries", label: "Requested liveries", type: "short", required: false },

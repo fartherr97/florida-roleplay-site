@@ -229,14 +229,14 @@ export const DEFAULT_TICKET_TYPES = [
     ],
   },
   {
-    id: "dept_bcso",
-    label: "BCSO — Broward County Sheriff's Office",
+    id: "dept_bso",
+    label: "BSO — Broward County Sheriff's Office",
     icon: "Shield",
     tone: "green",
     blurb: "A question or request for Broward County Sheriff's Office command.",
     enabled: true,
     openPermission: null,
-    workPermissions: ["support.bcso"],
+    workPermissions: ["support.bso"],
     exclusive: false,
     fields: [
       { id: "callsign", label: "Your in-game name or callsign", type: "short", required: false },

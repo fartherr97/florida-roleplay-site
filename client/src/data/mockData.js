@@ -208,14 +208,14 @@ export const departments = [
     applicationType: "fhp",
   },
   {
-    id: "bcso",
+    id: "bso",
     name: "Broward County Sheriff's Office",
-    abbr: "BCSO",
+    abbr: "BSO",
     tone: "green",
     icon: "Shield",
     tagline: "County patrol, K9, marine and aviation units.",
     mission:
-      "BCSO covers unincorporated Broward County with a full patrol division, a K9 detail, marine patrol on the bay and an aviation unit supporting county-wide operations.",
+      "BSO covers unincorporated Broward County with a full patrol division, a K9 detail, marine patrol on the bay and an aviation unit supporting county-wide operations.",
     roster: 56,
     hiring: true,
     ranks: [
@@ -233,7 +233,7 @@ export const departments = [
       "Marine Patrol Boat",
       "Air-1 Helicopter",
     ],
-    applicationType: "bcso",
+    applicationType: "bso",
   },
   {
     id: "mpd",

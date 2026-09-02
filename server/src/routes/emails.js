@@ -30,7 +30,7 @@ import { DEPARTMENT_COMMAND_KEYS } from "../lib/discipline.js";
 import { str } from "../validate.js";
 import * as seed from "../rosterSeed.js";
 
-/** The department-head role keys (fhp_colonel, bcso_sheriff, mpd_chief). */
+/** The department-head role keys (fhp_colonel, bso_sheriff, mpd_chief). */
 const DEPT_HEAD_KEYS = Object.values(DEPARTMENT_COMMAND_KEYS);
 
 const router = Router();

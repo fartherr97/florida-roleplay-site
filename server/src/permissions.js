@@ -153,7 +153,7 @@ export const PERMISSION_GROUPS = [
     permissions: [
       { key: "support.fhp", label: "Work FHP tickets", detail: "See and work tickets opened for Florida Highway Patrol." },
       { key: "support.mpd", label: "Work MPD tickets", detail: "See and work tickets opened for Miami Police Department." },
-      { key: "support.bcso", label: "Work BCSO tickets", detail: "See and work tickets opened for Broward County Sheriff's Office." },
+      { key: "support.bso", label: "Work BSO tickets", detail: "See and work tickets opened for Broward County Sheriff's Office." },
       { key: "support.civilian", label: "Work Civilian Department tickets", detail: "See and work tickets opened for the Civilian Department." },
     ],
   },
@@ -417,8 +417,8 @@ function staffFrom(key) {
 const DEPARTMENT_ROLES = [
   "fhp_trooper", "fhp_senior_trooper", "fhp_corporal", "fhp_sergeant",
   "fhp_lieutenant", "fhp_captain", "fhp_colonel",
-  "bcso_deputy", "bcso_master_deputy", "bcso_corporal", "bcso_sergeant",
-  "bcso_lieutenant", "bcso_major", "bcso_sheriff",
+  "bso_deputy", "bso_master_deputy", "bso_corporal", "bso_sergeant",
+  "bso_lieutenant", "bso_major", "bso_sheriff",
   "mpd_officer", "mpd_senior_officer", "mpd_corporal", "mpd_sergeant",
   "mpd_lieutenant", "mpd_captain", "mpd_chief",
 ];
@@ -434,8 +434,8 @@ export const DEFAULT_GRANTS = {
   "fivem.manage": ["head_admin", "directorship", "ownership"],
 
   "roster.view": ["member", ...CIVILIAN_TIERS, ...DEPARTMENT_ROLES, ...STAFF_LADDER],
-  "roster.edit_status": [...staffFrom("senior_mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
-  "roster.manage_loa": [...staffFrom("senior_mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "roster.edit_status": [...staffFrom("senior_mod"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
+  "roster.manage_loa": [...staffFrom("senior_mod"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "roster.edit_member": staffFrom("junior_admin"),
   "roster.remove": staffFrom("admin"),
 
@@ -509,25 +509,25 @@ export const DEFAULT_GRANTS = {
   // central support team (support.work) and Directorship still see every queue.
   "support.fhp": ["fhp_lieutenant", "fhp_captain", "fhp_colonel"],
   "support.mpd": ["mpd_lieutenant", "mpd_captain", "mpd_chief"],
-  "support.bcso": ["bcso_lieutenant", "bcso_major", "bcso_sheriff"],
+  "support.bso": ["bso_lieutenant", "bso_major", "bso_sheriff"],
   "support.civilian": ["senior_admin", "head_admin", "directorship", "ownership"],
 
   // Uploading to the image host — seeded to staff and department command, widen
   // it on this page for anyone else who should host images.
-  "media.upload": [...staffFrom("mod"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "media.upload": [...staffFrom("mod"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "media.manage": staffFrom("senior_admin"),
 
   // The dev team works development requests; department command see their own
   // department's work. Managing the hub (vehicle library, request categories)
   // sits higher. Opening a request needs nothing but a Discord account.
-  "development.work": [...staffFrom("admin"), "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "development.work": [...staffFrom("admin"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "development.manage": ["head_admin", "directorship", "ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),
   "site.support": STAFF_LADDER,
   "site.leadership": ["head_admin", "directorship", "ownership"],
-  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "bcso_sheriff", "mpd_chief"],
+  "site.department_heads": ["head_admin", "directorship", "ownership", "fhp_colonel", "bso_sheriff", "mpd_chief"],
 
   // Both of these can be used to grant everything else, so they sit at the top
   // of the ladder. Gating role mapping lower would be cosmetic: anyone able to

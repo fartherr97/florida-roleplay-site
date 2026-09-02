@@ -101,7 +101,7 @@ function uniqueKey(base, taken) {
 
 /**
  * Best guess at which department a Discord role belongs to, from its name: an
- * exact abbreviation (FHP, BCSO, MPD), then any word of the department's label.
+ * exact abbreviation (FHP, BSO, MPD), then any word of the department's label.
  * Returns "" when nothing matches, so the importer leaves it for the user.
  */
 function guessDepartment(name, departments) {
