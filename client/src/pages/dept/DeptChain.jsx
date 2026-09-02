@@ -1229,10 +1229,13 @@ export default function DeptChain({ page, config }) {
                         key={i}
                         d={`M ${s.x1} ${s.y1} C ${s.x1} ${midY}, ${s.x2} ${midY}, ${s.x2} ${s.y2}`}
                         fill="none"
-                        stroke={accent}
+                        // A shared box's connectors match the chart's own thin grey
+                        // hairlines (white/15); only a dashed in-place link keeps the
+                        // accent colour and arrow to mark it as the odd one out.
+                        stroke={dashed ? accent : "#ffffff"}
                         strokeWidth="1.5"
                         strokeDasharray={dashed ? "5 4" : undefined}
-                        strokeOpacity={dashed ? 0.8 : 0.9}
+                        strokeOpacity={dashed ? 0.8 : 0.16}
                         markerEnd={dashed ? "url(#coc-arrow)" : undefined}
                       />
                     );
