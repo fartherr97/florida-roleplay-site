@@ -607,6 +607,9 @@ async function resolveLiveLeadership() {
 router.get("/leadership", (_req, res) => {
   // Never let a CDN or browser cache this — a just-saved edit must show at once.
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  // Public leadership info — allow the FiveM loading-screen browser (a different
+  // origin) to read it so the in-game team panel can show the same live list.
+  res.set("Access-Control-Allow-Origin", "*");
   // safeOne, not safe: this endpoint returns an object, and safe()'s
   // rows.length check would discard it and serve the vacant fallback forever.
   safeOne(
