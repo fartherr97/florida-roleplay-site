@@ -402,6 +402,67 @@ function sanitizeReportsTo(root) {
   return clean(root);
 }
 
+/**
+ * Turns the stored tree into what actually gets drawn, plus the connector edges.
+ *
+ * A box whose parents (its structural parent + every "also reports to") are all
+ * siblings — children of one common box — is a *bridge*: instead of hanging under
+ * one of them, it is lifted out and rendered in a centered row beneath that
+ * common box, so it sits in the middle of its parents with a line coming down
+ * from each (what a shared precinct under two corporals should look like). Any
+ * other secondary link, where the parents are not tidy siblings, stays as a
+ * dashed line to the box in its normal place.
+ *
+ * Storage never changes — this is a render-time view — so drag, edit and delete
+ * all keep operating on the plain tree by id.
+ */
+function buildBridgeModel(root) {
+  if (!root) return { render: null, edges: [] };
+
+  const nodeById = new Map();
+  const parentOf = new Map();
+  (function index(n, p) {
+    nodeById.set(n.id, n);
+    parentOf.set(n.id, p);
+    (n.children || []).forEach((c) => index(c, n.id));
+  })(root, null);
+
+  const edges = [];
+  const bridgesByOwner = new Map(); // common-parent id -> [{ id, parentIds }]
+  const lifted = new Set();
+
+  for (const [id, node] of nodeById) {
+    const rt = (node.reportsTo || []).filter((pid) => nodeById.has(pid));
+    if (!rt.length) continue;
+    const sp = parentOf.get(id);
+    const parents = [sp, ...rt].filter(Boolean);
+    const grandparents = new Set(parents.map((pid) => parentOf.get(pid)));
+    const commonParent = grandparents.size === 1 ? [...grandparents][0] : null;
+
+    if (sp && commonParent && commonParent !== id && !lifted.has(commonParent)) {
+      // All parents are siblings — lift the box into a centered row under them.
+      if (!bridgesByOwner.has(commonParent)) bridgesByOwner.set(commonParent, []);
+      bridgesByOwner.get(commonParent).push({ id, parentIds: parents });
+      lifted.add(id);
+      parents.forEach((pid) => edges.push({ from: pid, to: id, kind: "solid" }));
+    } else {
+      // Parents aren't tidy siblings — keep the box in place, dashed lines up.
+      rt.forEach((pid) => edges.push({ from: pid, to: id, kind: "dashed" }));
+    }
+  }
+
+  const rebuild = (n) => ({
+    ...n,
+    children: (n.children || []).filter((c) => !lifted.has(c.id)).map(rebuild),
+    bridges: (bridgesByOwner.get(n.id) || []).map((b) => ({
+      node: rebuild(nodeById.get(b.id)),
+      parentIds: b.parentIds,
+    })),
+  });
+
+  return { render: rebuild(root), edges };
+}
+
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 function NodeCard({ node, accent, canEdit, isRoot, onEdit, dropHint, setDropHint, onDropNode, canDropOn, setDragId }) {
@@ -681,6 +742,30 @@ function NodeTree({ node, accent, canEdit, isRoot = true, onEdit, onAddChild, dr
           </div>
         </>
       )}
+      {node.bridges && node.bridges.length > 0 && (
+        // Shared boxes, rendered in a centered row beneath this box's children so
+        // each sits in the middle of its parents. The lines down from each parent
+        // are drawn by the SVG overlay, which measures the real positions.
+        <div className="mt-10 flex flex-col items-center gap-6">
+          {node.bridges.map((b) => (
+            <NodeTree
+              key={b.node.id}
+              node={b.node}
+              accent={accent}
+              canEdit={canEdit}
+              isRoot={false}
+              onEdit={onEdit}
+              onAddChild={onAddChild}
+              dropHint={dropHint}
+              setDropHint={setDropHint}
+              onDropNode={onDropNode}
+              canDropOn={canDropOn}
+              setDragId={setDragId}
+              dragId={dragId}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -887,6 +972,10 @@ export default function DeptChain({ page, config }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [links, setLinks] = useState({ w: 0, h: 0, segs: [] });
 
+  // The render view: shared boxes lifted into centered rows, plus the connector
+  // edges (solid for a lifted/shared box, dashed for a link left in place).
+  const model = useMemo(() => buildBridgeModel(root), [root]);
+
   // The boxes a box may add as extra parents: every other box except itself, its
   // own subtree (a line back down into itself), and its structural parent (whose
   // solid line already shows the relationship).
@@ -920,12 +1009,16 @@ export default function DeptChain({ page, config }) {
         });
       });
       const segs = [];
-      flattenNodes(root).forEach((n) => {
-        (n.reportsTo || []).forEach((pid) => {
-          const p = rects.get(pid);
-          const c = rects.get(n.id);
-          if (!p || !c) return;
-          segs.push({ x1: p.left + p.w / 2, y1: p.top + p.h, x2: c.left + c.w / 2, y2: c.top });
+      model.edges.forEach((edge) => {
+        const p = rects.get(edge.from);
+        const c = rects.get(edge.to);
+        if (!p || !c) return;
+        segs.push({
+          x1: p.left + p.w / 2,
+          y1: p.top + p.h,
+          x2: c.left + c.w / 2,
+          y2: c.top,
+          kind: edge.kind,
         });
       });
       setLinks({ w: panEl.scrollWidth, h: panEl.scrollHeight, segs });
@@ -943,7 +1036,7 @@ export default function DeptChain({ page, config }) {
       ro?.disconnect();
       window.removeEventListener("resize", schedule);
     };
-  }, [root, zoom, isFullscreen]);
+  }, [model, zoom, isFullscreen]);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement === fsRef.current);
@@ -1130,6 +1223,7 @@ export default function DeptChain({ page, config }) {
                   </defs>
                   {links.segs.map((s, i) => {
                     const midY = (s.y1 + s.y2) / 2;
+                    const dashed = s.kind === "dashed";
                     return (
                       <path
                         key={i}
@@ -1137,9 +1231,9 @@ export default function DeptChain({ page, config }) {
                         fill="none"
                         stroke={accent}
                         strokeWidth="1.5"
-                        strokeDasharray="5 4"
-                        strokeOpacity="0.8"
-                        markerEnd="url(#coc-arrow)"
+                        strokeDasharray={dashed ? "5 4" : undefined}
+                        strokeOpacity={dashed ? 0.8 : 0.9}
+                        markerEnd={dashed ? "url(#coc-arrow)" : undefined}
                       />
                     );
                   })}
@@ -1147,10 +1241,10 @@ export default function DeptChain({ page, config }) {
               )}
               <div ref={contentRef} style={{ zoom }} className="relative z-[1] mx-auto w-max">
                 <NodeTree
-                  node={root}
+                  node={model.render}
                   accent={accent}
                   canEdit={canEdit}
-                  onEdit={setEditing}
+                  onEdit={(n) => setEditing(findNode(root, n.id) || n)}
                   onAddChild={addChildTo}
                   dropHint={dropHint}
                   setDropHint={setDropHint}
