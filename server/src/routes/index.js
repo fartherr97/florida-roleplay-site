@@ -10,6 +10,7 @@ import { str } from "../validate.js";
 import * as seed from "../seed.js";
 import { attachUser } from "../middleware/requireRole.js";
 import { requirePermission } from "../middleware/requirePermission.js";
+import { fetchGuildMembers } from "../lib/discord.js";
 import staffHubRouter from "./staffHub.js";
 import civilianHubRouter from "./civilianHub.js";
 import rosterRouter from "./roster.js";
@@ -502,7 +503,107 @@ function shapeSeat(r) {
   };
 }
 
-/** The public leadership team — a fixed set of seats, edited by hand. */
+// The FLRP role keys whose Discord holders fill the public leadership card. The
+// site stores each key's Discord role id in `roster_role_map` (the same map the
+// roster and bot read), so the card names whoever actually holds the role rather
+// than a hand-typed seat. `directorship` is the single director rank in the map.
+const LEADERSHIP_OWNERSHIP_KEY = "ownership";
+const LEADERSHIP_DIRECTOR_KEYS = ["directorship"];
+
+// fetchGuildMembers reads the whole guild a page at a time, so its result is
+// memoised briefly — a burst of landing-page loads must not each re-read Discord.
+const LEADERSHIP_LIVE_TTL_MS = 60_000;
+let leadershipLiveCache = { at: 0, value: undefined };
+
+/**
+ * The live Ownership and Director members, read from Discord and shaped like
+ * leadership seats — or `null` whenever the feature cannot run (Discord not
+ * configured, no role mapping saved, an empty result, or any read failure), so
+ * the caller falls back to the hand-edited seats. Never throws.
+ */
+async function resolveLiveLeadership() {
+  const now = Date.now();
+  if (
+    leadershipLiveCache.value !== undefined &&
+    now - leadershipLiveCache.at < LEADERSHIP_LIVE_TTL_MS
+  ) {
+    return leadershipLiveCache.value;
+  }
+
+  let value = null;
+  try {
+    // Which Discord role ids stand for Ownership and for the Directorship. Only
+    // the stored map is trusted here: the seed ids are placeholders, so with no
+    // real mapping there is nothing to resolve and the manual seats stand.
+    const rows = await query(
+      "SELECT role_id, role_key FROM roster_role_map WHERE role_key = ANY($1)",
+      [[LEADERSHIP_OWNERSHIP_KEY, ...LEADERSHIP_DIRECTOR_KEYS]],
+    );
+    const ownershipRoleIds = new Set(
+      rows.filter((r) => r.role_key === LEADERSHIP_OWNERSHIP_KEY).map((r) => String(r.role_id)),
+    );
+    const directorRoleIds = new Set(
+      rows.filter((r) => LEADERSHIP_DIRECTOR_KEYS.includes(r.role_key)).map((r) => String(r.role_id)),
+    );
+    if (ownershipRoleIds.size === 0 && directorRoleIds.size === 0) {
+      leadershipLiveCache = { at: now, value: null };
+      return null;
+    }
+
+    const members = await fetchGuildMembers();
+    if (!members) {
+      leadershipLiveCache = { at: now, value: null };
+      return null;
+    }
+
+    // Handle carries no leading "@" — the card renders it as `@{handle}`.
+    const toSeat = (m, role) => ({
+      seatKey: "",
+      seat: role,
+      role,
+      grp: role === "Ownership" ? "ownership" : "directors",
+      vacant: false,
+      name: (m.nick || m.displayName || "").trim() || m.username || "Member",
+      handle: m.username || "",
+      discordId: m.id,
+      avatar: m.avatar || null,
+    });
+
+    const ownership = [];
+    const directors = [];
+    const seen = new Set();
+    for (const m of members) {
+      if (!m.id || seen.has(m.id)) continue;
+      const roles = Array.isArray(m.roles) ? m.roles : [];
+      // A member holding both roles appears only under Ownership, the higher group.
+      if (roles.some((r) => ownershipRoleIds.has(r))) {
+        ownership.push(toSeat(m, "Ownership"));
+        seen.add(m.id);
+      } else if (roles.some((r) => directorRoleIds.has(r))) {
+        directors.push(toSeat(m, "Director"));
+        seen.add(m.id);
+      }
+    }
+
+    if (ownership.length || directors.length) {
+      const byName = (a, b) => a.name.localeCompare(b.name);
+      value = { ownership: ownership.sort(byName), directors: directors.sort(byName) };
+    }
+  } catch (err) {
+    // Discord unconfigured or unreachable is an expected state — warn, fall back.
+    console.warn(`[leadership] live resolve failed: ${err?.message ?? err}`);
+    value = null;
+  }
+
+  leadershipLiveCache = { at: now, value };
+  return value;
+}
+
+/**
+ * The public leadership team. Resolved live from Discord — whoever holds the
+ * Ownership and Director roles — with the hand-edited seats as the fallback
+ * whenever Discord or the role mapping is not available.
+ */
 router.get("/leadership", (_req, res) => {
   // Never let a CDN or browser cache this — a just-saved edit must show at once.
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -511,6 +612,8 @@ router.get("/leadership", (_req, res) => {
   safeOne(
     res,
     async () => {
+      const live = await resolveLiveLeadership();
+      if (live) return live;
       await ensureLeadershipTable();
       const rows = await query(
         "SELECT seat_key, grp, title, name, handle, discord_id, avatar_url, sort_order FROM leadership_seats ORDER BY grp DESC, sort_order, title",
