@@ -123,6 +123,13 @@ export const STAFF_HUB = {
       ],
     },
     {
+      id: "fivem",
+      label: "In-game server",
+      items: [
+        { to: "/staff-hub/fivem-config", label: "FiveM Config", icon: "Gamepad2", permission: "fivem.view", detail: "In-game permissions, pay rates, weapon and vehicle registries — saves push to the live server with no restart." },
+      ],
+    },
+    {
       id: "exams",
       label: "Exam backend",
       items: [

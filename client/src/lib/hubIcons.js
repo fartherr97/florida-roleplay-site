@@ -9,7 +9,7 @@
 import {
   Activity, Anchor, Award, BadgeCheck, BookOpen, Briefcase, Building2, Calendar,
   Car, ChartColumn, CircleDollarSign, ClipboardList, Clock, Crown, Dog, Flame,
-  FileSpreadsheet, Fuel, Gavel, GraduationCap, Home, House, IdCard,
+  FileSpreadsheet, Fuel, Gamepad2, Gavel, GraduationCap, Home, House, IdCard,
   Inbox, Key, KeyRound, Landmark, LayoutGrid, LifeBuoy, ListChecks, MapPin, Megaphone,
   Network, Phone, Plane, Radio, Scale, ScrollText, Shield, ShieldCheck, Shirt,
   Siren, SlidersHorizontal, Star, Store, Stethoscope, Tag, Truck, Users,
@@ -19,7 +19,7 @@ import {
 const HUB_ICONS = {
   Activity, Anchor, Award, BadgeCheck, BookOpen, Briefcase, Building2, Calendar,
   Car, ChartColumn, CircleDollarSign, ClipboardList, Clock, Crown, Dog, Flame,
-  FileSpreadsheet, Fuel, Gavel, GraduationCap, Home, House, IdCard,
+  FileSpreadsheet, Fuel, Gamepad2, Gavel, GraduationCap, Home, House, IdCard,
   Inbox, Key, KeyRound, Landmark, LayoutGrid, LifeBuoy, ListChecks, MapPin, Megaphone,
   Network, Phone, Plane, Radio, Scale, ScrollText, Shield, ShieldCheck, Shirt,
   Siren, SlidersHorizontal, Star, Store, Stethoscope, Tag, Truck, Users,

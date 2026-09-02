@@ -70,6 +70,7 @@ import HubManagement from "./pages/hub/HubManagement";
 import HubAccessCenter from "./pages/hub/HubAccessCenter";
 import HubPermissions from "./pages/hub/HubPermissions";
 import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
+import HubFivemConfig from "./pages/hub/HubFivemConfig";
 import HubForms from "./pages/hub/HubForms";
 import HubPromotionBoard from "./pages/hub/HubPromotionBoard";
 import CivHome from "./pages/civ/CivHome";
@@ -305,6 +306,7 @@ export default function App() {
             <Route path="/staff-hub/access" element={<HubAccessCenter />} />
             <Route path="/staff-hub/permissions" element={<HubPermissions />} />
             <Route path="/staff-hub/discord-roles" element={<HubDiscordRoles />} />
+            <Route path="/staff-hub/fivem-config" element={<HubFivemConfig />} />
           </Route>
 
           {/* Civilian Hub — same shape: a public landing page, then a gated

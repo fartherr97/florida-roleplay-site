@@ -431,6 +431,29 @@ export const api = {
         "Accepted, but not persisted — no database is configured, so this will reset on reload.",
     })),
 
+  /* --- FiveM in-game config (source of truth for the live server) ---------
+   * Reads need `fivem.view`; writes need `fivem.manage`. Each write pushes the
+   * change live to the FiveM server (flrp_api /sync) — no restart. */
+  fivemCatalogue: () =>
+    get("/fivem/catalogue", {
+      roles: [],
+      permissions: [],
+      role_permissions: [],
+      pay_rates: [],
+      weapons: [],
+      vehicles: [],
+    }),
+  saveFivemGroupPermission: (payload) =>
+    put("/fivem/group-permission", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  saveFivemPayRate: (payload) =>
+    put("/fivem/pay-rate", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  saveFivemWeapon: (payload) =>
+    put("/fivem/weapon", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  saveFivemVehicle: (payload) =>
+    put("/fivem/vehicle", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  resyncFivem: () =>
+    post("/fivem/resync", {}, () => ({ ok: false, message: NOT_PERSISTED })),
+
   roster: () => get("/roster", rosterMock.roster),
   updateRosterStatus: (id, payload) =>
     post(`/roster/${encodeURIComponent(id)}/status`, payload, () => ({
