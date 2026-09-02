@@ -20,6 +20,7 @@ export const GUARDS = [
   { path: "/management/image-hosting", permission: "media.manage" },
   { path: "/management/emails", permission: "emails.view" },
   { path: "/management/broadcast", permission: "truthsocial.post" },
+  { path: "/management/store", permission: "store.manage" },
   { path: "/management/fivem-config", permission: "fivem.view" },
 
   // Staff Hub

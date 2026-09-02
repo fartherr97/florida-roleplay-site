@@ -81,6 +81,8 @@ import CivForms from "./pages/civ/CivForms";
 import Moderation from "./pages/staff/Moderation";
 import Support from "./pages/staff/Support";
 import Contact from "./pages/management/Contact";
+import StoreManagement from "./pages/management/StoreManagement";
+import AccountPurchases from "./pages/account/Purchases";
 import BotShell from "./components/bot/BotShell";
 import BotOverview from "./pages/management/bot/BotOverview";
 import BotRosters from "./pages/management/bot/BotRosters";
@@ -162,6 +164,7 @@ export default function App() {
             <Route path="management/fivem-config" element={<FivemConfig />} />
 
             <Route path="store" element={<Store />} />
+            <Route path="account/purchases" element={<AccountPurchases />} />
             <Route path="knowledge-base" element={<KnowledgeBase />} />
             <Route path="knowledge-base/:slug" element={<Article />} />
             <Route path="events" element={<Events />} />
@@ -179,6 +182,7 @@ export default function App() {
             <Route path="staff/moderation" element={<Moderation />} />
             <Route path="staff/support" element={<Support />} />
             <Route path="management/contact" element={<Contact />} />
+            <Route path="management/store" element={<StoreManagement />} />
 
             {/* The bot dashboard. Deliberately not behind this site's guard
                 table: authorisation belongs to the bot API, which re-checks

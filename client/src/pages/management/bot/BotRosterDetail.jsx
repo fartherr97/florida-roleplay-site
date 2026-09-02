@@ -549,6 +549,7 @@ function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
     callsignEnd: rank?.callsignRangeEnd ?? "",
     nicknamePriority: rank?.nicknamePriority ?? "NONE",
     requiresRoleId: rank?.requiresRoleId ?? "",
+    yieldNickname: rank?.yieldNickname ? "yes" : "no",
   });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -587,6 +588,7 @@ function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
           nicknamePriority: values.nicknamePriority,
           // null clears the gate; a value sets it. Always sent so clearing sticks.
           requiresRoleId: values.requiresRoleId.trim() || null,
+          yieldNickname: values.yieldNickname === "yes",
         },
       });
       onSaved();
@@ -724,6 +726,22 @@ function RankModal({ slug, guildId = null, rank = null, onClose, onSaved }) {
             value={values.nicknamePriority}
             onChange={(value) => setValues((v) => ({ ...v, nicknamePriority: value }))}
             options={PRIORITY_OPTIONS}
+          />
+        </Field>
+
+        <Field
+          label="Nickname source"
+          htmlFor="b-yield"
+          hint="For a member who is also on another roster in this same server (their department roster), whose rank writes their nickname here. Pick “their other roster” for an Auxiliary Staff rank so it keeps the member's department name and format instead of overwriting it."
+        >
+          <Select
+            id="b-yield"
+            value={values.yieldNickname}
+            onChange={(value) => setValues((v) => ({ ...v, yieldNickname: value }))}
+            options={[
+              { value: "no", label: "This roster writes their nickname" },
+              { value: "yes", label: "Their other roster writes it (keep department name)" },
+            ]}
           />
         </Field>
 

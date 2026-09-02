@@ -29,15 +29,20 @@ import { fetchGuildMembers, fetchGuildMember } from "./discord.js";
  */
 export function parseNick(nick) {
   const raw = String(nick ?? "").trim();
-  if (!raw) return { callsign: "", name: "" };
+  if (!raw) return { callsign: "", name: "", rank: "" };
   const parts = raw.split("|").map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const first = parts[0];
     // A callsign is a short number, optionally with a one-letter prefix (A-12).
     const callsign = /^[A-Za-z]?\d{1,4}$/.test(first) ? first : "";
-    return { callsign, name: parts[parts.length - 1] };
+    // The rank is whatever sits between the callsign and the name — the middle
+    // segment(s) the bot wrote, e.g. "Deputy Chief" in "702 | Deputy Chief | Kilo".
+    // With no leading callsign it is everything before the name.
+    const start = callsign ? 1 : 0;
+    const rank = parts.slice(start, -1).join(" | ");
+    return { callsign, name: parts[parts.length - 1], rank };
   }
-  return { callsign: "", name: raw };
+  return { callsign: "", name: raw, rank: "" };
 }
 
 /**
@@ -139,6 +144,33 @@ export async function applyUpsert(resolved, joinedAt, roleIds = null, nicks = nu
     } catch {
       // The activity overlay is best-effort; a missed stamp is not worth failing a sync.
     }
+  }
+}
+
+/**
+ * Refresh only a member's mapped roles and per-guild nicknames, leaving their
+ * primary department and rank alone.
+ *
+ * A department roster shows everyone who holds one of its roles, even when a
+ * member's single highest rank lives in another department (an MPD chief who is
+ * also community staff, say). A department's own sync must keep that member's
+ * roles current so its roster stays fresh, but it must NOT reassign their primary
+ * department — the community roster groups by that column and the full sync owns
+ * it. This is the light-touch update for those cross-department members.
+ */
+async function refreshMemberRoles(discordId, roleIds, nicks) {
+  const nicksJson = nicks && Object.keys(nicks).length ? JSON.stringify(nicks) : null;
+  try {
+    await query(
+      `UPDATE roster_members
+          SET role_ids  = COALESCE($2::text[], role_ids),
+              nicks     = COALESCE($3::jsonb, nicks),
+              synced_at = CURRENT_TIMESTAMP
+        WHERE discord_id = $1`,
+      [discordId, roleIds && roleIds.length ? roleIds : null, nicksJson],
+    );
+  } catch {
+    // Best-effort; the full sync is the backstop.
   }
 }
 
@@ -488,38 +520,58 @@ export async function syncRosterForDept(deptId) {
       // No database — the upserts below will no-op the same way.
     }
 
+    // Resolve rank using only THIS department's roles. A member's single highest
+    // rank may live in another department (an MPD chief who also holds a
+    // community-staff role, whose role outranks their chief role); resolving
+    // against the whole map would file them there and skip them here, even though
+    // they plainly hold an MPD role. Scoping to the department's own roles lands
+    // them on this roster under their rank in it — exactly how the department page
+    // already buckets people, by the roles they hold rather than their top rank.
+    const deptRoleMap = roleMap.filter((r) => r.department === deptId);
+
     const seen = new Set();
     const deptMembersList = [];
     for (const [discordId, data] of byId) {
       const held = [...data.roles].map(String);
-      if (!held.some((id) => dRoleIds.has(id))) continue; // not in this department
+      if (!held.some((id) => dRoleIds.has(id))) continue; // holds no role in this department
 
-      // Never steal a member from another department on a partial read.
+      const resolved = resolveMember(
+        { discordId, characterName: data.name || "Member", roles: held, callsign: "" },
+        deptRoleMap,
+        seed.DEPARTMENTS,
+      );
+      if (resolved.action !== "upsert") continue;
+
+      const roleIds = held.filter((id) => mappedRoleIds.has(id));
+
+      // Where a member's primary department is elsewhere, keep that record and
+      // only refresh their roles here; new or already-primary members get the
+      // full upsert under this department. Never reassign someone's primary
+      // department from a scoped read — the full sync owns that.
+      let priorDept = null;
       if (!existingD.has(discordId)) {
         try {
           const prior = await query(
             "SELECT department FROM roster_members WHERE discord_id = $1 LIMIT 1",
             [discordId],
           );
-          if (prior[0]?.department && prior[0].department !== deptId) continue;
+          priorDept = prior[0]?.department ?? null;
         } catch {
-          // No database — nothing stored to protect.
+          // No database — treat as a new member.
         }
       }
 
-      const resolved = resolveMember(
-        { discordId, characterName: data.name || "Member", roles: held, callsign: "" },
-        roleMap,
-        seed.DEPARTMENTS,
-      );
-      if (resolved.action !== "upsert" || resolved.entry.department !== deptId) continue;
-
-      const roleIds = held.filter((id) => mappedRoleIds.has(id));
-      await applyUpsert(resolved, null, roleIds, data.nicks);
+      if (priorDept && priorDept !== deptId) {
+        await refreshMemberRoles(discordId, roleIds, data.nicks);
+      } else {
+        await applyUpsert(resolved, null, roleIds, data.nicks);
+        // Only members primary to this department are auto-numbered here, so a
+        // cross-department member's callsign in their home department is untouched.
+        const gid = meta?.guildId;
+        const nickCallsign = gid && data.nicks[gid] ? parseNick(data.nicks[gid]).callsign : "";
+        deptMembersList.push({ discordId, nickCallsign });
+      }
       seen.add(discordId);
-      const gid = meta?.guildId;
-      const nickCallsign = gid && data.nicks[gid] ? parseNick(data.nicks[gid]).callsign : "";
-      deptMembersList.push({ discordId, nickCallsign });
     }
 
     // Prune only this department, and only on a clean scoped read.

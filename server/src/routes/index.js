@@ -25,6 +25,7 @@ import staffLogRouter from "./staffLog.js";
 import supportRouter from "./support.js";
 import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
+import storeRouter from "./store.js";
 import authRouter from "./auth.js";
 import fivemRouter from "./fivem.js";
 import {
@@ -81,6 +82,10 @@ router.use("/development", devHubRouter);
 // serves the bytes is mounted at /images in index.js, outside this /api prefix,
 // so a hosted image has a clean URL.
 router.use("/media", mediaRouter);
+// The Tebex-backed storefront: the public store, Ownership-only management, and
+// Tebex's payment webhook. The webhook verifies its own signature; every
+// management route is gated by store.manage.
+router.use("/store", storeRouter);
 // Discord OAuth. Mounted here with the rest so it shares the /api prefix and the
 // same-origin cookie; the handshake itself needs no session, and attachUser
 // above never blocks, so a signed-out visitor reaches /auth/login fine.
@@ -180,7 +185,32 @@ router.get("/departments/:id", (req, res) =>
 
 /* ----------------------------------------------------------------- rules */
 
-/** Groups flat rule rows back into the category shape the client renders. */
+/**
+ * A rule number as comparable numeric parts: "18.2" → [18, 2]. Null when the number is
+ * empty or not dotted digits, so custom labels are left to their saved order.
+ */
+function ruleNumberParts(value) {
+  const s = String(value ?? "").trim();
+  return /^\d+(\.\d+)*$/.test(s) ? s.split(".").map(Number) : null;
+}
+
+/** Numeric part-by-part compare, so 2 < 10 and 18.2 < 18.10 (unlike string order). */
+function compareNumberParts(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+/**
+ * Groups flat rule rows back into the category shape the client renders, in reading
+ * order. The SQL sorts `category_id` as a string — "cat-10" before "cat-2" — which
+ * scrambled the sections the moment the database took over from the seed, so the real
+ * ordering happens here: sections by the number their name starts with (unnumbered ones
+ * like the disclaimers first, as shipped), and rules inside each by their number
+ * (18 < 18.2 < 18.10), with unnumbered rules keeping their saved order at the end.
+ */
 function groupRules(rows) {
   const groups = new Map();
   rows.forEach((row) => {
@@ -199,50 +229,87 @@ function groupRules(rows) {
       body: row.body,
     });
   });
-  return [...groups.values()];
+
+  const list = [...groups.values()];
+  for (const group of list) {
+    group.items.sort((a, b) => {
+      const left = ruleNumberParts(a.number);
+      const right = ruleNumberParts(b.number);
+      if (left && right) return compareNumberParts(left, right);
+      if (left) return -1; // numbered rules read before unnumbered ones
+      if (right) return 1;
+      return 0; // both unnumbered: stable sort keeps their saved order
+    });
+  }
+  list.sort((a, b) => {
+    const left = /^(\d+)/.exec(String(a.category ?? ""));
+    const right = /^(\d+)/.exec(String(b.category ?? ""));
+    const l = left ? Number(left[1]) : -1;
+    const r = right ? Number(right[1]) : -1;
+    return l - r;
+  });
+  return list;
 }
 
-/** Mirrors the client's fallback filter so both paths behave identically. */
-function filterSeedRules(q) {
+/** Case-insensitive search over grouped rules; used for the DB rows and the seed alike. */
+function filterRuleGroups(groups, q) {
   const needle = q.toLowerCase();
-  return seed.rules
+  return groups
     .map((group) => ({
       ...group,
       items: group.items.filter(
         (item) =>
-          item.title.toLowerCase().includes(needle) ||
-          item.body.toLowerCase().includes(needle) ||
-          item.number.includes(needle) ||
-          group.category.toLowerCase().includes(needle),
+          String(item.title ?? "").toLowerCase().includes(needle) ||
+          String(item.body ?? "").toLowerCase().includes(needle) ||
+          String(item.number ?? "").includes(needle) ||
+          String(group.category ?? "").toLowerCase().includes(needle),
       ),
     }))
     .filter((group) => group.items.length > 0);
 }
 
-router.get("/rules", (req, res) => {
+router.get("/rules", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-  const fallback = q ? filterSeedRules(q) : seed.rules;
-
-  safe(
-    res,
-    async () => {
-      if (!q) {
-        const rows = await query("SELECT * FROM rules ORDER BY category_id, sort_order, number");
-        return groupRules(rows);
-      }
-      const like = `%${q}%`;
-      const rows = await query(`SELECT * FROM rules
-          WHERE title LIKE $1 OR body LIKE $2 OR number LIKE $3 OR category LIKE $4
-          ORDER BY category_id, sort_order, number`,
-        [like, like, like, like],
-      );
-      return groupRules(rows);
-    },
-    fallback,
-  );
+  try {
+    const rows = await query("SELECT * FROM rules ORDER BY category_id, sort_order, number");
+    // An entirely empty table means the database was never seeded (fresh install);
+    // fall back to the shipped rules. But once the database has rules, it is the
+    // single source of truth: a search with no matches returns an empty result
+    // rather than resurrecting deleted rules from the built-in seed — that phantom
+    // is exactly what made "deleted" rules reappear in search and 404 on save.
+    const groups = rows.length ? groupRules(rows) : seed.rules;
+    return res.json(q ? filterRuleGroups(groups, q) : groups);
+  } catch {
+    // No reachable database at all: serve the read-only seed so the page still renders.
+    const groups = seed.rules;
+    return res.json(q ? filterRuleGroups(groups, q) : groups);
+  }
 });
 
 /* --------------------------------------------------------- rules editing */
+
+/**
+ * Creates the rules table if a database predates it. Editing rules failed on any deploy
+ * whose schema was applied before the rules feature shipped: the table simply was not
+ * there, so every write threw and surfaced as the misleading "no database" error. Making
+ * it self-creating — the same pattern the newer tables use — means the feature works on
+ * an older database without a manual migration.
+ */
+async function ensureRulesTable() {
+  await query(`CREATE TABLE IF NOT EXISTS rules (
+      id                    VARCHAR(64)  NOT NULL,
+      category_id           VARCHAR(64)  NOT NULL,
+      category              VARCHAR(128) NOT NULL,
+      category_description  TEXT         NULL,
+      number                VARCHAR(16)  NOT NULL DEFAULT '',
+      title                 VARCHAR(255) NOT NULL DEFAULT '',
+      body                  TEXT         NOT NULL,
+      sort_order            INT          NOT NULL DEFAULT 0,
+      created_at            TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at            TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    )`);
+}
 
 /**
  * The rules table is the source of truth for editing, but a fresh deploy renders the seed
@@ -251,6 +318,7 @@ router.get("/rules", (req, res) => {
  * first write seeds the table from the shipped rules, once, and edits build on that.
  */
 async function ensureRulesSeeded() {
+  await ensureRulesTable();
   const [{ count }] = await query("SELECT COUNT(*)::int AS count FROM rules");
   if (count > 0) return;
   for (const group of seed.rules) {
@@ -272,7 +340,9 @@ function validateRule(body) {
   const title = str(body?.title).slice(0, 255);
   const text = str(body?.body).slice(0, 20000);
   const errors = [];
-  if (!title) errors.push("A title is required.");
+  // Title is optional: plenty of rules are just a number and their text, with no
+  // heading (the seed ships many that way), so requiring one would reject a
+  // legitimate edit with a 400.
   if (!text) errors.push("Rule text is required.");
   return { errors, value: { number, title, body: text } };
 }

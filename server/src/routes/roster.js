@@ -18,6 +18,7 @@ import { grantsPermission } from "../permissions.js";
 import { requireBot } from "../middleware/requireBot.js";
 import { resolveMember, applyUpsert, maybeSyncRoster, syncRosterFromGuild, syncRosterForDept, scheduleMemberSync } from "../lib/rosterSync.js";
 import { fetchGuildRoles, fetchGuildMembers } from "../lib/discord.js";
+import { guildIdForDept } from "../lib/transferRoles.js";
 import { collect, isDiscordId, str } from "../validate.js";
 
 const router = Router();
@@ -168,6 +169,73 @@ router.get("/guild-roles", requirePermission("discord.roles.manage"), async (req
  * arbitrary rather than merely wrong: a malformed snowflake, and the same
  * snowflake bound to two different roles.
  */
+/**
+ * Refreshes each mapped rank's display label from the *live* Discord role name.
+ *
+ * The role map stores its own copy of every role's label, captured when it was mapped, so
+ * renaming a role in Discord (e.g. "TPD | ..." → "MPD | ...") leaves the stored labels
+ * frozen and outdated. This reads the current role names from each department's own
+ * Discord server (by the role id the map already holds) and updates `rank_full` to match.
+ * Entries whose role no longer exists in a server that answered are reported, not touched,
+ * so a bad guild read can never wipe labels.
+ */
+router.post("/role-map/refresh-labels", requirePermission("discord.roles.manage"), async (_req, res) => {
+  try {
+    const rows = await query(
+      "SELECT role_id, department, rank_full FROM roster_role_map WHERE kind = 'rank'",
+    );
+    if (!rows.length) return res.json({ ok: true, updated: 0, missing: [] });
+
+    const main = String(process.env.DISCORD_GUILD_ID ?? "").trim();
+    // Which guild each department's roles live in — its own server, or the main one.
+    const guildForDept = new Map();
+    for (const dept of new Set(rows.map((r) => r.department))) {
+      const gid = (dept ? await guildIdForDept(dept) : null) || main;
+      guildForDept.set(dept, gid);
+    }
+
+    // Live role names, per guild that answered. A guild that fails to read is skipped
+    // entirely, so its entries are never mistaken for deleted roles.
+    const nameByGuildRole = new Map(); // `${guildId}:${roleId}` -> name
+    const readOk = new Set();
+    for (const gid of new Set([...guildForDept.values(), main])) {
+      if (!SNOWFLAKE.test(String(gid ?? ""))) continue;
+      let roles;
+      try {
+        roles = await fetchGuildRoles(gid);
+      } catch {
+        roles = null;
+      }
+      if (!roles) continue;
+      readOk.add(gid);
+      for (const role of roles) nameByGuildRole.set(`${gid}:${role.id}`, role.name);
+    }
+
+    let updated = 0;
+    const missing = [];
+    for (const row of rows) {
+      const gid = guildForDept.get(row.department) || main;
+      const liveName = nameByGuildRole.get(`${gid}:${String(row.role_id)}`);
+      if (!liveName) {
+        // Only flag it as gone when the server actually answered — otherwise we just
+        // could not read it this time.
+        if (readOk.has(gid)) missing.push({ roleId: String(row.role_id), label: row.rank_full });
+        continue;
+      }
+      if (liveName !== row.rank_full) {
+        await query(
+          "UPDATE roster_role_map SET rank_full = $1 WHERE role_id = $2 AND kind = 'rank'",
+          [liveName, String(row.role_id)],
+        );
+        updated += 1;
+      }
+    }
+    return res.json({ ok: true, updated, missing });
+  } catch {
+    return res.status(503).json({ ok: false, message: "Could not refresh labels — no database or Discord access." });
+  }
+});
+
 router.post("/role-map", requirePermission("discord.roles.manage"), async (req, res) => {
   const roles = Array.isArray(req.body?.roles) ? req.body.roles : null;
   const special = Array.isArray(req.body?.special) ? req.body.special : [];

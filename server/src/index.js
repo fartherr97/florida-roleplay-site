@@ -35,7 +35,17 @@ const origins = (process.env.CORS_ORIGIN || "http://localhost:5173")
 app.set("trust proxy", Number(process.env.TRUST_PROXY || 0));
 
 app.use(cors({ origin: origins, credentials: true }));
-app.use(express.json({ limit: "256kb" }));
+// Keep the exact received bytes on `req.rawBody`. The Tebex store webhook signs
+// the raw JSON, and a re-serialised body would hash differently — so the
+// signature must be checked against what actually arrived, not a re-encode.
+app.use(
+  express.json({
+    limit: "256kb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 
 /**
  * Liveness and readiness in one.
@@ -48,6 +58,16 @@ app.use(express.json({ limit: "256kb" }));
 app.get("/healthz", async (_req, res) => {
   const database = await ping();
   res.json({ ok: true, service: "florida-rp-api", database });
+});
+
+// API payloads are dynamic and per-user, and a just-saved edit must never be masked by a
+// stale copy held anywhere between here and the browser. The browser already asks with
+// `cache: no-store`, but that does not bind a CDN or reverse proxy in front of the API —
+// only an origin cache directive does. Send one on every API response so no shared cache
+// (edge, proxy or browser) may serve an old read after a write.
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store, max-age=0");
+  next();
 });
 
 app.use("/api", router);

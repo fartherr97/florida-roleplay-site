@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Plus, RotateCcw, Save, Search, TriangleAlert, Trash2 } from "lucide-react";
+import { Download, Plus, RefreshCw, RotateCcw, Save, Search, TriangleAlert, Trash2 } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -293,6 +293,39 @@ export default function HubDiscordRoles() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshLabels = async () => {
+    setRefreshing(true);
+    setStatus(null);
+    try {
+      const result = await api.refreshRoleMapLabels();
+      // Reload so the freshened labels show. This reads the saved map, so it also
+      // discards any unsaved edits — hence the button is disabled while dirty.
+      const data = await api.discordRoleMap();
+      if (data?.roles) {
+        const nextRoles = mergeMaps(ROLE_MAP, data.roles);
+        const nextSpecial = mergeMaps(SPECIAL_ROLES, data.special);
+        setRoles(nextRoles);
+        setSpecial(nextSpecial);
+        setSaved({ roles: nextRoles, special: nextSpecial });
+      }
+      const missing = result?.missing?.length ?? 0;
+      const updated = result?.updated ?? 0;
+      setStatus({
+        tone: missing ? "amber" : "green",
+        text:
+          `Refreshed ${updated} label${updated === 1 ? "" : "s"} from Discord.` +
+          (missing
+            ? ` ${missing} mapped role${missing === 1 ? " was" : "s were"} not found in its server — remove ${missing === 1 ? "it" : "them"} if the role was deleted.`
+            : ""),
+      });
+    } catch (err) {
+      setStatus({ tone: "rose", text: err?.message ?? "Could not refresh labels." });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <>
       <HubPageHeader
@@ -546,6 +579,16 @@ export default function HubDiscordRoles() {
           <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
             <Download className="size-4" />
             Import from Discord
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refreshLabels}
+            disabled={refreshing || dirty}
+            title="Update every rank's label to match its current Discord role name"
+          >
+            <RefreshCw className="size-4" />
+            {refreshing ? "Refreshing…" : "Refresh labels from Discord"}
           </Button>
           {scope !== "special" && (
             <Button
