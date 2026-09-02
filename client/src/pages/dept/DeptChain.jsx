@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  Link2,
   Maximize2,
   Minimize2,
   Network,
@@ -42,7 +43,10 @@ const uid = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 const hasNodeDrag = (e) => Array.from(e.dataTransfer?.types || []).includes("text/coc-node");
 
 function newNode(title = "New Position") {
-  return { id: uid("node"), title, name: "", color: "", imageUrl: "", members: [], children: [] };
+  // `reportsTo` holds extra parent box ids — the dashed "also reports to" links a
+  // box can have on top of its one structural parent (its place in the tree). It
+  // is what lets, say, one precinct box sit under two corporals.
+  return { id: uid("node"), title, name: "", color: "", imageUrl: "", members: [], children: [], reportsTo: [] };
 }
 
 /** Only render an http(s) image URL, so a stray value can't inject anything. */
@@ -350,6 +354,54 @@ function moveNodeTo(root, dragId, targetId, mode) {
   return findNode(result, dragId) ? result : root;
 }
 
+/** Every node, flattened, with a label for the "also reports to" picker. */
+function flattenNodes(node, out = []) {
+  if (!node) return out;
+  out.push(node);
+  (node.children || []).forEach((c) => flattenNodes(c, out));
+  return out;
+}
+
+/** The id of a node's structural (tree) parent, or null for the root. */
+function parentIdOf(root, id, parent = null) {
+  if (!root) return null;
+  if (root.id === id) return parent;
+  for (const c of root.children || []) {
+    const hit = parentIdOf(c, id, root.id);
+    if (hit !== null) return hit;
+  }
+  return null;
+}
+
+/** Every id in the tree, so a dangling reportsTo can be dropped after a delete. */
+function collectIds(node, set = new Set()) {
+  if (!node) return set;
+  set.add(node.id);
+  (node.children || []).forEach((c) => collectIds(c, set));
+  return set;
+}
+
+/**
+ * Drops secondary-parent links that no longer make sense: an id not in the tree
+ * (its box was deleted), a box pointing at itself, or at its own structural
+ * parent (which the solid tree line already shows) or one of its descendants
+ * (which would draw a line back down into itself). Keeps the data honest so the
+ * overlay never renders a stray line.
+ */
+function sanitizeReportsTo(root) {
+  if (!root) return root;
+  const ids = collectIds(root);
+  const clean = (node) => {
+    const structuralParent = parentIdOf(root, node.id);
+    const descendants = collectIds(node); // includes self
+    const reportsTo = [...new Set(node.reportsTo || [])].filter(
+      (pid) => ids.has(pid) && pid !== structuralParent && !descendants.has(pid),
+    );
+    return { ...node, reportsTo, children: (node.children || []).map(clean) };
+  };
+  return clean(root);
+}
+
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 function NodeCard({ node, accent, canEdit, isRoot, onEdit, dropHint, setDropHint, onDropNode, canDropOn, setDragId }) {
@@ -379,6 +431,7 @@ function NodeCard({ node, accent, canEdit, isRoot, onEdit, dropHint, setDropHint
   return (
     <button
       type="button"
+      data-coc-id={node.id}
       disabled={!canEdit}
       onClick={() => onEdit(node)}
       title={canEdit ? "Click to edit. Drag onto another box to move under it, or to a box's edge to slot beside it." : undefined}
@@ -634,9 +687,20 @@ function NodeTree({ node, accent, canEdit, isRoot = true, onEdit, onAddChild, dr
 
 // ── Box editor ───────────────────────────────────────────────────────────────
 
-function NodeModal({ node, isRoot, onClose, onSave, onAddChild, onMove, onDelete }) {
+function NodeModal({ node, isRoot, allBoxes = [], onClose, onSave, onAddChild, onMove, onDelete }) {
   const [draft, setDraft] = useState(node);
   const membersText = (draft.members || []).join("\n");
+  const reportsTo = draft.reportsTo || [];
+
+  const boxLabel = (b) => {
+    const { rank } = splitTitle(b.title || "Box");
+    return b.name ? `${rank} · ${b.name}` : rank || "Box";
+  };
+  const toggleReport = (id) =>
+    setDraft({
+      ...draft,
+      reportsTo: reportsTo.includes(id) ? reportsTo.filter((x) => x !== id) : [...reportsTo, id],
+    });
 
   return (
     <Modal open onClose={onClose} title={`Edit “${node.title || "box"}”`} className="max-w-xl">
@@ -690,6 +754,35 @@ function NodeModal({ node, isRoot, onClose, onSave, onAddChild, onMove, onDelete
             onChange={(e) => setDraft({ ...draft, members: e.target.value.split("\n") })}
           />
         </Field>
+
+        {allBoxes.length > 0 && (
+          <Field
+            label="Also reports to"
+            hint="Extra supervisors above this box, drawn as dashed lines on top of its normal place in the chart. Use it when one box answers to more than one — e.g. a precinct under two corporals."
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {allBoxes.map((b) => {
+                const on = reportsTo.includes(b.id);
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => toggleReport(b.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                      on
+                        ? "border-primary-400/50 bg-primary-500/15 text-primary-200"
+                        : "border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/25 hover:text-slate-200",
+                    )}
+                  >
+                    <Link2 className="size-3" />
+                    {boxLabel(b)}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        )}
 
         <div className="grid gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3 sm:grid-cols-3">
           <Button variant="ghost" size="sm" onClick={() => onAddChild(draft)}>
@@ -776,7 +869,10 @@ export default function DeptChain({ page, config }) {
     if (immediate) flush();
     else timer.current = setTimeout(flush, 500);
   };
-  const setTree = (next, immediate = true) => commit({ root: next }, { immediate });
+  // Sanitising on every write keeps secondary "reports to" links honest — a link
+  // to a box that was just deleted or moved under this one is dropped here rather
+  // than lingering as a stray line.
+  const setTree = (next, immediate = true) => commit({ root: sanitizeReportsTo(next) }, { immediate });
 
   const [editing, setEditing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -785,9 +881,69 @@ export default function DeptChain({ page, config }) {
   const [dragId, setDragId] = useState(null);
   const [zoom, setZoom] = useState(1);
   const panRef = useRef(null);
+  const contentRef = useRef(null);
   const panState = useRef(null);
   const fsRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [links, setLinks] = useState({ w: 0, h: 0, segs: [] });
+
+  // The boxes a box may add as extra parents: every other box except itself, its
+  // own subtree (a line back down into itself), and its structural parent (whose
+  // solid line already shows the relationship).
+  const editBoxes = useMemo(() => {
+    if (!editing || !root) return [];
+    const structuralParent = parentIdOf(root, editing.id);
+    const own = collectIds(findNode(root, editing.id) || { id: editing.id });
+    return flattenNodes(root)
+      .filter((b) => !own.has(b.id) && b.id !== structuralParent)
+      .map((b) => ({ id: b.id, title: b.title, name: b.name }));
+  }, [editing, root]);
+
+  // Measure the boxes and lay the dashed "also reports to" lines over the chart.
+  // Coordinates are in the scroll container's own content space, so the overlay
+  // scrolls with the chart and needs no re-measure on pan — only on a layout
+  // change (a box added/moved, zoom, fullscreen, a resize, an image loading).
+  useLayoutEffect(() => {
+    const panEl = panRef.current;
+    if (!panEl) return undefined;
+    let raf = 0;
+    const measure = () => {
+      const base = panEl.getBoundingClientRect();
+      const rects = new Map();
+      panEl.querySelectorAll("[data-coc-id]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        rects.set(el.getAttribute("data-coc-id"), {
+          left: r.left - base.left + panEl.scrollLeft,
+          top: r.top - base.top + panEl.scrollTop,
+          w: r.width,
+          h: r.height,
+        });
+      });
+      const segs = [];
+      flattenNodes(root).forEach((n) => {
+        (n.reportsTo || []).forEach((pid) => {
+          const p = rects.get(pid);
+          const c = rects.get(n.id);
+          if (!p || !c) return;
+          segs.push({ x1: p.left + p.w / 2, y1: p.top + p.h, x2: c.left + c.w / 2, y2: c.top });
+        });
+      });
+      setLinks({ w: panEl.scrollWidth, h: panEl.scrollHeight, segs });
+    };
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
+    schedule();
+    const ro = contentRef.current ? new ResizeObserver(schedule) : null;
+    if (ro && contentRef.current) ro.observe(contentRef.current);
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+      window.removeEventListener("resize", schedule);
+    };
+  }, [root, zoom, isFullscreen]);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement === fsRef.current);
@@ -955,11 +1111,41 @@ export default function DeptChain({ page, config }) {
               onMouseUp={() => (panState.current = null)}
               onMouseLeave={() => (panState.current = null)}
               className={cn(
-                "cursor-grab select-none overflow-auto p-6 active:cursor-grabbing",
+                "relative cursor-grab select-none overflow-auto p-6 active:cursor-grabbing",
                 isFullscreen ? "h-full max-h-none" : "max-h-[72vh]",
               )}
             >
-              <div style={{ zoom }} className="mx-auto w-max">
+              {links.segs.length > 0 && (
+                <svg
+                  className="pointer-events-none absolute left-0 top-0 z-0"
+                  width={links.w}
+                  height={links.h}
+                  style={{ overflow: "visible" }}
+                  aria-hidden="true"
+                >
+                  <defs>
+                    <marker id="coc-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                      <path d="M0,0 L10,5 L0,10 z" fill={accent} />
+                    </marker>
+                  </defs>
+                  {links.segs.map((s, i) => {
+                    const midY = (s.y1 + s.y2) / 2;
+                    return (
+                      <path
+                        key={i}
+                        d={`M ${s.x1} ${s.y1} C ${s.x1} ${midY}, ${s.x2} ${midY}, ${s.x2} ${s.y2}`}
+                        fill="none"
+                        stroke={accent}
+                        strokeWidth="1.5"
+                        strokeDasharray="5 4"
+                        strokeOpacity="0.8"
+                        markerEnd="url(#coc-arrow)"
+                      />
+                    );
+                  })}
+                </svg>
+              )}
+              <div ref={contentRef} style={{ zoom }} className="relative z-[1] mx-auto w-max">
                 <NodeTree
                   node={root}
                   accent={accent}
@@ -1000,6 +1186,7 @@ export default function DeptChain({ page, config }) {
           key={editing.id}
           node={editing}
           isRoot={root?.id === editing.id}
+          allBoxes={editBoxes}
           onClose={() => setEditing(null)}
           onSave={saveNode}
           onAddChild={addBelow}
