@@ -114,6 +114,7 @@ export const navGroups = [
       { label: "Bot Dashboard", to: "/management/bot", icon: "Bot", permission: "permissions.manage" },
       { label: "Email Directory", to: "/management/emails", icon: "Mail", permission: "emails.view" },
       { label: "Broadcast", to: "/management/broadcast", icon: "Megaphone", permission: "truthsocial.post" },
+      { label: "FiveM Config", to: "/management/fivem-config", icon: "Gamepad2", permission: "fivem.view" },
     ],
   },
 ];

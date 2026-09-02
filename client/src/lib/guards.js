@@ -20,6 +20,7 @@ export const GUARDS = [
   { path: "/management/image-hosting", permission: "media.manage" },
   { path: "/management/emails", permission: "emails.view" },
   { path: "/management/broadcast", permission: "truthsocial.post" },
+  { path: "/management/fivem-config", permission: "fivem.view" },
 
   // Staff Hub
   { path: "/staff-hub/home", permission: "staff.view" },
@@ -54,7 +55,6 @@ export const GUARDS = [
   { path: "/staff-hub/access", permission: "permissions.manage" },
   { path: "/staff-hub/permissions", permission: "permissions.manage" },
   { path: "/staff-hub/discord-roles", permission: "discord.roles.manage" },
-  { path: "/staff-hub/fivem-config", permission: "fivem.view" },
 
   // Development Hub — the queue is the dev team's; the member-facing pages
   // (hub, create, requests, library, help, feedback) need only a sign-in and

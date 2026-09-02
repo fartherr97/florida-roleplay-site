@@ -9,7 +9,8 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import HubPageHeader from "../../components/hub/HubPageHeader";
+import Section from "../../components/layout/Section";
+import PageHeader from "../../components/layout/PageHeader";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -48,7 +49,7 @@ const dollars = (cents) =>
     currency: "USD",
   });
 
-export default function HubFivemConfig() {
+export default function FivemConfig() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("fivem.manage");
 
@@ -91,12 +92,13 @@ export default function HubFivemConfig() {
   };
 
   return (
-    <>
-      <HubPageHeader
-        icon="Gamepad2"
-        eyebrow="Staff Hub"
+    <Section>
+      <PageHeader
+        eyebrow="Management"
         title="FiveM Config"
         subtitle="In-game permissions, pay, weapons and vehicles for the live server. Every save pushes to the server instantly — no restart."
+        backTo="/"
+        backLabel="Home"
         actions={
           <>
             <Badge tone="rose">{canManage ? "Ownership / Command" : "Read-only"}</Badge>
@@ -183,7 +185,7 @@ export default function HubFivemConfig() {
           )}
         </>
       )}
-    </>
+    </Section>
   );
 }
 

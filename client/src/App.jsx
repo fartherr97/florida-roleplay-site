@@ -20,6 +20,7 @@ import ImageHost from "./pages/ImageHost";
 import ImageHostAdmin from "./pages/management/ImageHostAdmin";
 import EmailDirectory from "./pages/management/EmailDirectory";
 import TruthSocial from "./pages/management/TruthSocial";
+import FivemConfig from "./pages/management/FivemConfig";
 import Staff from "./pages/Staff";
 import Join from "./pages/Join";
 import Whitelist from "./pages/Whitelist";
@@ -70,7 +71,6 @@ import HubManagement from "./pages/hub/HubManagement";
 import HubAccessCenter from "./pages/hub/HubAccessCenter";
 import HubPermissions from "./pages/hub/HubPermissions";
 import HubDiscordRoles from "./pages/hub/HubDiscordRoles";
-import HubFivemConfig from "./pages/hub/HubFivemConfig";
 import HubForms from "./pages/hub/HubForms";
 import HubPromotionBoard from "./pages/hub/HubPromotionBoard";
 import CivHome from "./pages/civ/CivHome";
@@ -159,6 +159,7 @@ export default function App() {
             <Route path="management/image-hosting" element={<ImageHostAdmin />} />
             <Route path="management/emails" element={<EmailDirectory />} />
             <Route path="management/broadcast" element={<TruthSocial />} />
+            <Route path="management/fivem-config" element={<FivemConfig />} />
 
             <Route path="store" element={<Store />} />
             <Route path="knowledge-base" element={<KnowledgeBase />} />
@@ -306,7 +307,6 @@ export default function App() {
             <Route path="/staff-hub/access" element={<HubAccessCenter />} />
             <Route path="/staff-hub/permissions" element={<HubPermissions />} />
             <Route path="/staff-hub/discord-roles" element={<HubDiscordRoles />} />
-            <Route path="/staff-hub/fivem-config" element={<HubFivemConfig />} />
           </Route>
 
           {/* Civilian Hub — same shape: a public landing page, then a gated
