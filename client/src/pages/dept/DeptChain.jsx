@@ -354,6 +354,26 @@ function moveNodeTo(root, dragId, targetId, mode) {
   return findNode(result, dragId) ? result : root;
 }
 
+/**
+ * Swaps two boxes' positions in the chart, each keeping its own subtree. Dropping
+ * one box onto the middle of another trades their places — the way you'd expect
+ * dragging one onto the other to behave. A box and one of its own ancestors can't
+ * be swapped (it would tangle the tree into itself), so that is left untouched.
+ */
+function swapNodes(root, aId, bId) {
+  if (!root || aId === bId) return root;
+  const a = findNode(root, aId);
+  const b = findNode(root, bId);
+  if (!a || !b) return root;
+  if (isDescendant(a, bId) || isDescendant(b, aId)) return root;
+
+  const swap = (node) => {
+    const swapped = node.id === aId ? b : node.id === bId ? a : node;
+    return { ...swapped, children: (swapped.children || []).map(swap) };
+  };
+  return swap(root);
+}
+
 /** Every node, flattened, with a label for the "also reports to" picker. */
 function flattenNodes(node, out = []) {
   if (!node) return out;
@@ -472,10 +492,10 @@ function NodeCard({ node, accent, canEdit, isRoot, onEdit, dropHint, setDropHint
   const zoneFor = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
-    if (isRoot) return "child";
+    if (isRoot) return "child"; // nothing sits above the top box to swap it with
     if (x < 0.3) return "before";
     if (x > 0.7) return "after";
-    return "child";
+    return "swap"; // dropping onto the middle trades the two boxes' places
   };
 
   const hintStyle =
@@ -483,9 +503,11 @@ function NodeCard({ node, accent, canEdit, isRoot, onEdit, dropHint, setDropHint
       ? { boxShadow: "inset 4px 0 0 0 var(--color-primary)" }
       : myHint === "after"
         ? { boxShadow: "inset -4px 0 0 0 var(--color-primary)" }
-        : myHint === "child"
-          ? { boxShadow: "inset 0 0 0 2px var(--color-primary)" }
-          : undefined;
+        : myHint === "swap"
+          ? { boxShadow: "inset 0 0 0 2px #22c55e" }
+          : myHint === "child"
+            ? { boxShadow: "inset 0 0 0 2px var(--color-primary)" }
+            : undefined;
 
   const { rank, sub } = splitTitle(node.title || "Untitled");
 
@@ -495,7 +517,7 @@ function NodeCard({ node, accent, canEdit, isRoot, onEdit, dropHint, setDropHint
       data-coc-id={node.id}
       disabled={!canEdit}
       onClick={() => onEdit(node)}
-      title={canEdit ? "Click to edit. Drag onto another box to move under it, or to a box's edge to slot beside it." : undefined}
+      title={canEdit ? "Click to edit. Drag onto another box to swap places, to a box's edge to slot beside it, or onto a “+” to move under it." : undefined}
       draggable={canEdit && !isRoot}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
@@ -1084,7 +1106,7 @@ export default function DeptChain({ page, config }) {
   }
   function handleDropNode(dId, targetId, mode) {
     setDropHint(null);
-    setTree(moveNodeTo(root, dId, targetId, mode));
+    setTree(mode === "swap" ? swapNodes(root, dId, targetId) : moveNodeTo(root, dId, targetId, mode));
   }
   function move(dir) {
     setTree(moveNode(root, editing.id, dir));
@@ -1108,7 +1130,7 @@ export default function DeptChain({ page, config }) {
         title={page.label}
         subtitle={
           canEdit
-            ? "Use the dashed “Add box” slots to grow the chart, click a box to edit it, or drag one onto another box (or its edge) to move it."
+            ? "Use the dashed “Add box” slots to grow the chart, click a box to edit it, or drag one onto another to swap their places (onto an edge to slot beside, onto a “+” to move under)."
             : "Who reports to whom, from the top down."
         }
         actions={
