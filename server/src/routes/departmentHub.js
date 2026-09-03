@@ -355,6 +355,61 @@ function matchRankFromNick(nick, deptRoleMap) {
   return supersets.length === 1 ? supersets[0] : null;
 }
 
+/**
+ * Manual per-member column values — the hand-entered fields a department's roster
+ * shows beside the synced name and rank (hire date, troop, dates of entry and
+ * promotion, and any other column the Builder defines). Kept apart from
+ * roster_members so they survive a Discord sync and apply to synced and manual
+ * members alike, keyed by the member's roster id within a department.
+ */
+let memberFieldsReady = null;
+async function ensureMemberFieldsTable() {
+  if (!memberFieldsReady) {
+    memberFieldsReady = query(`CREATE TABLE IF NOT EXISTS roster_member_fields (
+        department  VARCHAR(64)  NOT NULL,
+        member_id   VARCHAR(64)  NOT NULL,
+        values      JSONB        NOT NULL DEFAULT '{}'::jsonb,
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (department, member_id)
+      )`).catch((err) => {
+      memberFieldsReady = null;
+      throw err;
+    });
+  }
+  return memberFieldsReady;
+}
+
+/** A department's manual column values, member id -> { fieldId: value }. */
+async function loadMemberFields(deptId) {
+  try {
+    await ensureMemberFieldsTable();
+    const rows = await query(
+      "SELECT member_id, values FROM roster_member_fields WHERE department = $1",
+      [deptId],
+    );
+    return new Map(rows.map((r) => [String(r.member_id), r.values || {}]));
+  } catch {
+    return new Map();
+  }
+}
+
+// Fields the manual overlay must never touch — those come from the sync, the
+// nickname, or the status editor, so a stored value can't clobber them.
+const RESERVED_MEMBER_KEYS = new Set([
+  "id", "discordId", "characterName", "displayName", "department",
+  "rank", "rankFull", "rankColor", "callsign", "status", "source", "loaUntil", "joinedAt",
+]);
+
+/** Merges a member's stored column values onto them, leaving core fields alone. */
+function overlayMemberFields(member, values) {
+  if (!values || typeof values !== "object") return;
+  for (const [key, value] of Object.entries(values)) {
+    if (RESERVED_MEMBER_KEYS.has(key)) continue;
+    if (value === null || value === undefined || value === "") continue;
+    member[key] = value;
+  }
+}
+
 async function loadRosterAndMap(deptId, deptGuildId = "") {
   let roster = rosterSeed.filter((entry) => entry.department === deptId);
   let roleMap = ROLE_MAP.filter((role) => role.department === deptId);
@@ -422,6 +477,12 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
           // Legacy row with no recorded roles yet — keep it under its stored rank.
           built.push(base);
         }
+      }
+      // Fill in the hand-entered column values (hire date, troop, dates, …) for
+      // every member who has any, synced or manual alike.
+      const fieldsMap = await loadMemberFields(deptId);
+      if (fieldsMap.size) {
+        for (const member of built) overlayMemberFields(member, fieldsMap.get(member.id));
       }
       roster = built;
     }
@@ -526,6 +587,54 @@ router.delete(
       return res.json({ ok: true });
     } catch {
       return res.status(500).json({ ok: false, message: "Could not remove the member." });
+    }
+  },
+);
+
+/**
+ * The hand-entered column values for one member — hire date, troop, dates of
+ * entry and promotion, and whatever else the Builder defines as a roster column.
+ * Applies to any member on this department's roster, synced or manual. Only keys
+ * that are actual columns on this department are stored, so a stored value can
+ * never introduce an unknown field or overwrite the synced name/rank/callsign.
+ * Gated on the department's editRoster capability.
+ */
+router.post(
+  "/:deptId/roster/member-fields",
+  requirePermission("departments.view"),
+  withDepartment,
+  requireCapability("editRoster"),
+  async (req, res) => {
+    const memberId = str(req.body?.memberId).slice(0, 64);
+    if (!memberId) return res.status(400).json({ ok: false, message: "A member is required." });
+
+    // Only columns this department actually defines are allowed — and never the
+    // reserved ones the sync owns.
+    const allowed = new Set(
+      (req.deptConfig?.roster?.memberFields ?? [])
+        .map((field) => field.id)
+        .filter((id) => id && !RESERVED_MEMBER_KEYS.has(id) && id !== "callsign"),
+    );
+    const incoming = req.body?.values && typeof req.body.values === "object" ? req.body.values : {};
+    const values = {};
+    for (const [key, raw] of Object.entries(incoming)) {
+      if (!allowed.has(key)) continue;
+      if (raw === null || raw === undefined || raw === "") continue; // clearing drops the key
+      values[key] = typeof raw === "boolean" ? raw : str(raw).slice(0, 200);
+    }
+
+    try {
+      await ensureMemberFieldsTable();
+      await query(
+        `INSERT INTO roster_member_fields (department, member_id, values, updated_at)
+           VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP)
+         ON CONFLICT (department, member_id)
+           DO UPDATE SET values = $3::jsonb, updated_at = CURRENT_TIMESTAMP`,
+        [req.departmentId, memberId, JSON.stringify(values)],
+      );
+      return res.json({ ok: true, values });
+    } catch {
+      return res.status(500).json({ ok: false, message: "Could not save the member's details." });
     }
   },
 );

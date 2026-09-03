@@ -443,6 +443,12 @@ export const api = {
       `/dept/${encodeURIComponent(deptId)}/roster/manual/${encodeURIComponent(memberId)}`,
       () => ({ ok: false, message: NOT_PERSISTED }),
     ),
+  /** Save a member's hand-entered column values (hire date, troop, dates, …). */
+  saveMemberFields: (deptId, memberId, values) =>
+    post(`/dept/${encodeURIComponent(deptId)}/roster/member-fields`, { memberId, values }, () => ({
+      ok: false,
+      message: NOT_PERSISTED,
+    })),
 
   /** The guild's live Discord roles, or configured:false when no bot token is set. */
   guildRoles: (guildId) =>

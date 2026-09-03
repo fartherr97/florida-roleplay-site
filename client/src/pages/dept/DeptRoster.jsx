@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, SlidersHorizontal, Trash2, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -24,6 +24,14 @@ const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
   ...ACTIVITY_STATUSES.map((s) => ({ value: s.id, label: s.label })),
 ];
+
+// Column ids the manual editor never touches — they come from the Discord sync,
+// the nickname, or the status editor, so the server drops them anyway. Kept in
+// step with RESERVED_MEMBER_KEYS in server/src/routes/departmentHub.js.
+const RESERVED_FIELD_IDS = new Set([
+  "id", "discordId", "characterName", "displayName", "department",
+  "rank", "rankFull", "rankColor", "callsign", "status", "source", "loaUntil", "joinedAt",
+]);
 
 /**
  * A department's personnel.
@@ -50,6 +58,7 @@ export default function DeptRoster({ page, config }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState(null);
+  const [editingFields, setEditingFields] = useState(null); // member whose columns are being edited
   const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -116,6 +125,14 @@ export default function DeptRoster({ page, config }) {
   const canEditStatus = hasPermission("roster.edit_status");
   const canManageLoa = hasPermission("roster.manage_loa");
   const fields = config.roster.memberFields ?? [];
+  // The columns editable by hand: the department's own data columns, minus the
+  // ones the sync or a dedicated editor owns — status (its own editor), callsign
+  // (the Discord nickname / manual-member form) and the synced identity/date
+  // fields. This set matches the server's, so the editor never offers a column a
+  // save would silently drop.
+  const editableFields = fields.filter(
+    (field) => field.type !== "status" && !RESERVED_FIELD_IDS.has(field.id),
+  );
   const stats = config.roster.stats;
 
   const everyone = useMemo(
@@ -268,37 +285,52 @@ export default function DeptRoster({ page, config }) {
           <MemberCell field={field} member={member} editable={canEditStatus} onEdit={setEditing} />
         ),
       })),
-    // Edit/remove only ever touch a hand-added (manual) member; a Discord-synced
-    // one is owned by the bot and shows nothing here.
+    // Every member can have their column values (hire date, troop, dates, …)
+    // edited by hand — synced members included, since those columns are the
+    // department's own overlay rather than anything Discord owns. A hand-added
+    // (manual) member additionally has its identity editable and can be removed.
     ...(canEditRoster
       ? [
           {
             key: "manage",
             label: "",
-            width: "w-20",
-            render: (member) =>
-              member.source === "manual" ? (
-                <div className="flex items-center gap-1">
+            width: "w-28",
+            render: (member) => (
+              <div className="flex items-center gap-1">
+                {editableFields.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setManaging(member)}
-                    aria-label={`Edit ${member.characterName}`}
+                    onClick={() => setEditingFields(member)}
+                    aria-label={`Edit ${member.characterName}'s details`}
+                    title="Edit roster columns"
                     className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
                   >
-                    <Pencil className="size-3.5" />
+                    <SlidersHorizontal className="size-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => removeManual(member)}
-                    aria-label={`Remove ${member.characterName}`}
-                    className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <span className="text-[10px] uppercase tracking-wide text-slate-600">synced</span>
-              ),
+                )}
+                {member.source === "manual" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setManaging(member)}
+                      aria-label={`Edit ${member.characterName}`}
+                      title="Edit name, rank and callsign"
+                      className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeManual(member)}
+                      aria-label={`Remove ${member.characterName}`}
+                      className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            ),
           },
         ]
       : []),
@@ -413,10 +445,124 @@ export default function DeptRoster({ page, config }) {
         />
       )}
 
+      {editingFields && (
+        <MemberFieldsModal
+          deptId={id}
+          member={editingFields}
+          fields={editableFields}
+          onClose={() => setEditingFields(null)}
+          onSaved={() => {
+            setEditingFields(null);
+            setReloadKey((key) => key + 1);
+          }}
+        />
+      )}
+
       {rankOpen && (
         <RankOrderModal ranks={rankList} onClose={() => setRankOpen(false)} onSave={saveRankOrder} />
       )}
     </>
+  );
+}
+
+/**
+ * Edit one member's hand-entered column values. Renders an input per configured
+ * column, typed to match how the column shows in the table — a date picker for a
+ * date, a dropdown for a select, a toggle for a checkbox/cert, text otherwise.
+ * Works for any member on the roster, synced or manual.
+ */
+function MemberFieldsModal({ deptId, member, fields, onClose, onSaved }) {
+  const [values, setValues] = useState(() => {
+    const initial = {};
+    for (const field of fields) {
+      const current = member[field.id];
+      initial[field.id] =
+        field.type === "checkbox" || field.type === "cert" ? Boolean(current) : current ?? "";
+    }
+    return initial;
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const set = (id, value) => setValues((v) => ({ ...v, [id]: value }));
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      const result = await api.saveMemberFields(deptId, member.id, values);
+      if (result?.ok === false) {
+        setError(result.message || "Could not save.");
+        setSaving(false);
+        return;
+      }
+      onSaved();
+    } catch (err) {
+      setError(err?.message || "Could not save the member's details.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Edit ${member.characterName}`} subtitle="Roster columns" className="max-w-lg">
+      {fields.length === 0 ? (
+        <p className="text-sm text-slate-400">This roster has no editable columns configured.</p>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {fields.map((field) => (
+              <Field key={field.id} label={field.label} htmlFor={`mf-${field.id}`}>
+                {field.type === "date" ? (
+                  <TextInput
+                    id={`mf-${field.id}`}
+                    type="date"
+                    value={values[field.id] || ""}
+                    onChange={(e) => set(field.id, e.target.value)}
+                  />
+                ) : field.type === "checkbox" || field.type === "cert" ? (
+                  <Select
+                    id={`mf-${field.id}`}
+                    value={values[field.id] ? "yes" : "no"}
+                    onChange={(v) => set(field.id, v === "yes")}
+                    options={[
+                      { value: "no", label: field.type === "cert" ? "N/A" : "No" },
+                      { value: "yes", label: field.type === "cert" ? "Certified" : "Yes" },
+                    ]}
+                  />
+                ) : field.type === "select" && field.options?.length ? (
+                  <Select
+                    id={`mf-${field.id}`}
+                    value={values[field.id] || ""}
+                    onChange={(v) => set(field.id, v)}
+                    options={[
+                      { value: "", label: "—" },
+                      ...field.options.map((o) => ({ value: o, label: o })),
+                    ]}
+                  />
+                ) : (
+                  <TextInput
+                    id={`mf-${field.id}`}
+                    value={values[field.id] || ""}
+                    onChange={(e) => set(field.id, e.target.value)}
+                    maxLength={200}
+                  />
+                )}
+              </Field>
+            ))}
+          </div>
+          {error && <p className="text-sm font-semibold text-rose-300">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
 
