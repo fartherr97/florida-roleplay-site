@@ -89,6 +89,7 @@ import BotRosters from "./pages/management/bot/BotRosters";
 import BotRosterDetail from "./pages/management/bot/BotRosterDetail";
 import BotPermissions from "./pages/management/bot/BotPermissions";
 import BotAccess from "./pages/management/bot/BotAccess";
+import BotRoleManager from "./pages/management/bot/BotRoleManager";
 import BotTransfers from "./pages/management/bot/BotTransfers";
 import BotServers from "./pages/management/bot/BotServers";
 import BotMappings from "./pages/management/bot/BotMappings";
@@ -195,6 +196,7 @@ export default function App() {
               <Route path="rosters/:slug" element={<BotRosterDetail />} />
               <Route path="permissions" element={<BotPermissions />} />
               <Route path="access" element={<BotAccess />} />
+              <Route path="role-manager" element={<BotRoleManager />} />
               <Route path="transfers" element={<BotTransfers />} />
               <Route path="servers" element={<BotServers />} />
               <Route path="mappings" element={<BotMappings />} />
