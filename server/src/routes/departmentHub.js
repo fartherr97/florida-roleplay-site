@@ -26,7 +26,7 @@ import { roster as rosterSeed, ROLE_MAP } from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
-import { projectRoster } from "../lib/deptRoster.js";
+import { projectRoster, roleKeyFor } from "../lib/deptRoster.js";
 import { maybeSyncRoster, parseNick } from "../lib/rosterSync.js";
 import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
 import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
@@ -381,23 +381,37 @@ async function ensureMemberFieldsTable() {
         values      JSONB        NOT NULL DEFAULT '{}'::jsonb,
         updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (department, member_id)
-      )`).catch((err) => {
-      memberFieldsReady = null;
-      throw err;
-    });
+      )`)
+      // The band command placed the member in. Added after the table shipped, so
+      // an existing deploy picks it up without a manual migration.
+      .then(() =>
+        query("ALTER TABLE roster_member_fields ADD COLUMN IF NOT EXISTS category_id VARCHAR(64) NULL"),
+      )
+      .catch((err) => {
+        memberFieldsReady = null;
+        throw err;
+      });
   }
   return memberFieldsReady;
 }
 
-/** A department's manual column values, member id -> { fieldId: value }. */
+/**
+ * A department's per-member overlay, member id -> { values, categoryId }:
+ * the hand-entered column values, and the band command placed them in.
+ */
 async function loadMemberFields(deptId) {
   try {
     await ensureMemberFieldsTable();
     const rows = await query(
-      "SELECT member_id, values FROM roster_member_fields WHERE department = $1",
+      "SELECT member_id, values, category_id FROM roster_member_fields WHERE department = $1",
       [deptId],
     );
-    return new Map(rows.map((r) => [String(r.member_id), r.values || {}]));
+    return new Map(
+      rows.map((r) => [
+        String(r.member_id),
+        { values: r.values || {}, categoryId: r.category_id || null },
+      ]),
+    );
   } catch {
     return new Map();
   }
@@ -516,7 +530,13 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
       // every member who has any, synced or manual alike.
       const fieldsMap = await loadMemberFields(deptId);
       if (fieldsMap.size) {
-        for (const member of built) overlayMemberFields(member, fieldsMap.get(member.id));
+        for (const member of built) {
+          const stored = fieldsMap.get(member.id);
+          if (!stored) continue;
+          overlayMemberFields(member, stored.values);
+          // The band command placed them in; absent means Unassigned.
+          if (stored.categoryId) member.categoryId = stored.categoryId;
+        }
       }
       roster = built;
     }
@@ -669,6 +689,91 @@ router.post(
       return res.json({ ok: true, values });
     } catch {
       return res.status(500).json({ ok: false, message: "Could not save the member's details." });
+    }
+  },
+);
+
+/**
+ * Place one member into a roster band, or back into Unassigned (empty
+ * categoryId). Placement is entirely manual — nothing is inferred from rank —
+ * so this is the only way a member moves between bands. The band must exist on
+ * one of this department's rosters. Gated on the department's editRoster
+ * capability.
+ */
+router.post(
+  "/:deptId/roster/member-band",
+  requirePermission("departments.view"),
+  withDepartment,
+  requireCapability("editRoster"),
+  async (req, res) => {
+    const memberId = str(req.body?.memberId).slice(0, 64);
+    if (!memberId) return res.status(400).json({ ok: false, message: "A member is required." });
+    const wanted = str(req.body?.categoryId).slice(0, 64);
+    const bands = new Set(
+      (req.deptConfig?.roster?.subdivisions ?? []).flatMap((s) => (s.categories ?? []).map((c) => c.id)),
+    );
+    if (wanted && !bands.has(wanted)) {
+      return res.status(400).json({ ok: false, message: "No such band on this roster." });
+    }
+    const categoryId = wanted || null;
+    try {
+      await ensureMemberFieldsTable();
+      await query(
+        `INSERT INTO roster_member_fields (department, member_id, values, category_id, updated_at)
+           VALUES ($1, $2, '{}'::jsonb, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (department, member_id)
+           DO UPDATE SET category_id = $3, updated_at = CURRENT_TIMESTAMP`,
+        [req.departmentId, memberId, categoryId],
+      );
+      return res.json({ ok: true, categoryId });
+    } catch {
+      return res.status(500).json({ ok: false, message: "Could not place the member." });
+    }
+  },
+);
+
+/**
+ * One-off helper for a department that had a working layout before placement
+ * went manual: put every still-Unassigned member into the main roster band their
+ * rank maps to, saved as an ordinary manual placement. Members already placed are
+ * never moved, and it never runs on its own — command clicks it. Gated on the
+ * department's editRoster capability.
+ */
+router.post(
+  "/:deptId/roster/bands/fill",
+  requirePermission("departments.view"),
+  withDepartment,
+  requireCapability("editRoster"),
+  async (req, res) => {
+    try {
+      const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId);
+      const subs = req.deptConfig?.roster?.subdivisions ?? [];
+      const main = subs.find((s) => s.main) ?? subs[0];
+      const bands = main?.categories ?? [];
+      await ensureMemberFieldsTable();
+
+      let filled = 0;
+      let skipped = 0;
+      for (const member of roster) {
+        if (member.categoryId) continue; // already placed by hand — leave it
+        const key = roleKeyFor(member, roleMap);
+        const band = key ? bands.find((c) => (c.roleKeys ?? []).includes(key)) : null;
+        if (!band) {
+          skipped += 1;
+          continue;
+        }
+        await query(
+          `INSERT INTO roster_member_fields (department, member_id, values, category_id, updated_at)
+             VALUES ($1, $2, '{}'::jsonb, $3, CURRENT_TIMESTAMP)
+           ON CONFLICT (department, member_id)
+             DO UPDATE SET category_id = $3, updated_at = CURRENT_TIMESTAMP`,
+          [req.departmentId, member.id, band.id],
+        );
+        filled += 1;
+      }
+      return res.json({ ok: true, filled, skipped });
+    } catch {
+      return res.status(500).json({ ok: false, message: "Could not fill the bands." });
     }
   },
 );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, SlidersHorizontal, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, SlidersHorizontal, Sparkles, Trash2, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -133,6 +133,12 @@ export default function DeptRoster({ page, config }) {
   const editableFields = fields.filter(
     (field) => field.type !== "status" && !RESERVED_FIELD_IDS.has(field.id),
   );
+  // The bands a member can be placed into: the configured categories of the
+  // roster being viewed (never the synthetic "Unassigned" the projection adds).
+  const bandOptions = useMemo(() => {
+    const configSub = (config.roster?.subdivisions ?? []).find((s) => s.id === activeId) ?? (config.roster?.subdivisions ?? [])[0];
+    return (configSub?.categories ?? []).filter((c) => !c.unassigned).map((c) => ({ id: c.id, name: c.name }));
+  }, [config, activeId]);
   const stats = config.roster.stats;
 
   const everyone = useMemo(
@@ -297,12 +303,12 @@ export default function DeptRoster({ page, config }) {
             width: "w-28",
             render: (member) => (
               <div className="flex items-center gap-1">
-                {editableFields.length > 0 && (
+                {(editableFields.length > 0 || bandOptions.length > 0) && (
                   <button
                     type="button"
                     onClick={() => setEditingFields(member)}
-                    aria-label={`Edit ${member.characterName}'s details`}
-                    title="Edit roster columns"
+                    aria-label={`Edit ${member.characterName}'s band and details`}
+                    title="Place in a band / edit roster columns"
                     className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
                   >
                     <SlidersHorizontal className="size-3.5" />
@@ -335,6 +341,26 @@ export default function DeptRoster({ page, config }) {
         ]
       : []),
   ];
+
+  // One click to seed placements from ranks for a roster that had a good layout
+  // before placement went manual. Only touches members still Unassigned.
+  const [filling, setFilling] = useState(false);
+  const fillBands = async () => {
+    setFilling(true);
+    try {
+      const result = await api.fillBandsFromRanks(id);
+      setNotice(
+        result?.ok === false
+          ? result.message || "Could not fill the bands."
+          : `Placed ${result?.filled ?? 0} member${result?.filled === 1 ? "" : "s"} by rank${
+              result?.skipped ? `; ${result.skipped} had no matching band and stay Unassigned` : ""
+            }.`,
+      );
+      setReloadKey((key) => key + 1);
+    } finally {
+      setFilling(false);
+    }
+  };
 
   const saveStatus = async (payload) => {
     // The API answers with a message when the write did not land — a member who
@@ -382,6 +408,18 @@ export default function DeptRoster({ page, config }) {
           <Button variant="ghost" size="sm" onClick={() => setRankOpen(true)}>
             <ListOrdered className="size-4" />
             Rank order
+          </Button>
+        )}
+        {canEditRoster && bandOptions.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fillBands}
+            disabled={filling}
+            title="Place every still-Unassigned member into the band their rank maps to. Never moves anyone already placed."
+          >
+            <Sparkles className="size-4" />
+            {filling ? "Placing…" : "Fill bands from ranks"}
           </Button>
         )}
         {canEditRoster && (
@@ -450,6 +488,7 @@ export default function DeptRoster({ page, config }) {
           deptId={id}
           member={editingFields}
           fields={editableFields}
+          bands={bandOptions}
           onClose={() => setEditingFields(null)}
           onSaved={() => {
             setEditingFields(null);
@@ -471,7 +510,10 @@ export default function DeptRoster({ page, config }) {
  * date, a dropdown for a select, a toggle for a checkbox/cert, text otherwise.
  * Works for any member on the roster, synced or manual.
  */
-function MemberFieldsModal({ deptId, member, fields, onClose, onSaved }) {
+function MemberFieldsModal({ deptId, member, fields, bands = [], onClose, onSaved }) {
+  // Which band the member sits in. Placement is manual — a synced member
+  // starts Unassigned and stays there until command places them here.
+  const [band, setBand] = useState(member.categoryId ?? "");
   const [values, setValues] = useState(() => {
     const initial = {};
     for (const field of fields) {
@@ -491,11 +533,21 @@ function MemberFieldsModal({ deptId, member, fields, onClose, onSaved }) {
     setError("");
     setSaving(true);
     try {
-      const result = await api.saveMemberFields(deptId, member.id, values);
-      if (result?.ok === false) {
-        setError(result.message || "Could not save.");
-        setSaving(false);
-        return;
+      if (band !== (member.categoryId ?? "")) {
+        const placed = await api.setMemberBand(deptId, member.id, band || null);
+        if (placed?.ok === false) {
+          setError(placed.message || "Could not place the member.");
+          setSaving(false);
+          return;
+        }
+      }
+      if (fields.length > 0) {
+        const result = await api.saveMemberFields(deptId, member.id, values);
+        if (result?.ok === false) {
+          setError(result.message || "Could not save.");
+          setSaving(false);
+          return;
+        }
       }
       onSaved();
     } catch (err) {
@@ -505,11 +557,21 @@ function MemberFieldsModal({ deptId, member, fields, onClose, onSaved }) {
   };
 
   return (
-    <Modal open onClose={onClose} title={`Edit ${member.characterName}`} subtitle="Roster columns" className="max-w-lg">
-      {fields.length === 0 ? (
-        <p className="text-sm text-slate-400">This roster has no editable columns configured.</p>
+    <Modal open onClose={onClose} title={`Edit ${member.characterName}`} subtitle="Band and roster columns" className="max-w-lg">
+      {fields.length === 0 && bands.length === 0 ? (
+        <p className="text-sm text-slate-400">This roster has no bands or editable columns configured.</p>
       ) : (
         <form onSubmit={submit} className="space-y-4">
+          {bands.length > 0 && (
+            <Field label="Band" htmlFor="mf-band" hint="Where this member sits on the roster. New members start Unassigned.">
+              <Select
+                id="mf-band"
+                value={band}
+                onChange={setBand}
+                options={[{ value: "", label: "Unassigned" }, ...bands.map((b) => ({ value: b.id, label: b.name }))]}
+              />
+            </Field>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             {fields.map((field) => (
               <Field key={field.id} label={field.label} htmlFor={`mf-${field.id}`}>

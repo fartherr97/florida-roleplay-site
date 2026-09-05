@@ -443,6 +443,18 @@ export const api = {
       `/dept/${encodeURIComponent(deptId)}/roster/manual/${encodeURIComponent(memberId)}`,
       () => ({ ok: false, message: NOT_PERSISTED }),
     ),
+  /** Place a member into a roster band (null/empty = back to Unassigned). */
+  setMemberBand: (deptId, memberId, categoryId) =>
+    post(`/dept/${encodeURIComponent(deptId)}/roster/member-band`, { memberId, categoryId }, () => ({
+      ok: false,
+      message: NOT_PERSISTED,
+    })),
+  /** One-time: place every still-Unassigned member into the band their rank maps to. */
+  fillBandsFromRanks: (deptId) =>
+    post(`/dept/${encodeURIComponent(deptId)}/roster/bands/fill`, {}, () => ({
+      ok: false,
+      message: NOT_PERSISTED,
+    })),
   /** Save a member's hand-entered column values (hire date, troop, dates, …). */
   saveMemberFields: (deptId, memberId, values) =>
     post(`/dept/${encodeURIComponent(deptId)}/roster/member-fields`, { memberId, values }, () => ({

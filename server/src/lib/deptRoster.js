@@ -57,7 +57,7 @@ export function roleKeyFor(entry, roleMap) {
  * that should hold it is a routine state, and silently dropping those people
  * would look like the roster was broken.
  */
-export function projectSubdivision(subdivision, members, roleMap, rankOrder = null) {
+export function projectSubdivision(subdivision, members, roleMap, rankOrder = null, options = {}) {
   const withRole = members.map((entry) => {
     const roleKey = roleKeyFor(entry, roleMap);
     const base = (roleMap || []).find((role) => role.key === roleKey)?.order ?? 0;
@@ -68,26 +68,30 @@ export function projectSubdivision(subdivision, members, roleMap, rankOrder = nu
     return { ...entry, roleKey, order };
   });
 
-  const claimed = new Set();
-  const categories = (subdivision.categories || []).map((category) => {
-    const keys = new Set(category.roleKeys || []);
-    const rows = withRole.filter((entry) => {
-      if (!entry.roleKey || !keys.has(entry.roleKey)) return false;
-      claimed.add(entry.id);
-      return true;
-    });
-    return { ...category, members: sortMembers(rows) };
-  });
+  // Placement is manual: a member sits in the band command placed them in
+  // (member.categoryId), full stop. Nothing is inferred from their rank — that
+  // inference drifted with every label change and stranded people, so the rank
+  // now only decides the order *within* a band.
+  const categories = (subdivision.categories || []).map((category) => ({
+    ...category,
+    members: sortMembers(withRole.filter((entry) => entry.categoryId === category.id)),
+  }));
 
-  const leftover = withRole.filter((entry) => !claimed.has(entry.id));
-  if (leftover.length > 0) {
-    categories.push({
-      id: "cat-unassigned",
-      name: "Unassigned",
-      color: "#64748b",
-      unassigned: true,
-      members: sortMembers(leftover),
-    });
+  // On the main roster, everyone not placed into any band in the department
+  // waits in "Unassigned" until command places them.
+  if (options.unassignedBand) {
+    const known =
+      options.knownCategoryIds ?? new Set((subdivision.categories || []).map((c) => c.id));
+    const leftover = withRole.filter((entry) => !entry.categoryId || !known.has(entry.categoryId));
+    if (leftover.length > 0) {
+      categories.push({
+        id: "cat-unassigned",
+        name: "Unassigned",
+        color: "#64748b",
+        unassigned: true,
+        members: sortMembers(leftover),
+      });
+    }
   }
   return categories;
 }
@@ -112,23 +116,26 @@ function sortMembers(rows) {
 export function projectRoster(config, roster, roleMap) {
   const members = (roster || []).filter((entry) => entry.department === config.id);
   const rankOrder = config.roster?.rankOrder || null;
-  return (config.roster?.subdivisions || []).map((subdivision) => {
-    // Explicit roleKeys win. Otherwise the main roster takes everyone, while a
-    // non-main unit scopes itself to the ranks its bands claim — so a freshly
-    // built unit (say, SWAT) shows only its assigned ranks instead of dumping
-    // the whole department into "Unassigned".
-    const explicit = subdivision.roleKeys?.length ? subdivision.roleKeys : null;
-    const keys =
-      explicit ??
-      (subdivision.main
-        ? null
-        : [...new Set((subdivision.categories || []).flatMap((cat) => cat.roleKeys || []))]);
-    const scoped = keys
-      ? members.filter((entry) => keys.includes(roleKeyFor(entry, roleMap)))
-      : members;
+  const subdivisions = config.roster?.subdivisions || [];
+  const knownCategoryIds = new Set(subdivisions.flatMap((s) => (s.categories || []).map((c) => c.id)));
+  const mainId = (subdivisions.find((s) => s.main) ?? subdivisions[0])?.id;
+  return subdivisions.map((subdivision) => {
+    const own = new Set((subdivision.categories || []).map((c) => c.id));
+    const isMain = subdivision.id === mainId;
+    // The main roster holds its own bands plus everyone not yet placed anywhere;
+    // a unit roster (say, SWAT) shows only the members placed into its own bands.
+    const scoped = isMain
+      ? members.filter(
+          (entry) =>
+            !entry.categoryId || own.has(entry.categoryId) || !knownCategoryIds.has(entry.categoryId),
+        )
+      : members.filter((entry) => own.has(entry.categoryId));
     return {
       ...subdivision,
-      categories: projectSubdivision(subdivision, scoped, roleMap, rankOrder),
+      categories: projectSubdivision(subdivision, scoped, roleMap, rankOrder, {
+        unassignedBand: isMain,
+        knownCategoryIds,
+      }),
       total: scoped.length,
     };
   });
