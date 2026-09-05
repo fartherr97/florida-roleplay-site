@@ -28,10 +28,17 @@ export function ranksForDepartment(roleMap, departmentId) {
  * table shows), so match on the department plus either form of the rank.
  */
 export function roleKeyFor(entry, roleMap) {
+  // The roster projection carries the key of the exact rank it resolved for this
+  // member; trust it over re-matching a label, which drifts when two roles share
+  // one. Only fall back to a label match for legacy/manual rows that lack it.
+  if (entry.roleKey) return entry.roleKey;
   const candidates = (roleMap || []).filter((role) => role.department === entry.department);
+  const norm = (value) => String(value ?? "").trim().toLowerCase();
   const match =
     candidates.find((role) => role.rank === entry.rank) ??
-    candidates.find((role) => role.rankFull === entry.rankFull);
+    candidates.find((role) => role.rankFull === entry.rankFull) ??
+    candidates.find((role) => norm(role.rank) === norm(entry.rank)) ??
+    candidates.find((role) => norm(role.rankFull) === norm(entry.rankFull));
   return match?.key ?? null;
 }
 

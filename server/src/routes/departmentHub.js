@@ -472,7 +472,18 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
           // disagree with the bot (which was the "Kilo shows as the wrong rank" drift).
           const fromNick = nick ? matchRankFromNick(nick, roleMap) : null;
           const top = fromNick ?? deptRoles.sort((a, b) => (b.order ?? 0) - (a.order ?? 0))[0];
-          built.push({ ...base, department: deptId, rank: top.rank, rankFull: top.rankFull, rankColor: top.color || "" });
+          // Carry the resolved role's key straight through so the roster bands
+          // bucket this member by the exact rank we picked here. Re-deriving the
+          // key from the rank label downstream drifts whenever two roles share a
+          // label — which is how correctly-mapped members ended up "Unassigned".
+          built.push({
+            ...base,
+            department: deptId,
+            rank: top.rank,
+            rankFull: top.rankFull,
+            rankColor: top.color || "",
+            roleKey: top.key,
+          });
         } else if (held === null && base.department === deptId) {
           // Legacy row with no recorded roles yet — keep it under its stored rank.
           built.push(base);
