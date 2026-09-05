@@ -98,13 +98,14 @@ import BotSync from "./pages/management/bot/BotSync";
 import BotAudit from "./pages/management/bot/BotAudit";
 
 /**
- * Redirects a legacy /departments/bso/... URL to the rebranded /departments/bcso/...
+ * Redirects a legacy /departments/bcso/... URL to the current /departments/bso/...
  * one, preserving everything after the department id (the hub path, query and hash),
- * so old shared links keep working after the BSO → BCSO rename.
+ * so links shared while the department was briefly "BCSO" keep working after the
+ * BCSO → BSO rename.
  */
 function DeptAliasRedirect() {
   const location = useLocation();
-  const path = location.pathname.replace(/^\/departments\/bso(?=\/|$)/, "/departments/bcso");
+  const path = location.pathname.replace(/^\/departments\/bcso(?=\/|$)/, "/departments/bso");
   return <Navigate to={`${path}${location.search}${location.hash}`} replace />;
 }
 
@@ -337,10 +338,10 @@ export default function App() {
             <Route path="/civilian-hub/guides" element={<CivGuides />} />
           </Route>
 
-          {/* BSO was rebranded to BCSO, so its department id is now `bcso`.
-              Old /departments/bso/... links (still floating around Discord)
-              redirect to the new id, keeping the rest of the path intact. */}
-          <Route path="/departments/bso/*" element={<DeptAliasRedirect />} />
+          {/* The sheriff's office was briefly "BCSO" (id `bcso`) before settling on
+              BSO (id `bso`). Links from that window (still floating around Discord)
+              redirect to the current id, keeping the rest of the path intact. */}
+          <Route path="/departments/bcso/*" element={<DeptAliasRedirect />} />
 
           {/* Department sites. One route serves every department: the :deptId
               segment picks which saved config loads, and the pages inside come
