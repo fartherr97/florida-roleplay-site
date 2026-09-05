@@ -327,6 +327,16 @@ function rankTokens(value) {
 function matchRankFromNick(nick, deptRoleMap) {
   const rankText = parseNick(nick).rank;
   if (!rankText) return null;
+  return matchRankLabel(rankText, deptRoleMap);
+}
+
+/**
+ * The role-map entry a bare rank label names — "Captain", "Asst. Chief",
+ * "MPD | Sergeant" — using the same prefix-and-abbreviation-tolerant matching as a
+ * nickname's rank segment. Used for rows that store a rank label without a
+ * nickname or roles to resolve it from.
+ */
+function matchRankLabel(rankText, deptRoleMap) {
   const wanted = rankTokens(rankText);
   if (!wanted.length) return null;
   const wantedKey = wanted.join(" ");
@@ -485,8 +495,21 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
             roleKey: top.key,
           });
         } else if (held === null && base.department === deptId) {
-          // Legacy row with no recorded roles yet — keep it under its stored rank.
-          built.push(base);
+          // A row with no recorded roles yet — created by the bot's push endpoint,
+          // which sends no role list. Its stored rank label is the bare word
+          // ("Captain") while the map's labels carry the department prefix
+          // ("MPD | Captain"), so a plain label lookup misses and the member falls
+          // into "Unassigned". Resolve them the same way as everyone else: the
+          // rank written into their nickname first, then the stored label matched
+          // through the same prefix-and-abbreviation-tolerant matcher.
+          const fromNick = nick ? matchRankFromNick(nick, roleMap) : null;
+          const fromLabel = matchRankLabel(base.rankFull || base.rank || "", roleMap);
+          const top = fromNick ?? fromLabel;
+          built.push(
+            top
+              ? { ...base, rank: top.rank, rankFull: top.rankFull, rankColor: top.color || "", roleKey: top.key }
+              : base,
+          );
         }
       }
       // Fill in the hand-entered column values (hire date, troop, dates, …) for

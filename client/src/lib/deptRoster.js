@@ -33,7 +33,14 @@ export function roleKeyFor(entry, roleMap) {
   // members in "Unassigned".
   if (entry.roleKey) return entry.roleKey;
   const candidates = (roleMap || []).filter((role) => role.department === entry.department);
-  const norm = (value) => String(value ?? "").trim().toLowerCase();
+  // Drop a leading "MPD | " department prefix so a stored "Captain" still lines
+  // up with a map label of "MPD | Captain".
+  const norm = (value) =>
+    String(value ?? "")
+      .toLowerCase()
+      .replace(/^[a-z0-9]+\s*\|\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
   const match =
     candidates.find((role) => role.rank === entry.rank) ??
     candidates.find((role) => role.rankFull === entry.rankFull) ??

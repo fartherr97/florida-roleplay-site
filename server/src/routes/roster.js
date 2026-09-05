@@ -846,7 +846,12 @@ router.post("/sync", requireBot, async (req, res) => {
 
   if (!dryRun) {
     try {
-      await applyUpsert(resolved, str(req.body?.joinedAt));
+      // Record which mapped roles the member holds. Without this a row created
+      // here has no role_ids, which the department roster can't bucket by rank —
+      // members synced through this push sat in "Unassigned" for exactly that reason.
+      const mappedIds = new Set(roleMap.map((role) => String(role.roleId)));
+      const roleIds = value.roles.filter((rid) => mappedIds.has(String(rid)));
+      await applyUpsert(resolved, str(req.body?.joinedAt), roleIds);
     } catch {
       // No database yet — the computed result is still returned so the bot can
       // apply the nickname and the flow is exercisable end to end.
@@ -922,7 +927,10 @@ router.post("/sync/bulk", requireBot, async (req, res) => {
 
     if (!dryRun) {
       try {
-        await applyUpsert(resolved, str(raw?.joinedAt));
+        // Record the member's mapped roles too — see the single-member sync above.
+        const mappedIds = new Set(roleMap.map((role) => String(role.roleId)));
+        const roleIds = value.roles.filter((rid) => mappedIds.has(String(rid)));
+        await applyUpsert(resolved, str(raw?.joinedAt), roleIds);
       } catch {
         /* no database — the response still reports the intent */
       }
