@@ -443,12 +443,17 @@ export const api = {
       `/dept/${encodeURIComponent(deptId)}/roster/manual/${encodeURIComponent(memberId)}`,
       () => ({ ok: false, message: NOT_PERSISTED }),
     ),
-  /** Place a member into a roster band (null/empty = back to Unassigned). */
-  setMemberBand: (deptId, memberId, categoryId) =>
-    post(`/dept/${encodeURIComponent(deptId)}/roster/member-band`, { memberId, categoryId }, () => ({
-      ok: false,
-      message: NOT_PERSISTED,
-    })),
+  /**
+   * Place a member into a band on one roster (subdivision); null/empty categoryId
+   * takes them off it — back to Unassigned on the main roster, off the unit
+   * entirely on a unit roster.
+   */
+  setMemberBand: (deptId, memberId, subdivisionId, categoryId) =>
+    post(
+      `/dept/${encodeURIComponent(deptId)}/roster/member-band`,
+      { memberId, subdivisionId, categoryId },
+      () => ({ ok: false, message: NOT_PERSISTED }),
+    ),
   /** One-time: place every still-Unassigned member into the band their rank maps to. */
   fillBandsFromRanks: (deptId) =>
     post(`/dept/${encodeURIComponent(deptId)}/roster/bands/fill`, {}, () => ({
@@ -606,6 +611,12 @@ export const api = {
 
   saveDeptAccess: (id, access) =>
     put(`/dept/${encodeURIComponent(id)}/access`, { access }, () => ({
+      ok: true,
+      message: NOT_PERSISTED,
+    })),
+  /** Who may arrange each unit roster, by Discord id — { subdivisionId: [ids] }. */
+  saveDeptUnitEditors: (id, editors) =>
+    put(`/dept/${encodeURIComponent(id)}/unit-editors`, { editors }, () => ({
       ok: true,
       message: NOT_PERSISTED,
     })),

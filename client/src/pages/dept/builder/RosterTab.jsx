@@ -137,8 +137,9 @@ export default function RosterTab({ config }) {
 
           {!sub.main && (
             <p className="mb-3 text-xs text-slate-500">
-              This unit shows only the ranks its bands claim — members appear here on top of
-              their spot on the main roster.
+              A unit roster shows only the members placed into its bands, on top of their
+              spot on the main roster. Whoever runs the unit can be named as an editor on
+              the Access &amp; roles page and will then place members here themselves.
             </p>
           )}
 

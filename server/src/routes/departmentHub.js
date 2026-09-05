@@ -26,7 +26,7 @@ import { roster as rosterSeed, ROLE_MAP } from "../rosterSeed.js";
 import { requirePermission, loadGrants } from "../middleware/requirePermission.js";
 import { resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
-import { projectRoster, roleKeyFor } from "../lib/deptRoster.js";
+import { mainSubdivisionId, placementFor, projectRoster, roleKeyFor } from "../lib/deptRoster.js";
 import { maybeSyncRoster, parseNick } from "../lib/rosterSync.js";
 import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
 import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
@@ -41,6 +41,7 @@ import {
   redactAccess,
   redactSensitive,
   summarize,
+  unitEditsFor,
   validateConfig,
   validDepartmentId,
 } from "../lib/departmentConfig.js";
@@ -135,8 +136,25 @@ async function withDepartment(req, res, next) {
   req.deptConfig = config;
   req.deptPermissions = permissions;
   req.deptCapabilities = capabilitiesFor(config, user?.roles ?? [], permissions);
+  // The unit rosters this caller may arrange: all of them with editRoster, else
+  // only the units whose editor list names their Discord id.
+  req.deptUnitEdits = unitEditsFor(config, user?.id, req.deptCapabilities);
   next();
 }
+
+/**
+ * Gate a roster-arranging route on one subdivision: the department-wide
+ * editRoster capability, or being a named editor of that unit.
+ */
+function mayEditUnit(req, subdivisionId) {
+  return req.deptCapabilities?.has("editRoster") || req.deptUnitEdits?.has(subdivisionId);
+}
+
+const UNIT_FORBIDDEN = {
+  ok: false,
+  code: "AUTH_ROLE_MISSING",
+  message: "You can't arrange that roster. Its command staff grant that on the Access page.",
+};
 
 /** Gate a department route on one capability from src/lib/departmentConfig.js. */
 function requireCapability(capability) {
@@ -212,7 +230,7 @@ router.get(
     let config = req.deptConfig;
     if (!caps.has("manage")) config = redactSensitive(config);
     if (!caps.has("manageAccess") && !caps.has("viewAudit")) config = redactAccess(config);
-    res.json({ config, capabilities: [...caps] });
+    res.json({ config, capabilities: [...caps], unitEdits: [...req.deptUnitEdits] });
   },
 );
 
@@ -387,6 +405,13 @@ async function ensureMemberFieldsTable() {
       .then(() =>
         query("ALTER TABLE roster_member_fields ADD COLUMN IF NOT EXISTS category_id VARCHAR(64) NULL"),
       )
+      // One placement per subdivision — { subdivisionId: bandId } — so a member
+      // can sit on the main roster and on a unit at once. `category_id` is the
+      // older single placement, still read (as the main-roster band) until a row
+      // is next written.
+      .then(() =>
+        query("ALTER TABLE roster_member_fields ADD COLUMN IF NOT EXISTS placements JSONB NOT NULL DEFAULT '{}'::jsonb"),
+      )
       .catch((err) => {
         memberFieldsReady = null;
         throw err;
@@ -396,25 +421,72 @@ async function ensureMemberFieldsTable() {
 }
 
 /**
- * A department's per-member overlay, member id -> { values, categoryId }:
- * the hand-entered column values, and the band command placed them in.
+ * A department's per-member overlay, member id -> { values, placements }: the
+ * hand-entered column values, and the band command placed them in on each
+ * subdivision. A legacy single `category_id` (from before per-unit placement)
+ * is folded in as the main-roster placement when the row has no other.
  */
-async function loadMemberFields(deptId) {
+async function loadMemberFields(deptId, config = null) {
   try {
     await ensureMemberFieldsTable();
     const rows = await query(
-      "SELECT member_id, values, category_id FROM roster_member_fields WHERE department = $1",
+      "SELECT member_id, values, category_id, placements FROM roster_member_fields WHERE department = $1",
       [deptId],
     );
+    const mainId = config ? mainSubdivisionId(config) : null;
     return new Map(
-      rows.map((r) => [
-        String(r.member_id),
-        { values: r.values || {}, categoryId: r.category_id || null },
-      ]),
+      rows.map((r) => {
+        const placements =
+          r.placements && typeof r.placements === "object" && !Array.isArray(r.placements)
+            ? { ...r.placements }
+            : {};
+        if (Object.keys(placements).length === 0 && r.category_id && mainId) {
+          placements[mainId] = String(r.category_id);
+        }
+        return [String(r.member_id), { values: r.values || {}, placements }];
+      }),
     );
   } catch {
     return new Map();
   }
+}
+
+/** The stored placements for one member, or {} — same legacy fold-in as loadMemberFields. */
+async function loadMemberPlacements(deptId, memberId, config) {
+  const rows = await query(
+    "SELECT category_id, placements FROM roster_member_fields WHERE department = $1 AND member_id = $2",
+    [deptId, memberId],
+  );
+  const row = rows[0];
+  if (!row) return {};
+  const placements =
+    row.placements && typeof row.placements === "object" && !Array.isArray(row.placements)
+      ? { ...row.placements }
+      : {};
+  const mainId = mainSubdivisionId(config);
+  if (Object.keys(placements).length === 0 && row.category_id && mainId) {
+    placements[mainId] = String(row.category_id);
+  }
+  return placements;
+}
+
+/**
+ * Write one member's placement on one subdivision (null = remove). Writes the
+ * whole map so the legacy `category_id` is retired at the same time — otherwise
+ * clearing the last placement would let the old single band resurface.
+ */
+async function writeMemberPlacement(deptId, memberId, config, subdivisionId, categoryId) {
+  const placements = await loadMemberPlacements(deptId, memberId, config);
+  if (categoryId) placements[subdivisionId] = categoryId;
+  else delete placements[subdivisionId];
+  await query(
+    `INSERT INTO roster_member_fields (department, member_id, values, category_id, placements, updated_at)
+       VALUES ($1, $2, '{}'::jsonb, NULL, $3::jsonb, CURRENT_TIMESTAMP)
+     ON CONFLICT (department, member_id)
+       DO UPDATE SET category_id = NULL, placements = $3::jsonb, updated_at = CURRENT_TIMESTAMP`,
+    [deptId, memberId, JSON.stringify(placements)],
+  );
+  return placements;
 }
 
 // Fields the manual overlay must never touch — those come from the sync, the
@@ -434,7 +506,7 @@ function overlayMemberFields(member, values) {
   }
 }
 
-async function loadRosterAndMap(deptId, deptGuildId = "") {
+async function loadRosterAndMap(deptId, deptGuildId = "", config = null) {
   let roster = rosterSeed.filter((entry) => entry.department === deptId);
   let roleMap = ROLE_MAP.filter((role) => role.department === deptId);
   try {
@@ -528,14 +600,14 @@ async function loadRosterAndMap(deptId, deptGuildId = "") {
       }
       // Fill in the hand-entered column values (hire date, troop, dates, …) for
       // every member who has any, synced or manual alike.
-      const fieldsMap = await loadMemberFields(deptId);
+      const fieldsMap = await loadMemberFields(deptId, config);
       if (fieldsMap.size) {
         for (const member of built) {
           const stored = fieldsMap.get(member.id);
           if (!stored) continue;
           overlayMemberFields(member, stored.values);
-          // The band command placed them in; absent means Unassigned.
-          if (stored.categoryId) member.categoryId = stored.categoryId;
+          // The band command placed them in on each roster; absent means Unassigned.
+          if (Object.keys(stored.placements).length) member.placements = stored.placements;
         }
       }
       roster = built;
@@ -554,7 +626,7 @@ router.get(
     // Opening a department roster nudges a throttled Discord refresh, so it
     // populates on its own once the department's roles are mapped.
     maybeSyncRoster();
-    const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId);
+    const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId, req.deptConfig);
     res.json({ subdivisions: projectRoster(req.deptConfig, roster, roleMap) });
   },
 );
@@ -657,10 +729,23 @@ router.post(
   "/:deptId/roster/member-fields",
   requirePermission("departments.view"),
   withDepartment,
-  requireCapability("editRoster"),
   async (req, res) => {
     const memberId = str(req.body?.memberId).slice(0, 64);
     if (!memberId) return res.status(400).json({ ok: false, message: "A member is required." });
+
+    // editRoster covers everyone; a unit editor may only touch members currently
+    // placed on a unit they run.
+    if (!req.deptCapabilities.has("editRoster")) {
+      let placements = {};
+      try {
+        await ensureMemberFieldsTable();
+        placements = await loadMemberPlacements(req.departmentId, memberId, req.deptConfig);
+      } catch {
+        placements = {};
+      }
+      const onMyUnit = [...req.deptUnitEdits].some((subId) => placements[subId]);
+      if (!onMyUnit) return res.status(403).json(UNIT_FORBIDDEN);
+    }
 
     // Only columns this department actually defines are allowed — and never the
     // reserved ones the sync owns.
@@ -694,38 +779,38 @@ router.post(
 );
 
 /**
- * Place one member into a roster band, or back into Unassigned (empty
- * categoryId). Placement is entirely manual — nothing is inferred from rank —
- * so this is the only way a member moves between bands. The band must exist on
- * one of this department's rosters. Gated on the department's editRoster
- * capability.
+ * Place one member into a band on one subdivision, or take them off it (empty
+ * categoryId). Placement is entirely manual — nothing is inferred from rank — so
+ * this is the only way a member moves between bands. Each subdivision holds its
+ * own placement, so putting someone on SWAT never touches their spot on the main
+ * roster. Allowed with the department's editRoster capability, or for a named
+ * editor of that unit.
  */
 router.post(
   "/:deptId/roster/member-band",
   requirePermission("departments.view"),
   withDepartment,
-  requireCapability("editRoster"),
   async (req, res) => {
     const memberId = str(req.body?.memberId).slice(0, 64);
     if (!memberId) return res.status(400).json({ ok: false, message: "A member is required." });
+    const subs = req.deptConfig?.roster?.subdivisions ?? [];
+    // An older client sends no subdivision: that always meant the main roster.
+    const subdivisionId = str(req.body?.subdivisionId).slice(0, 64) || mainSubdivisionId(req.deptConfig);
+    const sub = subs.find((entry) => entry.id === subdivisionId);
+    if (!sub) return res.status(400).json({ ok: false, message: "No such roster." });
+    if (!mayEditUnit(req, sub.id)) return res.status(403).json(UNIT_FORBIDDEN);
+
     const wanted = str(req.body?.categoryId).slice(0, 64);
-    const bands = new Set(
-      (req.deptConfig?.roster?.subdivisions ?? []).flatMap((s) => (s.categories ?? []).map((c) => c.id)),
-    );
-    if (wanted && !bands.has(wanted)) {
+    if (wanted && !(sub.categories ?? []).some((c) => c.id === wanted)) {
       return res.status(400).json({ ok: false, message: "No such band on this roster." });
     }
     const categoryId = wanted || null;
     try {
       await ensureMemberFieldsTable();
-      await query(
-        `INSERT INTO roster_member_fields (department, member_id, values, category_id, updated_at)
-           VALUES ($1, $2, '{}'::jsonb, $3, CURRENT_TIMESTAMP)
-         ON CONFLICT (department, member_id)
-           DO UPDATE SET category_id = $3, updated_at = CURRENT_TIMESTAMP`,
-        [req.departmentId, memberId, categoryId],
+      const placements = await writeMemberPlacement(
+        req.departmentId, memberId, req.deptConfig, sub.id, categoryId,
       );
-      return res.json({ ok: true, categoryId });
+      return res.json({ ok: true, subdivisionId: sub.id, categoryId, placements });
     } catch {
       return res.status(500).json({ ok: false, message: "Could not place the member." });
     }
@@ -746,29 +831,25 @@ router.post(
   requireCapability("editRoster"),
   async (req, res) => {
     try {
-      const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId);
+      const { roster, roleMap } = await loadRosterAndMap(req.departmentId, req.deptConfig.guildId, req.deptConfig);
       const subs = req.deptConfig?.roster?.subdivisions ?? [];
-      const main = subs.find((s) => s.main) ?? subs[0];
+      const mainId = mainSubdivisionId(req.deptConfig);
+      const main = subs.find((entry) => entry.id === mainId);
       const bands = main?.categories ?? [];
+      if (!main) return res.status(400).json({ ok: false, message: "This department has no main roster." });
       await ensureMemberFieldsTable();
 
       let filled = 0;
       let skipped = 0;
       for (const member of roster) {
-        if (member.categoryId) continue; // already placed by hand — leave it
+        if (placementFor(member, mainId)) continue; // already placed by hand — leave it
         const key = roleKeyFor(member, roleMap);
         const band = key ? bands.find((c) => (c.roleKeys ?? []).includes(key)) : null;
         if (!band) {
           skipped += 1;
           continue;
         }
-        await query(
-          `INSERT INTO roster_member_fields (department, member_id, values, category_id, updated_at)
-             VALUES ($1, $2, '{}'::jsonb, $3, CURRENT_TIMESTAMP)
-           ON CONFLICT (department, member_id)
-             DO UPDATE SET category_id = $3, updated_at = CURRENT_TIMESTAMP`,
-          [req.departmentId, member.id, band.id],
-        );
+        await writeMemberPlacement(req.departmentId, member.id, req.deptConfig, mainId, band.id);
         filled += 1;
       }
       return res.json({ ok: true, filled, skipped });
@@ -870,7 +951,7 @@ router.get("/:deptId/public", async (req, res) => {
   const config = await loadConfig(id);
   if (!config) return res.status(404).json({ ok: false, message: `No department "${id}".` });
 
-  const { roster, roleMap } = await loadRosterAndMap(id, config.guildId);
+  const { roster, roleMap } = await loadRosterAndMap(id, config.guildId, config);
 
   // The rank ladder is every rank mapped to this department, highest first.
   const ranks = roleMap
@@ -1088,6 +1169,45 @@ router.put(
       });
     }
     await saveConfig(req, res, merged, "access.save", "Changed who may manage this site.");
+  },
+);
+
+/**
+ * Who may arrange each unit roster, by Discord id — { subdivisionId: [ids] }.
+ * Split out like the access table so granting a subdivision head their unit
+ * never rewrites anything else, and so it needs manageAccess rather than the
+ * whole Builder. Units not named in the body keep their current editors.
+ */
+router.put(
+  "/:deptId/unit-editors",
+  requirePermission("departments.view"),
+  withDepartment,
+  requireCapability("manageAccess"),
+  async (req, res) => {
+    const incoming = req.body?.editors;
+    if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+      return res.status(400).json({ ok: false, errors: ["An editors map is required."] });
+    }
+    const subs = req.deptConfig.roster.subdivisions;
+    const unknown = Object.keys(incoming).filter((subId) => !subs.some((sub) => sub.id === subId));
+    if (unknown.length) {
+      return res.status(400).json({ ok: false, errors: [`No such unit: ${unknown.join(", ")}.`] });
+    }
+    const merged = normalizeConfig(
+      {
+        ...req.deptConfig,
+        roster: {
+          ...req.deptConfig.roster,
+          subdivisions: subs.map((sub) =>
+            sub.id in incoming
+              ? { ...sub, editorIds: Array.isArray(incoming[sub.id]) ? incoming[sub.id] : [] }
+              : sub,
+          ),
+        },
+      },
+      req.departmentId,
+    );
+    await saveConfig(req, res, merged, "access.units", "Changed who may arrange the unit rosters.");
   },
 );
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, SlidersHorizontal, Sparkles, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ListOrdered, Pencil, Plus, Search, SlidersHorizontal, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -49,7 +49,7 @@ const RESERVED_FIELD_IDS = new Set([
  */
 export default function DeptRoster({ page, config }) {
   const { hasPermission } = useAuth();
-  const { id, can, mutate } = useDeptConfig();
+  const { id, can, canEditUnit, mutate } = useDeptConfig();
   const canEditRoster = can("editRoster");
   const [managing, setManaging] = useState(null); // "new" | member row | null
   const [rankOpen, setRankOpen] = useState(false);
@@ -59,6 +59,7 @@ export default function DeptRoster({ page, config }) {
   const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState(null);
   const [editingFields, setEditingFields] = useState(null); // member whose columns are being edited
+  const [addingToUnit, setAddingToUnit] = useState(false);
   const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -121,6 +122,12 @@ export default function DeptRoster({ page, config }) {
   // Derived rather than reset in an effect, so switching department renders the
   // new department's first unit instead of the old department's selection.
   const active = subdivisions.find((sub) => sub.id === activeId) ?? subdivisions[0] ?? null;
+  const main = subdivisions.find((sub) => sub.main) ?? subdivisions[0] ?? null;
+  const isMainView = !active || !main || active.id === main.id;
+  // Arranging the roster being viewed: department-wide editRoster, or being a
+  // named editor of this unit (set by command on the Access page). A unit editor
+  // gets the band/columns controls on their own unit's tab only.
+  const canEditActive = !!active && canEditUnit(active.id);
 
   const canEditStatus = hasPermission("roster.edit_status");
   const canManageLoa = hasPermission("roster.manage_loa");
@@ -136,9 +143,9 @@ export default function DeptRoster({ page, config }) {
   // The bands a member can be placed into: the configured categories of the
   // roster being viewed (never the synthetic "Unassigned" the projection adds).
   const bandOptions = useMemo(() => {
-    const configSub = (config.roster?.subdivisions ?? []).find((s) => s.id === activeId) ?? (config.roster?.subdivisions ?? [])[0];
+    const configSub = (config.roster?.subdivisions ?? []).find((s) => s.id === active?.id);
     return (configSub?.categories ?? []).filter((c) => !c.unassigned).map((c) => ({ id: c.id, name: c.name }));
-  }, [config, activeId]);
+  }, [config, active?.id]);
   const stats = config.roster.stats;
 
   const everyone = useMemo(
@@ -295,7 +302,7 @@ export default function DeptRoster({ page, config }) {
     // edited by hand — synced members included, since those columns are the
     // department's own overlay rather than anything Discord owns. A hand-added
     // (manual) member additionally has its identity editable and can be removed.
-    ...(canEditRoster
+    ...(canEditActive
       ? [
           {
             key: "manage",
@@ -314,7 +321,7 @@ export default function DeptRoster({ page, config }) {
                     <SlidersHorizontal className="size-3.5" />
                   </button>
                 )}
-                {member.source === "manual" && (
+                {canEditRoster && member.source === "manual" && (
                   <>
                     <button
                       type="button"
@@ -410,7 +417,7 @@ export default function DeptRoster({ page, config }) {
             Rank order
           </Button>
         )}
-        {canEditRoster && bandOptions.length > 0 && (
+        {canEditRoster && isMainView && bandOptions.length > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -428,6 +435,12 @@ export default function DeptRoster({ page, config }) {
             Add member
           </Button>
         )}
+        {canEditActive && !isMainView && bandOptions.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setAddingToUnit(true)}>
+            <UserPlus className="size-4" />
+            Add to {active.name}
+          </Button>
+        )}
       </div>
 
       {notice && (
@@ -436,7 +449,17 @@ export default function DeptRoster({ page, config }) {
         </Card>
       )}
 
-      {everyone.length === 0 ? (
+      {everyone.length === 0 && !isMainView ? (
+        <Card className="p-10 text-center">
+          <Users className="mx-auto size-8 text-slate-600" />
+          <p className="mt-3 text-sm text-slate-400">
+            Nobody has been placed on {active?.name ?? "this unit"} yet.
+            {canEditActive && bandOptions.length > 0
+              ? " Use “Add to unit” to place members from the main roster into its bands."
+              : ""}
+          </p>
+        </Card>
+      ) : everyone.length === 0 ? (
         <Card className="p-10 text-center">
           <Users className="mx-auto size-8 text-slate-600" />
           <p className="mt-3 text-sm text-slate-400">
@@ -483,9 +506,27 @@ export default function DeptRoster({ page, config }) {
         />
       )}
 
-      {editingFields && (
+      {addingToUnit && active && main && (
+        <AddToUnitModal
+          deptId={id}
+          unit={active}
+          bands={bandOptions}
+          candidates={(main.categories ?? [])
+            .flatMap((category) => category.members)
+            .filter((member) => !everyone.some((placed) => placed.id === member.id))}
+          onClose={() => setAddingToUnit(false)}
+          onSaved={() => {
+            setAddingToUnit(false);
+            setReloadKey((key) => key + 1);
+          }}
+        />
+      )}
+
+      {editingFields && active && (
         <MemberFieldsModal
           deptId={id}
+          subdivisionId={active.id}
+          unit={!isMainView}
           member={editingFields}
           fields={editableFields}
           bands={bandOptions}
@@ -510,9 +551,10 @@ export default function DeptRoster({ page, config }) {
  * date, a dropdown for a select, a toggle for a checkbox/cert, text otherwise.
  * Works for any member on the roster, synced or manual.
  */
-function MemberFieldsModal({ deptId, member, fields, bands = [], onClose, onSaved }) {
-  // Which band the member sits in. Placement is manual — a synced member
-  // starts Unassigned and stays there until command places them here.
+function MemberFieldsModal({ deptId, subdivisionId, unit = false, member, fields, bands = [], onClose, onSaved }) {
+  // Which band the member sits in *on this roster*. Placement is manual — a
+  // synced member starts Unassigned and stays there until command places them;
+  // on a unit roster, clearing the band takes them off the unit.
   const [band, setBand] = useState(member.categoryId ?? "");
   const [values, setValues] = useState(() => {
     const initial = {};
@@ -534,7 +576,7 @@ function MemberFieldsModal({ deptId, member, fields, bands = [], onClose, onSave
     setSaving(true);
     try {
       if (band !== (member.categoryId ?? "")) {
-        const placed = await api.setMemberBand(deptId, member.id, band || null);
+        const placed = await api.setMemberBand(deptId, member.id, subdivisionId, band || null);
         if (placed?.ok === false) {
           setError(placed.message || "Could not place the member.");
           setSaving(false);
@@ -563,12 +605,23 @@ function MemberFieldsModal({ deptId, member, fields, bands = [], onClose, onSave
       ) : (
         <form onSubmit={submit} className="space-y-4">
           {bands.length > 0 && (
-            <Field label="Band" htmlFor="mf-band" hint="Where this member sits on the roster. New members start Unassigned.">
+            <Field
+              label="Band"
+              htmlFor="mf-band"
+              hint={
+                unit
+                  ? "Where this member sits on this unit. “Not on this unit” removes them from it; their main-roster spot is unchanged."
+                  : "Where this member sits on the roster. New members start Unassigned."
+              }
+            >
               <Select
                 id="mf-band"
                 value={band}
                 onChange={setBand}
-                options={[{ value: "", label: "Unassigned" }, ...bands.map((b) => ({ value: b.id, label: b.name }))]}
+                options={[
+                  { value: "", label: unit ? "Not on this unit" : "Unassigned" },
+                  ...bands.map((b) => ({ value: b.id, label: b.name })),
+                ]}
               />
             </Field>
           )}
@@ -624,6 +677,113 @@ function MemberFieldsModal({ deptId, member, fields, bands = [], onClose, onSave
           </div>
         </form>
       )}
+    </Modal>
+  );
+}
+
+/**
+ * Put a department member onto a unit roster: pick them from everyone on the
+ * main roster who is not on this unit yet, choose the band, save. Their spot on
+ * the main roster is untouched — a unit placement sits on top of it.
+ */
+function AddToUnitModal({ deptId, unit, bands, candidates, onClose, onSaved }) {
+  const [search, setSearch] = useState("");
+  const [memberId, setMemberId] = useState("");
+  const [band, setBand] = useState(bands[0]?.id ?? "");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const shown = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    const rows = needle
+      ? candidates.filter((member) =>
+          [member.characterName, member.displayName, member.callsign, member.rankFull, member.rank]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(needle)),
+        )
+      : candidates;
+    return rows.slice(0, 60);
+  }, [candidates, search]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!memberId || !band) return;
+    setError("");
+    setSaving(true);
+    try {
+      const result = await api.setMemberBand(deptId, memberId, unit.id, band);
+      if (result?.ok === false) {
+        setError(result.message || "Could not place the member.");
+        setSaving(false);
+        return;
+      }
+      onSaved();
+    } catch (err) {
+      setError(err?.message || "Could not place the member.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Add to ${unit.name}`} subtitle="Pick a member and the band they join" className="max-w-lg">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+          <TextInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, rank or callsign…"
+            className="pl-9"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto rounded-xl ring-1 ring-inset ring-white/[0.06]">
+          {shown.length === 0 ? (
+            <p className="p-4 text-sm text-slate-500">
+              {candidates.length === 0 ? "Everyone on the main roster is already on this unit." : "Nobody matches that search."}
+            </p>
+          ) : (
+            shown.map((member) => {
+              const selected = member.id === memberId;
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => setMemberId(member.id)}
+                  className={
+                    selected
+                      ? "dept-accent-tile flex w-full items-center gap-3 px-3 py-2 text-left"
+                      : "flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-white/[0.04]"
+                  }
+                >
+                  <span className="w-16 shrink-0 text-xs font-bold text-slate-400">{member.callsign || "—"}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-white">{member.characterName}</span>
+                    <span className="block truncate text-xs text-slate-500">{member.rankFull || member.rank}</span>
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+        <Field label="Band" htmlFor="atu-band">
+          <Select
+            id="atu-band"
+            value={band}
+            onChange={setBand}
+            options={bands.map((b) => ({ value: b.id, label: b.name }))}
+          />
+        </Field>
+        {error && <p className="text-sm font-semibold text-rose-300">{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={saving || !memberId || !band}>
+            {saving ? "Adding…" : "Add to unit"}
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 }

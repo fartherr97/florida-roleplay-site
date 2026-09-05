@@ -69,16 +69,17 @@ export function projectSubdivision(subdivision, members, roleMap, rankOrder = nu
   });
 
   // Placement is manual: a member sits in the band command placed them in
-  // (member.categoryId), full stop. Nothing is inferred from their rank — that
-  // inference drifted with every label change and stranded people, so the rank
-  // now only decides the order *within* a band.
+  // (member.categoryId, already resolved for *this* subdivision by projectRoster),
+  // full stop. Nothing is inferred from their rank — that inference drifted with
+  // every label change and stranded people, so the rank now only decides the
+  // order *within* a band.
   const categories = (subdivision.categories || []).map((category) => ({
     ...category,
     members: sortMembers(withRole.filter((entry) => entry.categoryId === category.id)),
   }));
 
-  // On the main roster, everyone not placed into any band in the department
-  // waits in "Unassigned" until command places them.
+  // On the main roster, everyone not placed into one of its bands waits in
+  // "Unassigned" until command places them.
   if (options.unassignedBand) {
     const known =
       options.knownCategoryIds ?? new Set((subdivision.categories || []).map((c) => c.id));
@@ -108,33 +109,52 @@ function sortMembers(rows) {
   );
 }
 
+/** The id of the department's main roster: the one flagged `main`, else the first. */
+export function mainSubdivisionId(config) {
+  const subs = config?.roster?.subdivisions || [];
+  return (subs.find((s) => s.main) ?? subs[0])?.id ?? null;
+}
+
+/** Which band a member is placed in on one subdivision, or null. */
+export function placementFor(entry, subdivisionId) {
+  const placements = entry?.placements;
+  if (!placements || typeof placements !== "object") return null;
+  const band = placements[subdivisionId];
+  return band ? String(band) : null;
+}
+
 /**
  * The full projection for a department: every subdivision with its categories
- * filled in. A subdivision naming `roleKeys` takes only those ranks; the main
- * roster takes everyone in the department.
+ * filled in.
+ *
+ * A member carries one placement per subdivision (`member.placements`, a map of
+ * subdivision id to band id), so someone can be a Trooper on the main roster
+ * *and* an Operator on SWAT. The main roster shows everyone in the department —
+ * anyone not placed into one of its bands sits in "Unassigned" — while a unit
+ * roster shows only the members placed into one of its own bands.
  */
 export function projectRoster(config, roster, roleMap) {
   const members = (roster || []).filter((entry) => entry.department === config.id);
   const rankOrder = config.roster?.rankOrder || null;
   const subdivisions = config.roster?.subdivisions || [];
-  const knownCategoryIds = new Set(subdivisions.flatMap((s) => (s.categories || []).map((c) => c.id)));
-  const mainId = (subdivisions.find((s) => s.main) ?? subdivisions[0])?.id;
+  const mainId = mainSubdivisionId(config);
   return subdivisions.map((subdivision) => {
     const own = new Set((subdivision.categories || []).map((c) => c.id));
     const isMain = subdivision.id === mainId;
-    // The main roster holds its own bands plus everyone not yet placed anywhere;
-    // a unit roster (say, SWAT) shows only the members placed into its own bands.
-    const scoped = isMain
-      ? members.filter(
-          (entry) =>
-            !entry.categoryId || own.has(entry.categoryId) || !knownCategoryIds.has(entry.categoryId),
-        )
-      : members.filter((entry) => own.has(entry.categoryId));
+    // Resolve each member's band *on this subdivision*; a placement naming a band
+    // that no longer exists here counts as none.
+    const placed = members.map((entry) => {
+      const band = placementFor(entry, subdivision.id);
+      return { ...entry, categoryId: band && own.has(band) ? band : null };
+    });
+    // The main roster holds everyone (Unassigned catches the unplaced); a unit
+    // roster (say, SWAT) shows only the members placed into its own bands.
+    const scoped = isMain ? placed : placed.filter((entry) => entry.categoryId);
     return {
       ...subdivision,
       categories: projectSubdivision(subdivision, scoped, roleMap, rankOrder, {
         unassignedBand: isMain,
-        knownCategoryIds,
+        knownCategoryIds: own,
       }),
       total: scoped.length,
     };

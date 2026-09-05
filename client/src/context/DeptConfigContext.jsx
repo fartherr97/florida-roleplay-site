@@ -27,7 +27,13 @@ export function DeptConfigProvider({ id, children }) {
   // Results are stamped with the id they were fetched for, so switching
   // departments derives "loading" during render rather than needing an effect to
   // reset state — which would render the previous department's config first.
-  const [loaded, setLoaded] = useState({ id: null, config: null, capabilities: [], error: null });
+  const [loaded, setLoaded] = useState({
+    id: null,
+    config: null,
+    capabilities: [],
+    unitEdits: [],
+    error: null,
+  });
   const [draft, setDraft] = useState({ id: null, config: null });
   const [history, setHistory] = useState([]);
   const [reloadKey, setReloadKey] = useState(0);
@@ -41,13 +47,17 @@ export function DeptConfigProvider({ id, children }) {
       .then((result) => {
         if (!active) return;
         if (!result?.config) {
-          setLoaded({ id, config: null, capabilities: [], error: "not-found" });
+          setLoaded({ id, config: null, capabilities: [], unitEdits: [], error: "not-found" });
           return;
         }
         setLoaded({
           id,
           config: normalizeConfig(result.config, id),
           capabilities: result.capabilities ?? [],
+          // The unit rosters the caller may arrange — resolved server-side, like
+          // capabilities, so a subdivision head sees exactly the controls the API
+          // would accept.
+          unitEdits: result.unitEdits ?? [],
           error: null,
         });
       })
@@ -57,6 +67,7 @@ export function DeptConfigProvider({ id, children }) {
           id,
           config: null,
           capabilities: [],
+          unitEdits: [],
           error: err instanceof ApiForbiddenError ? "forbidden" : "error",
         });
       });
@@ -75,6 +86,7 @@ export function DeptConfigProvider({ id, children }) {
     () => new Set(fresh ? loaded.capabilities : []),
     [fresh, loaded.capabilities],
   );
+  const unitEdits = useMemo(() => new Set(fresh ? loaded.unitEdits : []), [fresh, loaded.unitEdits]);
 
   const flush = useCallback(
     (next) => {
@@ -173,6 +185,8 @@ export function DeptConfigProvider({ id, children }) {
       error: fresh ? loaded.error : null,
       capabilities,
       can: (capability) => capabilities.has(capability),
+      /** Whether the caller may arrange one unit roster: editRoster, or a named unit editor. */
+      canEditUnit: (subdivisionId) => capabilities.has("editRoster") || unitEdits.has(subdivisionId),
       mutate,
       savePage,
       undo,
@@ -197,6 +211,7 @@ export function DeptConfigProvider({ id, children }) {
       save.state,
       savePage,
       undo,
+      unitEdits,
     ],
   );
 

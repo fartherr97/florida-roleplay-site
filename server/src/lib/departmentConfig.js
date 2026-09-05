@@ -152,6 +152,20 @@ export function accessLevelFor(config, roleKeys = [], permissions = new Set()) {
     .reduce((max, grant) => Math.max(max, grant.level ?? 0), -1);
 }
 
+/**
+ * The subdivisions (unit rosters) a caller may arrange: every one of them when
+ * they hold the department-wide editRoster capability, otherwise just the units
+ * whose `editorIds` name their Discord id. The server sends this list with the
+ * config; the client never recomputes it from roles.
+ */
+export function unitEditsFor(config, userId, capabilities = new Set()) {
+  const subs = config?.roster?.subdivisions || [];
+  if (capabilities.has("editRoster")) return new Set(subs.map((sub) => sub.id));
+  const id = String(userId ?? "");
+  if (!id) return new Set();
+  return new Set(subs.filter((sub) => (sub.editorIds || []).includes(id)).map((sub) => sub.id));
+}
+
 /* ------------------------------------------------------------------ *
  * Pages
  * ------------------------------------------------------------------ */
@@ -312,6 +326,17 @@ function normalizeRankOrder(raw) {
   return out;
 }
 
+/** A de-duplicated list of Discord snowflakes; anything else is dropped. */
+function normalizeIdList(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const value of raw) {
+    const id = String(value ?? "").trim();
+    if (/^\d{17,20}$/.test(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 export function normalizeConfig(raw, id) {
   const config = raw && typeof raw === "object" ? raw : {};
   const branding = config.branding || {};
@@ -416,6 +441,11 @@ export function normalizeConfig(raw, id) {
           // Which role keys from ROLE_MAP land in this subdivision. Empty on the
           // main roster means "every role mapped to this department".
           roleKeys: Array.isArray(sub.roleKeys) ? sub.roleKeys.map(String) : [],
+          // Discord user ids allowed to arrange *this unit's* roster — place members
+          // into its bands and edit their columns — without holding the department-
+          // wide editRoster capability. Set by command on the Access page, so a
+          // subdivision head can run their own unit.
+          editorIds: normalizeIdList(sub.editorIds),
           categories: (Array.isArray(sub.categories) ? sub.categories : []).map(
             (cat, catIndex) => ({
               id: String(cat.id ?? `cat-${catIndex}`),

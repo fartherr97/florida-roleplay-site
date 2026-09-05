@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { Check, Plus, ShieldAlert, Trash2, Users, X } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Field from "../../components/ui/Field";
 import Select from "../../components/ui/Select";
+import { TextInput } from "../../components/ui/TextInput";
 import DeptPageHeader from "../../components/dept/DeptPageHeader";
 import { useAuth } from "../../context/useAuth";
 import { useDeptConfig } from "../../context/useDeptConfig";
@@ -28,10 +29,11 @@ import { cn } from "../../lib/cn";
  */
 export default function DeptAccess({ page, config }) {
   const { user } = useAuth();
-  const { can, mutate, saveMessage, saveState } = useDeptConfig();
+  const { id, can, reload, saveMessage, saveState } = useDeptConfig();
   const [roles, setRoles] = useState([]);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -59,6 +61,28 @@ export default function DeptAccess({ page, config }) {
     return [...mine, ...others].filter((role) => !grantedKeys.has(role.key));
   }, [config.id, grantedKeys, roles]);
 
+  // Saved through the access endpoint rather than the whole-config save: that
+  // one needs the full Builder ("manage"), while this page is open to anyone
+  // with "manageAccess" — the narrower route is the one they are allowed to hit.
+  const saveAccess = async (next) => {
+    setSaving(true);
+    setError("");
+    try {
+      const result = await api.saveDeptAccess(id, next);
+      if (result?.ok === false) {
+        setError(result.errors?.join(" ") || result.message || "That change was rejected.");
+        return false;
+      }
+      reload();
+      return true;
+    } catch (err) {
+      setError(err?.errors?.join(" ") || err?.message || "That change was rejected.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const update = (roleKey, changes) => {
     setError("");
     const next = grants.map((grant) =>
@@ -68,7 +92,7 @@ export default function DeptAccess({ page, config }) {
       setError("Someone has to be able to manage this site — otherwise nobody could undo it.");
       return;
     }
-    mutate((current) => ({ ...current, access: next }));
+    saveAccess(next);
   };
 
   const remove = (roleKey) => {
@@ -78,29 +102,26 @@ export default function DeptAccess({ page, config }) {
       setError("That would leave nobody able to manage this site.");
       return;
     }
-    mutate((current) => ({ ...current, access: next }));
+    saveAccess(next);
   };
 
-  const add = (roleKey, label, grantLevel) => {
-    mutate((current) => ({
-      ...current,
-      access: [
-        ...(current.access ?? []),
-        {
-          roleKey,
-          label,
-          level: grantLevel,
-          manage: false,
-          editRoster: false,
-          editStructure: false,
-          manageCalendar: false,
-          manageLog: false,
-          manageAccess: false,
-          viewAudit: true,
-        },
-      ],
-    }));
-    setAdding(false);
+  const add = async (roleKey, label, grantLevel) => {
+    const ok = await saveAccess([
+      ...grants,
+      {
+        roleKey,
+        label,
+        level: grantLevel,
+        manage: false,
+        editRoster: false,
+        editStructure: false,
+        manageCalendar: false,
+        manageLog: false,
+        manageAccess: false,
+        viewAudit: true,
+      },
+    ]);
+    if (ok) setAdding(false);
   };
 
   return (
@@ -182,7 +203,7 @@ export default function DeptAccess({ page, config }) {
                         <button
                           key={capability.key}
                           type="button"
-                          disabled={locked}
+                          disabled={locked || saving}
                           onClick={() => update(grant.roleKey, { [capability.key]: !on })}
                           title={capability.detail}
                           className={cn(
@@ -216,7 +237,170 @@ export default function DeptAccess({ page, config }) {
             })}
         </div>
       )}
+
+      <UnitEditors config={config} deptId={id} editable={editable} onSaved={reload} />
     </>
+  );
+}
+
+/**
+ * Who may arrange each unit roster, by Discord user id.
+ *
+ * A subdivision head usually holds no department-wide capability — they run one
+ * unit, not the roster. Naming their Discord id on their unit lets them place
+ * members into its bands and edit those members' columns from the unit's own
+ * tab, and nothing else. Saved on its own endpoint (manageAccess), like the
+ * grants above.
+ */
+function UnitEditors({ config, deptId, editable, onSaved }) {
+  const subdivisions = config.roster?.subdivisions ?? [];
+  const mainId = (subdivisions.find((sub) => sub.main) ?? subdivisions[0])?.id;
+  const units = subdivisions.filter((sub) => sub.id !== mainId);
+  const [names, setNames] = useState({});
+  const [drafts, setDrafts] = useState({});
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+
+  // Names for the ids, so a pasted snowflake reads as a person once saved.
+  useEffect(() => {
+    let active = true;
+    api.deptRoster(deptId).then((result) => {
+      if (!active) return;
+      const map = {};
+      for (const sub of result?.subdivisions ?? []) {
+        for (const category of sub.categories ?? []) {
+          for (const member of category.members ?? []) {
+            if (member.discordId && /^\d{17,20}$/.test(member.discordId)) {
+              map[member.discordId] = member.characterName || member.displayName;
+            }
+          }
+        }
+      }
+      setNames(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [deptId]);
+
+  const save = async (subId, ids) => {
+    setBusy(subId);
+    setError("");
+    try {
+      const result = await api.saveDeptUnitEditors(deptId, { [subId]: ids });
+      if (result?.ok === false) {
+        setError(result.errors?.join(" ") || result.message || "Could not save the unit editors.");
+        return;
+      }
+      setDrafts((d) => ({ ...d, [subId]: "" }));
+      onSaved();
+    } catch (err) {
+      setError(err?.errors?.join(" ") || err?.message || "Could not save the unit editors.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const addIds = (sub) => {
+    const pasted = String(drafts[sub.id] ?? "")
+      .split(/[\s,;]+/)
+      .map((v) => v.replace(/[<@!>]/g, "").trim())
+      .filter(Boolean);
+    const valid = pasted.filter((v) => /^\d{17,20}$/.test(v));
+    if (valid.length === 0) {
+      setError("Paste one or more Discord user ids (17–20 digits).");
+      return;
+    }
+    save(sub.id, [...new Set([...(sub.editorIds ?? []), ...valid])]);
+  };
+
+  return (
+    <Card className="mt-8 p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Users className="size-4 text-slate-400" />
+        <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Unit roster editors</h3>
+      </div>
+      <p className="mb-4 text-sm text-slate-400">
+        Let a subdivision head run their own unit tab without department-wide roster access. Paste
+        their Discord user id under the unit; they can then place members into that unit's bands and
+        edit those members' columns, and nothing else. Anyone with “Arrange the roster” above already
+        covers every unit.
+      </p>
+
+      {error && (
+        <p className="mb-4 rounded-xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-inset ring-rose-400/25">
+          {error}
+        </p>
+      )}
+
+      {units.length === 0 ? (
+        <p className="text-sm text-slate-500">
+          This department has no unit rosters yet. Add one under Roster → “Add a unit” in the Builder.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {units.map((sub) => {
+            const ids = sub.editorIds ?? [];
+            return (
+              <div key={sub.id} className="rounded-2xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.06]">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-white">{sub.name}</span>
+                  <Badge tone="slate">{ids.length === 1 ? "1 editor" : `${ids.length} editors`}</Badge>
+                </div>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {ids.length === 0 && (
+                    <span className="text-xs text-slate-500">Nobody yet — only department roster editors can arrange this unit.</span>
+                  )}
+                  {ids.map((uid) => (
+                    <span
+                      key={uid}
+                      className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] py-1 pl-3 pr-1.5 text-xs ring-1 ring-inset ring-white/[0.08]"
+                    >
+                      <span className="font-semibold text-slate-200">{names[uid] || "Unknown member"}</span>
+                      <code className="text-[11px] text-slate-500">{uid}</code>
+                      {editable && (
+                        <button
+                          type="button"
+                          disabled={busy === sub.id}
+                          onClick={() => save(sub.id, ids.filter((v) => v !== uid))}
+                          aria-label={`Remove ${names[uid] || uid} from ${sub.name} editors`}
+                          className="grid size-5 place-items-center rounded-full text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                {editable && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <Field label="Discord user id(s)" htmlFor={`ue-${sub.id}`} className="min-w-64 flex-1">
+                      <TextInput
+                        id={`ue-${sub.id}`}
+                        value={drafts[sub.id] ?? ""}
+                        onChange={(e) => setDrafts((d) => ({ ...d, [sub.id]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addIds(sub);
+                          }
+                        }}
+                        placeholder="Paste one or more ids, separated by spaces or commas"
+                        className="h-10"
+                      />
+                    </Field>
+                    <Button size="sm" disabled={busy === sub.id || !(drafts[sub.id] ?? "").trim()} onClick={() => addIds(sub)}>
+                      <Plus className="size-4" />
+                      {busy === sub.id ? "Saving…" : "Add"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 
