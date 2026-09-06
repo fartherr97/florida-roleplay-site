@@ -29,6 +29,7 @@ import { permissionsFor } from "../permissions.js";
 import { mainSubdivisionId, placementFor, projectRoster, roleKeyFor } from "../lib/deptRoster.js";
 import { maybeSyncRoster, parseNick } from "../lib/rosterSync.js";
 import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
+import { fetchDeptDutyHours } from "../lib/dutyHours.js";
 import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
 import { resolveDepartmentId } from "../lib/tenant.js";
 import { collect, str } from "../validate.js";
@@ -1042,6 +1043,28 @@ router.get(
       );
     } catch {
       res.json([]);
+    }
+  },
+);
+
+/* ---- Live duty hours from the FiveM server ------------------------------ */
+// GET /:deptId/duty-hours — the department's aggregated on-duty time, straight
+// from the game (flrp_api /duty/hours), so the Hours page shows live data with
+// ranks, subdivisions and per-member totals. Anyone who can view the department
+// can see it; it never writes.
+router.get(
+  "/:deptId/duty-hours",
+  requirePermission("departments.view"),
+  withDepartment,
+  async (req, res) => {
+    try {
+      const from = Number(req.query.from);
+      const to = Number(req.query.to);
+      const range = Number.isFinite(from) && Number.isFinite(to) ? { from, to } : undefined;
+      res.json(await fetchDeptDutyHours(req.departmentId, range));
+    } catch (err) {
+      res.json({ ok: false, code: "DUTY_HOURS_ERROR", message: err.message,
+        department: null, members: [], ranks: [], subdivisions: [] });
     }
   },
 );
