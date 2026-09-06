@@ -19,6 +19,7 @@ import { query, execute } from "../db.js";
 import { fivemConfigSeed } from "../fivemSeed.js";
 import { attachUser } from "../middleware/requireRole.js";
 import { requirePermission } from "../middleware/requirePermission.js";
+import { ingestSession, ingestSessions, setLive } from "../lib/dutyHours.js";
 
 const router = Router();
 
@@ -207,6 +208,37 @@ router.put("/vehicle", attachUser, requirePermission("fivem.manage"), async (req
 router.post("/resync", attachUser, requirePermission("fivem.manage"), async (_req, res) => {
   await notifyFxserver("all");
   res.json({ ok: true });
+});
+
+/* ------------------------------------------------------------------ *
+ * Duty-hours ingest (machine): the FiveM server pushes duty data here.
+ * We accumulate it; each department hub's Hours page reads it back.
+ * ------------------------------------------------------------------ */
+router.post("/duty/session", requireFivemSecret, async (req, res) => {
+  try {
+    const ok = await ingestSession(req.body?.session || req.body);
+    res.json({ ok });
+  } catch (err) {
+    res.status(500).json({ ok: false, code: "INGEST_FAILED", message: err.message });
+  }
+});
+
+router.post("/duty/session_bulk", requireFivemSecret, async (req, res) => {
+  try {
+    const n = await ingestSessions(req.body?.sessions || []);
+    res.json({ ok: true, ingested: n });
+  } catch (err) {
+    res.status(500).json({ ok: false, code: "INGEST_FAILED", message: err.message });
+  }
+});
+
+router.post("/duty/live", requireFivemSecret, async (req, res) => {
+  try {
+    await setLive(req.body || {});
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, code: "LIVE_FAILED", message: err.message });
+  }
 });
 
 export default router;

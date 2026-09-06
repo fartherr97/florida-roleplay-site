@@ -48,17 +48,11 @@ const toHours = (seconds) => Math.round(((Number(seconds) || 0) / 3600) * 10) / 
 
 /** Turn the failure code from the server into a plain-English cause + fix. */
 function diagnose(code) {
-  if (code === "FXSERVER_UNSET" || code === "OFFLINE")
-    return "The site isn’t configured to reach the game yet — set FXSERVER_SYNC_URL and FXSERVER_SYNC_SECRET in the site environment.";
-  if (code === "FXSERVER_UNREACHABLE")
-    return "The site reached out but the game server didn’t answer — the game’s flrp_api HTTP port isn’t reachable from the site (firewall / not exposed), or FXSERVER_SYNC_URL is wrong.";
-  if (code === "FXSERVER_HTTP_404")
-    return "The game answered, but the /duty/hours endpoint is missing — restart flrp_api on the game so the new route loads.";
-  if (code === "FXSERVER_HTTP_401")
-    return "The game rejected the request — FXSERVER_SYNC_SECRET must exactly match the game’s flrp_api_shared_secret.";
-  if (code === "FXSERVER_HTTP_503")
-    return "The game’s flrp_api isn’t configured (its flrp_api_shared_secret is unset) or the duty system isn’t running.";
-  return "The site can’t reach the game’s duty API right now. Once the FiveM duty endpoint is reachable, hours appear here automatically.";
+  if (code === "NO_DATA_YET" || code === "OFFLINE")
+    return "Waiting for the FiveM server to report duty data. The game pushes a heartbeat every minute and each shift as it ends — restart flrp_onduty on the game if this doesn’t clear, and make sure flrp_site_api_url / flrp_site_api_secret are set there.";
+  if (code === "DB_ERROR")
+    return "The site database is unavailable, so duty hours can’t be read right now. Try again shortly.";
+  return "Duty data isn’t available yet. Once the FiveM server has reported in, hours appear here automatically.";
 }
 
 const SORTS = [
