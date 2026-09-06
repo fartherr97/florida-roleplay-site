@@ -35,21 +35,13 @@ function computeRange(preset, from, to) {
   return null; // "all"
 }
 
-/** Long form: "38 min" · "1 hour and 22 min" · "2 hours". */
+/** Compact: "1h 22m" · "38m" · "2h" · "0m". */
 function fmtDuration(seconds) {
   const s = Math.max(0, Math.floor(Number(seconds) || 0));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h === 0) return `${m} min`;
-  const hp = `${h} hour${h === 1 ? "" : "s"}`;
-  return m === 0 ? hp : `${hp} and ${m} min`;
-}
-/** Compact "128h 30m" for the stat tiles. */
-function fmtCompact(seconds) {
-  const s = Math.max(0, Math.floor(Number(seconds) || 0));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 /** Turn the failure code from the server into a plain-English cause + fix. */
@@ -183,10 +175,10 @@ export default function DeptHours({ page, config }) {
       {/* stats */}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Hours logged", value: fmtCompact(stats.totalSeconds) },
+          { label: "Hours logged", value: fmtDuration(stats.totalSeconds) },
           { label: "Members", value: stats.people },
           { label: "On duty now", value: stats.onNow },
-          { label: "Avg / member", value: fmtCompact(stats.avgSeconds) },
+          { label: "Avg / member", value: fmtDuration(stats.avgSeconds) },
         ].map((s) => (
           <Card key={s.label} className="p-5">
             <div className="dept-accent-text text-2xl font-extrabold tracking-tight tabular-nums">{s.value}</div>
