@@ -571,6 +571,12 @@ export const api = {
   deptVersions: (id) => get(`/dept/${encodeURIComponent(id)}/versions`, []),
   deptAudit: (id) => get(`/dept/${encodeURIComponent(id)}/audit`, []),
 
+  // Live on-duty hours for a department, straight from the FiveM server.
+  deptDutyHours: (id) =>
+    get(`/dept/${encodeURIComponent(id)}/duty-hours`, {
+      ok: false, code: "OFFLINE", department: null, members: [], ranks: [], subdivisions: [],
+    }),
+
   saveDeptConfig: (id, config) =>
     put(`/dept/${encodeURIComponent(id)}/config`, { config }, () => ({
       ok: true,
