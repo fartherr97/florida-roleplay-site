@@ -5,9 +5,12 @@
  * direction that already works for config sync) rather than us pulling from it.
  * flrp_onduty POSTs each completed shift to /api/fivem/duty/session, a heartbeat
  * to /api/fivem/duty/live (who's on duty + department metadata), and backfills
- * recent history once on boot. We accumulate the sessions here and each
- * department hub's Hours page is served by aggregating them for the chosen
- * window — no request ever leaves the site.
+ * recent history once on boot. We accumulate the sessions here.
+ *
+ * The Hours page lists the WHOLE department: the community roster (the ranks the
+ * Discord bot maintains) is the member list, and duty time is overlaid onto it
+ * by callsign — so everyone shows, with 0 hours until they clock in. Anyone who
+ * clocked in but isn't on the roster is appended so their time is never lost.
  */
 import { execute, query } from "../db.js";
 
@@ -41,6 +44,7 @@ function ensureTables() {
 }
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+const normCallsign = (s) => String(s || "").toUpperCase().replace(/\s+/g, "");
 const validSession = (s) =>
   s && typeof s.license === "string" && typeof s.entity === "string" && Number.isFinite(Number(s.startedAt));
 
@@ -78,22 +82,24 @@ export async function setLive(payload) {
   );
 }
 
-/** The duty-hours slice for one department, aggregated for an optional window. */
+/** The whole department + its duty hours, aggregated for an optional window. */
 export async function fetchDeptDutyHours(deptId, range) {
   try {
     await ensureTables();
     const wantId = String(deptId || "").toLowerCase();
 
     // live snapshot → department metadata + who's on duty right now
-    let live = null;
     const lrows = await query("SELECT payload FROM fivem_duty_live WHERE id = 1");
-    live = lrows[0]?.payload ?? null;
+    const live = lrows[0]?.payload ?? null;
     const depts = live?.departments ?? [];
     const meta =
       depts.find((d) => String(d.id).toLowerCase() === wantId) ||
       depts.find((d) => String(d.short || "").toLowerCase() === wantId) || null;
     const entity = (meta?.id ?? wantId).toLowerCase();
+    const subLabelMap = new Map((meta?.subdivisions ?? []).map((s) => [s.id, s.label]));
+    const gameRankLabel = new Map((meta?.ranks ?? []).map((r) => [r.id, r.label]));
 
+    // ---- duty session aggregates for the window --------------------------
     const ranged = range && Number.isFinite(range.from) && Number.isFinite(range.to);
     const where = ["entity = $1"];
     const params = [entity];
@@ -103,12 +109,6 @@ export async function fetchDeptDutyHours(deptId, range) {
     const totals = await query(
       `SELECT license, SUM(COALESCE(seconds,0)) AS total, COUNT(*) AS sessions, MAX(started_at) AS last_on
        FROM fivem_duty_sessions WHERE ${clause} GROUP BY license`, params);
-
-    // no data at all yet → tell the page it's still waiting on the game
-    if (!live && totals.length === 0) {
-      return { ok: false, code: "NO_DATA_YET", department: null, members: [], ranks: [], subdivisions: [] };
-    }
-
     const latest = await query(
       `SELECT DISTINCT ON (license) license, name, rank, subdivision, callsign
        FROM fivem_duty_sessions WHERE ${clause} ORDER BY license, started_at DESC`, params);
@@ -122,43 +122,98 @@ export async function fetchDeptDutyHours(deptId, range) {
       liveBy.set(u.license, u);
     }
 
-    const rankLabel = new Map((meta?.ranks ?? []).map((r) => [r.id, r.label]));
-    const subLabel = new Map((meta?.subdivisions ?? []).map((s) => [s.id, s.label]));
-
-    const rowFor = (license, total, sessions, lastOn) => {
+    // one duty row per license, indexed by callsign for roster matching
+    const dutyByLicense = new Map();
+    const licenses = new Set([...totals.map((r) => r.license), ...liveBy.keys()]);
+    for (const license of licenses) {
+      const t = totals.find((r) => r.license === license);
       const l = latestBy.get(license) || {};
       const u = liveBy.get(license);
       const liveSecs = u ? Math.max(0, nowSec - Number(u.since)) : 0;
-      const rank = u?.rank ?? l.rank ?? null;
-      const subdivision = u?.subdivision ?? l.subdivision ?? null;
-      return {
-        name: u?.name ?? l.name ?? "Unknown",
+      dutyByLicense.set(license, {
         callsign: u?.callsign ?? l.callsign ?? null,
-        rank, subdivision,
-        rankLabel: rankLabel.get(rank) ?? rank ?? "—",
-        subLabel: subLabel.get(subdivision) ?? null,
-        totalSeconds: Number(total || 0) + liveSecs,
-        sessions: Number(sessions || 0),
-        lastOn: Number(lastOn || (u ? u.since : 0)),
+        name: u?.name ?? l.name ?? "Unknown",
+        rank: u?.rank ?? l.rank ?? null,
+        subdivision: u?.subdivision ?? l.subdivision ?? null,
+        totalSeconds: Number(t?.total || 0) + liveSecs,
+        sessions: Number(t?.sessions || 0),
+        lastOn: Number(t?.last_on || (u ? u.since : 0)),
         onDutyNow: !!u,
-      };
-    };
+      });
+    }
+    const dutyByCallsign = new Map();
+    for (const d of dutyByLicense.values()) if (d.callsign) dutyByCallsign.set(normCallsign(d.callsign), d);
 
-    const members = totals.map((r) => rowFor(r.license, r.total, r.sessions, r.last_on));
-    // people on duty now with no session rows in this window yet
-    const seen = new Set(totals.map((r) => r.license));
-    for (const [license, u] of liveBy) if (!seen.has(license)) members.push(rowFor(license, 0, 0, u.since));
+    // ---- the community roster: the full department membership -------------
+    let rosterMembers = [];
+    let rankRows = [];
+    try {
+      rosterMembers = await query(
+        `SELECT character_name, display_name, rank_label, callsign, status
+         FROM roster_members WHERE lower(department) = $1`, [wantId]);
+      rankRows = await query(
+        `SELECT rank_label, MAX(sort_order) AS sort_order
+         FROM roster_role_map WHERE lower(coalesce(department,'')) = $1 AND kind = 'rank'
+         GROUP BY rank_label ORDER BY MAX(sort_order) DESC`, [wantId]);
+    } catch { /* roster not provisioned — fall back to duty-only members */ }
+
+    // nothing anywhere → the page is genuinely waiting on the game
+    if (rosterMembers.length === 0 && dutyByLicense.size === 0 && !live) {
+      return { ok: false, code: "NO_DATA_YET", department: null, members: [], ranks: [], subdivisions: [] };
+    }
+
+    const usedCallsign = new Set();
+    const members = [];
+
+    // 1) every roster member, hours overlaid by callsign (0 until they clock in)
+    for (const rm of rosterMembers) {
+      const key = rm.callsign ? normCallsign(rm.callsign) : null;
+      const d = key ? dutyByCallsign.get(key) : null;
+      if (d && key) usedCallsign.add(key);
+      members.push({
+        name: rm.display_name || rm.character_name || d?.name || "Unknown",
+        callsign: rm.callsign || d?.callsign || null,
+        rank: rm.rank_label || "Unranked",
+        rankLabel: rm.rank_label || "Unranked",
+        subLabel: d ? (subLabelMap.get(d.subdivision) ?? null) : null,
+        totalSeconds: d?.totalSeconds || 0,
+        sessions: d?.sessions || 0,
+        lastOn: d?.lastOn || 0,
+        onDutyNow: d?.onDutyNow || false,
+        status: rm.status || null,
+      });
+    }
+
+    // 2) anyone who clocked in but isn't matched to a roster member
+    const extraRanks = new Set();
+    for (const d of dutyByLicense.values()) {
+      const key = d.callsign ? normCallsign(d.callsign) : null;
+      if (key && usedCallsign.has(key)) continue;
+      const rl = gameRankLabel.get(d.rank) || "Unranked";
+      extraRanks.add(rl);
+      members.push({
+        name: d.name, callsign: d.callsign, rank: rl, rankLabel: rl,
+        subLabel: subLabelMap.get(d.subdivision) ?? null,
+        totalSeconds: d.totalSeconds, sessions: d.sessions, lastOn: d.lastOn, onDutyNow: d.onDutyNow, status: null,
+      });
+    }
+
+    // ranks list: roster ranks (senior first) + any extras from duty-only rows
+    const ranks = rankRows.map((r) => ({ id: r.rank_label, label: r.rank_label }));
+    const seen = new Set(ranks.map((r) => r.id));
+    for (const rl of extraRanks) if (!seen.has(rl)) { ranks.push({ id: rl, label: rl }); seen.add(rl); }
+    if (members.some((m) => m.rank === "Unranked") && !seen.has("Unranked")) ranks.push({ id: "Unranked", label: "Unranked" });
 
     return {
       ok: true,
       generatedAt: live?.generatedAt ?? nowSec,
       from: ranged ? Math.floor(range.from) : null,
       to: ranged ? Math.floor(range.to) : null,
-      department: meta ? { id: meta.id, label: meta.label, short: meta.short } : (members.length ? { id: deptId } : null),
-      ranks: meta?.ranks ?? [],
+      department: meta ? { id: meta.id, label: meta.label, short: meta.short } : { id: deptId },
+      ranks,
       subdivisions: meta?.subdivisions ?? [],
       members,
-      unmatched: !meta && members.length === 0,
+      unmatched: members.length === 0,
     };
   } catch (err) {
     return { ok: false, code: "DB_ERROR", message: err.message, department: null, members: [], ranks: [], subdivisions: [] };

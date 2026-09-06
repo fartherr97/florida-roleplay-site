@@ -35,16 +35,22 @@ function computeRange(preset, from, to) {
   return null; // "all"
 }
 
-/** Seconds → "12h 30m" / "45m" / "8s". */
+/** Long form: "38 min" · "1 hour and 22 min" · "2 hours". */
 function fmtDuration(seconds) {
   const s = Math.max(0, Math.floor(Number(seconds) || 0));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m`;
-  return `${s}s`;
+  if (h === 0) return `${m} min`;
+  const hp = `${h} hour${h === 1 ? "" : "s"}`;
+  return m === 0 ? hp : `${hp} and ${m} min`;
 }
-const toHours = (seconds) => Math.round(((Number(seconds) || 0) / 3600) * 10) / 10;
+/** Compact "128h 30m" for the stat tiles. */
+function fmtCompact(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 /** Turn the failure code from the server into a plain-English cause + fix. */
 function diagnose(code) {
@@ -109,10 +115,10 @@ export default function DeptHours({ page, config }) {
     const totalSeconds = members.reduce((s, m) => s + (Number(m.totalSeconds) || 0), 0);
     const onNow = members.filter((m) => m.onDutyNow).length;
     return {
-      hours: toHours(totalSeconds),
+      totalSeconds,
       people: members.length,
       onNow,
-      average: members.length ? Math.round((toHours(totalSeconds) / members.length) * 10) / 10 : 0,
+      avgSeconds: members.length ? totalSeconds / members.length : 0,
     };
   }, [members]);
 
@@ -177,10 +183,10 @@ export default function DeptHours({ page, config }) {
       {/* stats */}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Hours logged", value: `${stats.hours}h` },
+          { label: "Hours logged", value: fmtCompact(stats.totalSeconds) },
           { label: "Members", value: stats.people },
           { label: "On duty now", value: stats.onNow },
-          { label: "Avg / member", value: `${stats.average}h` },
+          { label: "Avg / member", value: fmtCompact(stats.avgSeconds) },
         ].map((s) => (
           <Card key={s.label} className="p-5">
             <div className="dept-accent-text text-2xl font-extrabold tracking-tight tabular-nums">{s.value}</div>
