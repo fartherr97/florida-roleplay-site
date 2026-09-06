@@ -572,10 +572,16 @@ export const api = {
   deptAudit: (id) => get(`/dept/${encodeURIComponent(id)}/audit`, []),
 
   // Live on-duty hours for a department, straight from the FiveM server.
-  deptDutyHours: (id) =>
-    get(`/dept/${encodeURIComponent(id)}/duty-hours`, {
+  // Optional { from, to } (unix seconds) limits it to shifts started in a range.
+  deptDutyHours: (id, range) => {
+    const qs =
+      range && Number.isFinite(range.from) && Number.isFinite(range.to)
+        ? `?from=${Math.floor(range.from)}&to=${Math.floor(range.to)}`
+        : "";
+    return get(`/dept/${encodeURIComponent(id)}/duty-hours${qs}`, {
       ok: false, code: "OFFLINE", department: null, members: [], ranks: [], subdivisions: [],
-    }),
+    });
+  },
 
   saveDeptConfig: (id, config) =>
     put(`/dept/${encodeURIComponent(id)}/config`, { config }, () => ({

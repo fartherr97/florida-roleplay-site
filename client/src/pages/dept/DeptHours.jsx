@@ -1,12 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock, RefreshCw, Search, Users } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Select from "../../components/ui/Select";
 import { TextInput } from "../../components/ui/TextInput";
 import DeptPageHeader from "../../components/dept/DeptPageHeader";
-import { relativeTime } from "../../lib/format";
+import { formatDate, relativeTime } from "../../lib/format";
 import { api } from "../../lib/api";
+
+const RANGE_PRESETS = [
+  { value: "all", label: "All time" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "month", label: "This month" },
+  { value: "custom", label: "Custom range…" },
+];
+
+/** Resolve a preset / custom dates to a { from, to } window in unix seconds. */
+function computeRange(preset, from, to) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (preset === "7d") return { from: nowSec - 7 * 86400, to: nowSec };
+  if (preset === "30d") return { from: nowSec - 30 * 86400, to: nowSec };
+  if (preset === "month") {
+    const d = new Date();
+    return { from: Math.floor(new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000), to: nowSec };
+  }
+  if (preset === "custom") {
+    if (!from || !to) return null;
+    const f = Math.floor(new Date(`${from}T00:00:00`).getTime() / 1000);
+    const t = Math.floor(new Date(`${to}T23:59:59`).getTime() / 1000);
+    if (!Number.isFinite(f) || !Number.isFinite(t) || f > t) return null;
+    return { from: f, to: t };
+  }
+  return null; // "all"
+}
 
 /** Seconds → "12h 30m" / "45m" / "8s". */
 function fmtDuration(seconds) {
@@ -38,19 +65,26 @@ export default function DeptHours({ page, config }) {
   const [sort, setSort] = useState("hours");
   const [grouped, setGrouped] = useState(true);
 
-  const load = async (soft) => {
+  const [preset, setPreset] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const range = useMemo(() => computeRange(preset, customFrom, customTo), [preset, customFrom, customTo]);
+  const rangeKey = range ? `${range.from}:${range.to}` : "all";
+
+  const load = useCallback(async (soft) => {
     if (soft) setRefreshing(true); else setLoading(true);
-    const res = await api.deptDutyHours(config.id).catch(() => null);
+    const res = await api.deptDutyHours(config.id, range).catch(() => null);
     setData(res);
     setLoading(false);
     setRefreshing(false);
-  };
-  useEffect(() => { load(false); /* eslint-disable-next-line */ }, [config.id]);
+    // range is captured via rangeKey below; recreated only when the window changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.id, rangeKey]);
+  useEffect(() => { load(false); }, [load]);
   useEffect(() => {
     const t = setInterval(() => load(true), 30_000);
     return () => clearInterval(t);
-    /* eslint-disable-next-line */
-  }, [config.id]);
+  }, [load]);
 
   const members = useMemo(() => data?.members ?? [], [data]);
   const ranks = useMemo(() => data?.ranks ?? [], [data]);
@@ -144,6 +178,28 @@ export default function DeptHours({ page, config }) {
             <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{s.label}</div>
           </Card>
         ))}
+      </div>
+
+      {/* timeframe */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Timeframe</span>
+        <Select value={preset} onChange={setPreset} options={RANGE_PRESETS} className="min-w-[150px]" />
+        {preset === "custom" && (
+          <>
+            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+              className="h-10 rounded-xl border border-white/10 bg-white/[0.02] px-3 text-sm text-slate-200 [color-scheme:dark]" />
+            <span className="text-slate-500">→</span>
+            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+              className="h-10 rounded-xl border border-white/10 bg-white/[0.02] px-3 text-sm text-slate-200 [color-scheme:dark]" />
+          </>
+        )}
+        {data?.from && data?.to ? (
+          <span className="text-[11px] text-slate-500">
+            Shifts started {formatDate(data.from * 1000)} – {formatDate(data.to * 1000)}
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-500">All recorded shifts</span>
+        )}
       </div>
 
       {/* controls */}

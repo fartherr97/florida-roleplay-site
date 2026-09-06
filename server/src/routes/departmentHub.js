@@ -729,7 +729,10 @@ router.get(
   withDepartment,
   async (req, res) => {
     try {
-      res.json(await fetchDeptDutyHours(req.departmentId));
+      const from = Number(req.query.from);
+      const to = Number(req.query.to);
+      const range = Number.isFinite(from) && Number.isFinite(to) ? { from, to } : undefined;
+      res.json(await fetchDeptDutyHours(req.departmentId, range));
     } catch (err) {
       res.json({ ok: false, code: "DUTY_HOURS_ERROR", message: err.message,
         department: null, members: [], ranks: [], subdivisions: [] });

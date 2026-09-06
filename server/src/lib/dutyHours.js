@@ -13,18 +13,26 @@
  * own slice out of the cached report.
  */
 const TTL_MS = 15_000;
-let cache = { at: 0, data: null };
+const cache = new Map(); // rangeKey -> { at, data }
 
-/** Fetch (and cache) the whole duty-hours report from the FiveM server. */
-export async function fetchDutyReport() {
+/**
+ * Fetch (and cache) the whole duty-hours report from the FiveM server. An
+ * optional { from, to } (unix seconds) asks the game for shifts started in that
+ * window only; each distinct range is cached on its own short TTL.
+ */
+export async function fetchDutyReport({ from, to } = {}) {
   const base = process.env.FXSERVER_SYNC_URL;
   const secret = process.env.FXSERVER_SYNC_SECRET;
   if (!base || !secret) return { ok: false, code: "FXSERVER_UNSET" };
 
+  const ranged = Number.isFinite(from) && Number.isFinite(to);
+  const key = ranged ? `${from}:${to}` : "all";
   const now = Date.now();
-  if (cache.data && now - cache.at < TTL_MS) return cache.data;
+  const hit = cache.get(key);
+  if (hit && now - hit.at < TTL_MS) return hit.data;
 
-  const url = `${base.replace(/\/+$/, "")}/duty/hours`;
+  let url = `${base.replace(/\/+$/, "")}/duty/hours`;
+  if (ranged) url += `?from=${from}&to=${to}`;
   try {
     const res = await fetch(url, {
       headers: { "X-FLRP-Secret": secret },
@@ -32,8 +40,12 @@ export async function fetchDutyReport() {
     });
     if (!res.ok) return { ok: false, code: `FXSERVER_HTTP_${res.status}` };
     const json = await res.json();
-    const data = { ok: true, generatedAt: json.generatedAt ?? null, departments: json.departments ?? [] };
-    cache = { at: now, data };
+    const data = {
+      ok: true, generatedAt: json.generatedAt ?? null,
+      from: json.from ?? null, to: json.to ?? null,
+      departments: json.departments ?? [],
+    };
+    cache.set(key, { at: now, data });
     return data;
   } catch (err) {
     return { ok: false, code: "FXSERVER_UNREACHABLE", message: err.message };
@@ -41,8 +53,8 @@ export async function fetchDutyReport() {
 }
 
 /** The duty-hours slice for one department (matched by id, then short code). */
-export async function fetchDeptDutyHours(deptId) {
-  const report = await fetchDutyReport();
+export async function fetchDeptDutyHours(deptId, range) {
+  const report = await fetchDutyReport(range);
   if (!report.ok) {
     return { ok: false, code: report.code, department: null, members: [], ranks: [], subdivisions: [] };
   }
@@ -57,12 +69,14 @@ export async function fetchDeptDutyHours(deptId) {
     // The game has no department with this id — the site dept just isn't linked.
     return {
       ok: true, unmatched: true, generatedAt: report.generatedAt,
+      from: report.from ?? null, to: report.to ?? null,
       department: null, members: [], ranks: [], subdivisions: [],
     };
   }
   return {
     ok: true,
     generatedAt: report.generatedAt,
+    from: report.from ?? null, to: report.to ?? null,
     department: { id: match.id, label: match.label, short: match.short },
     ranks: match.ranks || [],
     subdivisions: match.subdivisions || [],
