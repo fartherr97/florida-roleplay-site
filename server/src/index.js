@@ -7,6 +7,7 @@ import cors from "cors";
 import router from "./routes/index.js";
 import { serve as mediaServe } from "./routes/media.js";
 import { startRosterSync } from "./lib/rosterSync.js";
+import { migrateLegacyDepartmentIds } from "./lib/legacyIds.js";
 import { close, ping } from "./db.js";
 
 /**
@@ -106,9 +107,18 @@ const server = app.listen(port, "0.0.0.0", () => {
       ? `serving client from ${clientDist}`
       : "client/dist not built — API only",
   );
-  // Keep the roster in step with Discord on its own: a sync shortly after boot,
-  // then on an interval. No-op unless a bot token and guild are configured.
-  startRosterSync();
+  // Fold any rows still stored under a retired department id (bcso → bso) into
+  // the current one before the first roster sync goes looking for them.
+  migrateLegacyDepartmentIds()
+    .then((summary) => {
+      if (summary && Object.keys(summary).length) {
+        console.log("legacy department ids migrated:", JSON.stringify(summary));
+      }
+    })
+    .catch(() => {})
+    // Keep the roster in step with Discord on its own: a sync shortly after boot,
+    // then on an interval. No-op unless a bot token and guild are configured.
+    .finally(() => startRosterSync());
 });
 
 /**

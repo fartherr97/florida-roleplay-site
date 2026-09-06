@@ -32,6 +32,7 @@ import { fireAdminLogWebhook } from "../lib/deptWebhook.js";
 import { fetchDeptDutyHours } from "../lib/dutyHours.js";
 import { fileAdminLogDiscipline } from "../lib/deptDiscipline.js";
 import { resolveDepartmentId } from "../lib/tenant.js";
+import { canonicalDepartmentId } from "../lib/legacyIds.js";
 import { collect, str } from "../validate.js";
 import {
   capabilitiesFor,
@@ -102,9 +103,16 @@ async function loadAll() {
   );
   try {
     const rows = await query("SELECT id, config FROM department_configs");
+    // A row still under a retired id (see lib/legacyIds.js) only counts when
+    // nothing lives under the current one — otherwise it would show up in the
+    // directory as a duplicate of the department it used to be.
+    const ids = new Set(rows.map((row) => row.id));
     rows.forEach((row) => {
       const parsed = parseConfig(row.config);
-      if (parsed) configs.set(row.id, fromStored(parsed, row.id));
+      if (!parsed) return;
+      const canonical = canonicalDepartmentId(row.id);
+      if (canonical !== row.id && ids.has(canonical)) return;
+      configs.set(canonical, fromStored({ ...parsed, id: canonical }, canonical));
     });
   } catch {
     // No database — the seeds stand on their own.
