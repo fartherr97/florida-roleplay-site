@@ -19,9 +19,8 @@ All optional — the store stays dormant (empty state on `/store`) until
 | Variable | Required for | What it is |
 | --- | --- | --- |
 | `TEBEX_STORE_TOKEN` | listing packages, checkout | The **public webstore token** from the Tebex panel (the Headless API identifier). Not secret, but kept server-side. |
-| `TEBEX_SECRET_KEY` | checkout (subscriptions) | The **private/secret API key** that pairs with the public token, from Tebex → your project → API Keys. Creating a basket authenticates with it; a subscription checkout fails with "Basic auth credentials are required" without it. |
 | `TEBEX_WEBHOOK_SECRET` | fulfillment | The **webhook signing secret** from Tebex → Developers → Webhooks. Real payment webhooks are refused without it. |
-| `TEBEX_STORE_URL` | optional | Public store URL for "Open in Tebex" links. Defaults to `https://<token>.tebex.io`. |
+| `TEBEX_STORE_URL` | "Open in Tebex" links **and checkout** | Your hosted Tebex store URL. The Buy button redirects the buyer to `<TEBEX_STORE_URL>/package/<id>`, where Tebex runs the whole basket/login/subscription/payment flow. Set this to your real store address; the `https://<token>.tebex.io` fallback is only a guess. |
 | `SITE_URL` | optional | The site's public origin, used to build checkout return URLs. Defaults to `https://www.flrp.us`. |
 | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` | Discord-role entitlements | Already used by the roster sync; reused to grant/remove roles. |
 

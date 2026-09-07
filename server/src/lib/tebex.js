@@ -30,16 +30,6 @@ export function webhookSecret() {
   return String(process.env.TEBEX_WEBHOOK_SECRET ?? "").trim();
 }
 
-/**
- * The Headless API private key, from the Tebex panel's store API keys. Public
- * reads (packages, categories) don't need it, but creating an authenticated
- * basket does — Tebex requires it for recurring/subscription checkouts, which
- * fail with "Basic auth credentials are required" without it.
- */
-export function secretKey() {
-  return String(process.env.TEBEX_SECRET_KEY ?? "").trim();
-}
-
 /** True once a store token is configured; the storefront is dormant until then. */
 export function tebexConfigured() {
   return Boolean(storeToken());
@@ -56,8 +46,20 @@ export function tebexStoreUrl() {
   return token ? `https://${token}.tebex.io` : "";
 }
 
+/**
+ * The hosted Tebex checkout URL for one package. Subscriptions ("tiers") require
+ * the buyer to log in to a Tebex auth provider before a basket will accept them,
+ * which only Tebex's own hosted checkout does — so a purchase is a redirect to
+ * the package on the hosted store, where Tebex runs the whole basket, login,
+ * subscription and payment flow. The package slug defaults to its numeric id.
+ */
+export function hostedPackageUrl(packageId) {
+  const base = tebexStoreUrl();
+  return base ? `${base}/package/${encodeURIComponent(String(packageId))}` : "";
+}
+
 /** A short-timeout fetch that never hangs the request or leaks the reason raw. */
-async function tebexFetch(path, { method = "GET", body, auth = false } = {}) {
+async function tebexFetch(path, { method = "GET", body } = {}) {
   const token = storeToken();
   if (!token) {
     const err = new Error("The store is not connected to Tebex yet.");
@@ -65,27 +67,11 @@ async function tebexFetch(path, { method = "GET", body, auth = false } = {}) {
     throw err;
   }
 
-  const headers = { "Content-Type": "application/json", Accept: "application/json" };
-  // Authenticated endpoints (creating a basket, above all for subscriptions) use
-  // HTTP Basic auth: the public token as the username, the private key as the
-  // password. Public reads leave it off.
-  if (auth) {
-    const secret = secretKey();
-    if (!secret) {
-      const err = new Error(
-        "This purchase needs an authenticated Tebex request, but no private key is set. Add TEBEX_SECRET_KEY.",
-      );
-      err.code = "TEBEX_NOT_CONFIGURED";
-      throw err;
-    }
-    headers.Authorization = `Basic ${Buffer.from(`${token}:${secret}`).toString("base64")}`;
-  }
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   const options = {
     method,
-    headers,
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     signal: controller.signal,
   };
   if (body !== undefined) options.body = JSON.stringify(body);
@@ -165,60 +151,6 @@ function normalizePackage(pkg) {
     type: String(pkg.type ?? "single"),
     status: pkg.disabled ? "disabled" : "active",
   };
-}
-
-/**
- * Create a basket for one package and return Tebex's hosted checkout URL plus
- * the basket ident. The FLRP user is stitched in as basket `custom` data, which
- * Tebex echoes back on the payment webhook — that is how a settled payment finds
- * its way back to the account that started it. We never fulfill on the return
- * redirect; only the webhook does.
- */
-export async function createCheckout({ packageId, completeUrl, cancelUrl, custom, ipAddress }) {
-  const token = encodeURIComponent(storeToken());
-  const basket = await tebexFetch(`/accounts/${token}/baskets`, {
-    method: "POST",
-    auth: true,
-    body: {
-      complete_url: completeUrl,
-      cancel_url: cancelUrl,
-      complete_auto_redirect: true,
-      // The Headless API requires the buyer's IP on basket creation; omitting it
-      // is rejected as a "Request payload error". Fall back to a placeholder so a
-      // missing/again-anonymised IP never blocks checkout.
-      ip_address: ipAddress || "0.0.0.0",
-      custom: custom ?? {},
-    },
-  });
-
-  const ident = basket?.ident ?? basket?.id;
-  if (!ident) {
-    const err = new Error("Tebex did not return a basket.");
-    err.code = "TEBEX_ERROR";
-    throw err;
-  }
-
-  await tebexFetch(`/baskets/${encodeURIComponent(ident)}/packages`, {
-    method: "POST",
-    auth: true,
-    body: { package_id: Number(packageId), quantity: 1 },
-  });
-
-  // Re-read the basket so we hand back the freshest checkout link.
-  let checkoutUrl = basket?.links?.checkout ?? null;
-  try {
-    const refreshed = await tebexFetch(`/accounts/${token}/baskets/${encodeURIComponent(ident)}`, { auth: true });
-    checkoutUrl = refreshed?.links?.checkout ?? checkoutUrl;
-  } catch {
-    // The link from creation stands if the re-read fails.
-  }
-
-  if (!checkoutUrl) {
-    const err = new Error("Tebex did not return a checkout link.");
-    err.code = "TEBEX_ERROR";
-    throw err;
-  }
-  return { ident: String(ident), checkoutUrl: String(checkoutUrl) };
 }
 
 /* ------------------------------------------------------------ webhooks */

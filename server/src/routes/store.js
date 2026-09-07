@@ -21,11 +21,6 @@ import * as store from "../lib/store.js";
 
 const router = Router();
 
-function siteOrigin() {
-  const raw = String(process.env.SITE_URL ?? process.env.PUBLIC_SITE_URL ?? "").trim();
-  return raw ? raw.replace(/\/+$/, "") : "https://www.flrp.us";
-}
-
 /* ------------------------------------------------------------- public */
 
 /** The storefront: enabled packages plus whether the store is even connected. */
@@ -74,51 +69,20 @@ router.post("/checkout", async (req, res) => {
     return res.status(404).json({ ok: false, code: "PACKAGE_UNAVAILABLE", message: "That package isn't available." });
   }
 
-  try {
-    const origin = siteOrigin();
-    const { ident, checkoutUrl } = await tebex.createCheckout({
-      packageId,
-      completeUrl: `${origin}/store?status=complete`,
-      cancelUrl: `${origin}/store?status=cancel`,
-      ipAddress: req.ip,
-      custom: { flrp_user_id: user.id, flrp_username: user.displayName ?? user.username ?? null },
-    });
-
-    // Record the intent so the webhook can adopt it and, until then, the player
-    // sees a pending purchase. Never a grant — that waits for Tebex.
-    try {
-      await store.recordPendingPurchase({
-        basketIdent: ident,
-        tebexPackageId: packageId,
-        packageName: pkg.name,
-        userId: user.id,
-        username: user.displayName ?? user.username ?? null,
-        amount: pkg.price,
-        currency: pkg.currency,
-        isSubscription: pkg.isSubscription,
-      });
-    } catch {
-      // A missing pending row doesn't block checkout — the webhook still fulfills.
-    }
-
-    return res.json({ ok: true, checkoutUrl });
-  } catch (err) {
-    const code = err?.code === "TEBEX_UNREACHABLE" ? "TEBEX_UNREACHABLE" : "CHECKOUT_FAILED";
-    // Log the real Tebex reason server-side, and pass its title through to the
-    // buyer's banner. "Please try again" hides a configuration problem (an
-    // unwhitelisted return URL, a package that can't go in an anonymous basket)
-    // that a retry will never fix; the actual message is what points at the fix.
-    const reason = typeof err?.message === "string" && err.message ? err.message : null;
-    console.error("[store] checkout failed", { code, status: err?.status ?? null, reason });
-    return res.status(502).json({
+  // Subscriptions ("tiers") can't be added to a basket until the buyer has logged
+  // in to a Tebex auth provider, which only Tebex's hosted checkout does — so a
+  // purchase is a redirect to the package on the hosted store, where Tebex runs
+  // the whole basket, login, subscription and payment flow, then grants what the
+  // package is configured to give. Nothing is charged or created here.
+  const checkoutUrl = tebex.hostedPackageUrl(packageId);
+  if (!checkoutUrl) {
+    return res.status(503).json({
       ok: false,
-      code,
-      message:
-        code === "TEBEX_UNREACHABLE"
-          ? "Couldn't reach Tebex. Please try again shortly."
-          : `Tebex rejected the checkout${reason ? `: ${reason}` : ". Please try again shortly."}`,
+      code: "STORE_URL_MISSING",
+      message: "The store URL isn't set. An admin should set TEBEX_STORE_URL to the Tebex store address.",
     });
   }
+  return res.json({ ok: true, checkoutUrl });
 });
 
 /** A signed-in player's own purchases and their fulfillment state. */
