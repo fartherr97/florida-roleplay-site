@@ -103,7 +103,20 @@ router.post("/checkout", async (req, res) => {
     return res.json({ ok: true, checkoutUrl });
   } catch (err) {
     const code = err?.code === "TEBEX_UNREACHABLE" ? "TEBEX_UNREACHABLE" : "CHECKOUT_FAILED";
-    return res.status(502).json({ ok: false, code, message: "Couldn't start checkout with Tebex. Please try again shortly." });
+    // Log the real Tebex reason server-side, and pass its title through to the
+    // buyer's banner. "Please try again" hides a configuration problem (an
+    // unwhitelisted return URL, a package that can't go in an anonymous basket)
+    // that a retry will never fix; the actual message is what points at the fix.
+    const reason = typeof err?.message === "string" && err.message ? err.message : null;
+    console.error("[store] checkout failed", { code, status: err?.status ?? null, reason });
+    return res.status(502).json({
+      ok: false,
+      code,
+      message:
+        code === "TEBEX_UNREACHABLE"
+          ? "Couldn't reach Tebex. Please try again shortly."
+          : `Tebex rejected the checkout${reason ? `: ${reason}` : ". Please try again shortly."}`,
+    });
   }
 });
 
