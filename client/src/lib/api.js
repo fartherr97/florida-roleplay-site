@@ -295,8 +295,24 @@ export const api = {
   // checkout hands back Tebex's hosted checkout URL — the browser navigates
   // there, and only Tebex's webhook grants anything.
   storePackages: () => get("/store/packages", { configured: false, packages: [], storeUrl: "" }),
-  storeCheckout: (packageId) =>
-    post("/store/checkout", { packageId }, () => ({ ok: false, message: NOT_PERSISTED })),
+  // Checkout redirects to Tebex and persists nothing locally, so the generic
+  // offline stub ("no database configured") would be a misleading reason here.
+  // Surface Tebex's own error instead — store not connected, Tebex unreachable,
+  // the package unavailable — so the banner names the real problem.
+  storeCheckout: async (packageId) => {
+    if (!USE_API) return { ok: false, message: "The store isn't connected yet." };
+    try {
+      return await request("/store/checkout", {
+        method: "POST",
+        body: JSON.stringify({ packageId }),
+      });
+    } catch (err) {
+      return {
+        ok: false,
+        message: err?.message || "Couldn't start checkout. Please try again shortly.",
+      };
+    }
+  },
   storeMyPurchases: () => get("/store/purchases/me", { purchases: [] }),
 
   // Ownership-only Store Management. Every one of these hits a store.manage-gated
