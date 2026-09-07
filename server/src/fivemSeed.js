@@ -18,13 +18,24 @@
 /* ---- Roles (FLRP groups) ------------------------------------------------- */
 export const ROLES = [
   { key: "member", name: "Community Member", kind: "base", priority: 0, is_department: false, inherits: null },
+  // Staff — moderate tier (Trial Mod / Mod / Senior Mod) and administer tier
+  // (Junior / Admin / Senior / Lead Admin). The granular ranks are distinct
+  // roles that inherit their tier so they share its perms until tuned per-rank.
+  { key: "trial_mod", name: "Trial Moderator", kind: "staff", priority: 9, is_department: false, inherits: "moderator" },
   { key: "moderator", name: "Moderator", kind: "staff", priority: 10, is_department: false, inherits: "member" },
+  { key: "senior_mod", name: "Senior Moderator", kind: "staff", priority: 12, is_department: false, inherits: "moderator" },
+  { key: "junior_admin", name: "Junior Administrator", kind: "staff", priority: 16, is_department: false, inherits: "administrator" },
   { key: "administrator", name: "Administrator", kind: "staff", priority: 20, is_department: false, inherits: "moderator" },
+  { key: "senior_admin", name: "Senior Administrator", kind: "staff", priority: 22, is_department: false, inherits: "administrator" },
+  { key: "lead_admin", name: "Lead Administrator", kind: "staff", priority: 25, is_department: false, inherits: "administrator" },
   { key: "director", name: "Director", kind: "staff", priority: 30, is_department: false, inherits: "administrator" },
   { key: "ownership", name: "Ownership", kind: "staff", priority: 40, is_department: false, inherits: "director" },
   { key: "cert_civ_1", name: "Certified Civilian I", kind: "certification", priority: 5, is_department: false, inherits: null },
   { key: "cert_civ_2", name: "Certified Civilian II", kind: "certification", priority: 6, is_department: false, inherits: null },
   { key: "cert_civ_3", name: "Certified Civilian III", kind: "certification", priority: 7, is_department: false, inherits: null },
+  // Civilian leadership — inherit Cert Civ III (top civ tier) until tuned.
+  { key: "civ_supervisor", name: "Civilian Supervisor", kind: "certification", priority: 8, is_department: false, inherits: "cert_civ_3" },
+  { key: "civ_manager", name: "Civilian Manager", kind: "certification", priority: 9, is_department: false, inherits: "cert_civ_3" },
   { key: "bso", name: "BSO", kind: "department", priority: 15, is_department: true, inherits: null },
   { key: "fhp", name: "FHP", kind: "department", priority: 15, is_department: true, inherits: null },
   { key: "mpd", name: "MPD", kind: "department", priority: 15, is_department: true, inherits: null },
