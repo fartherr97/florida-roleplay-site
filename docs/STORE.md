@@ -19,6 +19,7 @@ All optional — the store stays dormant (empty state on `/store`) until
 | Variable | Required for | What it is |
 | --- | --- | --- |
 | `TEBEX_STORE_TOKEN` | listing packages, checkout | The **public webstore token** from the Tebex panel (the Headless API identifier). Not secret, but kept server-side. |
+| `TEBEX_SECRET_KEY` | checkout (subscriptions) | The **private/secret API key** that pairs with the public token, from Tebex → your project → API Keys. Creating a basket authenticates with it; a subscription checkout fails with "Basic auth credentials are required" without it. |
 | `TEBEX_WEBHOOK_SECRET` | fulfillment | The **webhook signing secret** from Tebex → Developers → Webhooks. Real payment webhooks are refused without it. |
 | `TEBEX_STORE_URL` | optional | Public store URL for "Open in Tebex" links. Defaults to `https://<token>.tebex.io`. |
 | `SITE_URL` | optional | The site's public origin, used to build checkout return URLs. Defaults to `https://www.flrp.us`. |

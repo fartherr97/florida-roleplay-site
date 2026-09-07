@@ -30,6 +30,16 @@ export function webhookSecret() {
   return String(process.env.TEBEX_WEBHOOK_SECRET ?? "").trim();
 }
 
+/**
+ * The Headless API private key, from the Tebex panel's store API keys. Public
+ * reads (packages, categories) don't need it, but creating an authenticated
+ * basket does — Tebex requires it for recurring/subscription checkouts, which
+ * fail with "Basic auth credentials are required" without it.
+ */
+export function secretKey() {
+  return String(process.env.TEBEX_SECRET_KEY ?? "").trim();
+}
+
 /** True once a store token is configured; the storefront is dormant until then. */
 export function tebexConfigured() {
   return Boolean(storeToken());
@@ -47,7 +57,7 @@ export function tebexStoreUrl() {
 }
 
 /** A short-timeout fetch that never hangs the request or leaks the reason raw. */
-async function tebexFetch(path, { method = "GET", body } = {}) {
+async function tebexFetch(path, { method = "GET", body, auth = false } = {}) {
   const token = storeToken();
   if (!token) {
     const err = new Error("The store is not connected to Tebex yet.");
@@ -55,11 +65,27 @@ async function tebexFetch(path, { method = "GET", body } = {}) {
     throw err;
   }
 
+  const headers = { "Content-Type": "application/json", Accept: "application/json" };
+  // Authenticated endpoints (creating a basket, above all for subscriptions) use
+  // HTTP Basic auth: the public token as the username, the private key as the
+  // password. Public reads leave it off.
+  if (auth) {
+    const secret = secretKey();
+    if (!secret) {
+      const err = new Error(
+        "This purchase needs an authenticated Tebex request, but no private key is set. Add TEBEX_SECRET_KEY.",
+      );
+      err.code = "TEBEX_NOT_CONFIGURED";
+      throw err;
+    }
+    headers.Authorization = `Basic ${Buffer.from(`${token}:${secret}`).toString("base64")}`;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   const options = {
     method,
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers,
     signal: controller.signal,
   };
   if (body !== undefined) options.body = JSON.stringify(body);
@@ -152,6 +178,7 @@ export async function createCheckout({ packageId, completeUrl, cancelUrl, custom
   const token = encodeURIComponent(storeToken());
   const basket = await tebexFetch(`/accounts/${token}/baskets`, {
     method: "POST",
+    auth: true,
     body: {
       complete_url: completeUrl,
       cancel_url: cancelUrl,
@@ -173,13 +200,14 @@ export async function createCheckout({ packageId, completeUrl, cancelUrl, custom
 
   await tebexFetch(`/baskets/${encodeURIComponent(ident)}/packages`, {
     method: "POST",
+    auth: true,
     body: { package_id: Number(packageId), quantity: 1 },
   });
 
   // Re-read the basket so we hand back the freshest checkout link.
   let checkoutUrl = basket?.links?.checkout ?? null;
   try {
-    const refreshed = await tebexFetch(`/accounts/${token}/baskets/${encodeURIComponent(ident)}`);
+    const refreshed = await tebexFetch(`/accounts/${token}/baskets/${encodeURIComponent(ident)}`, { auth: true });
     checkoutUrl = refreshed?.links?.checkout ?? checkoutUrl;
   } catch {
     // The link from creation stands if the re-read fails.
