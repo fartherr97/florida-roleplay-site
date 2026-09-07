@@ -80,6 +80,7 @@ router.post("/checkout", async (req, res) => {
       packageId,
       completeUrl: `${origin}/store?status=complete`,
       cancelUrl: `${origin}/store?status=cancel`,
+      ipAddress: req.ip,
       custom: { flrp_user_id: user.id, flrp_username: user.displayName ?? user.username ?? null },
     });
 

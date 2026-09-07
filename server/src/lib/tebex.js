@@ -83,7 +83,12 @@ async function tebexFetch(path, { method = "GET", body } = {}) {
   }
 
   if (!res.ok) {
-    const err = new Error(payload?.title || payload?.message || `Tebex responded ${res.status}.`);
+    // Tebex returns { title, detail, status }; the detail names the offending
+    // field ("The ip address field is required."), which is what actually points
+    // at the fix, so include it when present.
+    const title = payload?.title || payload?.message || `Tebex responded ${res.status}.`;
+    const detail = payload?.detail && payload.detail !== title ? ` ${payload.detail}` : "";
+    const err = new Error(`${title}${detail}`.trim());
     err.code = "TEBEX_ERROR";
     err.status = res.status;
     throw err;
@@ -143,7 +148,7 @@ function normalizePackage(pkg) {
  * its way back to the account that started it. We never fulfill on the return
  * redirect; only the webhook does.
  */
-export async function createCheckout({ packageId, completeUrl, cancelUrl, custom }) {
+export async function createCheckout({ packageId, completeUrl, cancelUrl, custom, ipAddress }) {
   const token = encodeURIComponent(storeToken());
   const basket = await tebexFetch(`/accounts/${token}/baskets`, {
     method: "POST",
@@ -151,6 +156,10 @@ export async function createCheckout({ packageId, completeUrl, cancelUrl, custom
       complete_url: completeUrl,
       cancel_url: cancelUrl,
       complete_auto_redirect: true,
+      // The Headless API requires the buyer's IP on basket creation; omitting it
+      // is rejected as a "Request payload error". Fall back to a placeholder so a
+      // missing/again-anonymised IP never blocks checkout.
+      ip_address: ipAddress || "0.0.0.0",
       custom: custom ?? {},
     },
   });
