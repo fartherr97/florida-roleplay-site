@@ -296,6 +296,12 @@ export const PERMISSION_GROUPS = [
         label: "Administer the image host",
         detail: "See every uploaded image with who posted it, and remove anyone's.",
       },
+      {
+        key: "media.compress",
+        label: "Use the image compressor",
+        detail:
+          "Open the management image compressor — shrink an image to a target file size in the browser. Directorship and up.",
+      },
     ],
   },
   {
@@ -520,6 +526,9 @@ export const DEFAULT_GRANTS = {
   // it on this page for anyone else who should host images.
   "media.upload": [...staffFrom("mod"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "media.manage": staffFrom("senior_admin"),
+  // The management image compressor — Director+ only, per request. Runs entirely
+  // in the browser, so this only gates the page and its nav link.
+  "media.compress": ["directorship", "ownership"],
 
   // The dev team works development requests; department command see their own
   // department's work. Managing the hub (vehicle library, request categories)

@@ -107,6 +107,7 @@ export const navGroups = [
       { label: "Site Administration", to: "/staff-hub/administration", icon: "SlidersHorizontal" },
       { label: "Access & Roles", to: "/staff-hub/access", icon: "KeyRound" },
       { label: "Image Hosting Administration", to: "/management/image-hosting", icon: "Image" },
+      { label: "Image Compressor", to: "/management/image-compressor", icon: "Minimize2", permission: "media.compress" },
       // The route stays open (a public contact form) but the link is management-only.
       { label: "Contact Management", to: "/management/contact", icon: "Mail", permission: "permissions.manage" },
       // The bot dashboard has its own session-based gate; hide the link from anyone

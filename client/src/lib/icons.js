@@ -5,14 +5,14 @@
 import {
   Activity, Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
   ClipboardList, Code, Crown, Flame, Gamepad2, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy, Link,
-  ListChecks, Mail, MessageSquare, Newspaper, Radio, Scale, ScrollText, Shield, ShoppingCart, Siren, Star,
+  ListChecks, Mail, MessageSquare, Minimize2, Newspaper, Radio, Scale, ScrollText, Shield, ShoppingCart, Siren, Star,
   SlidersHorizontal, Stethoscope, Store, Tag, Ticket, Users, UserCog, Wrench,
 } from "lucide-react";
 
 const ICONS = {
   Activity, Anchor, ArrowLeftRight, Award, BookOpen, Bot, Briefcase, Building2, Calendar, Car, ChartColumn,
   ClipboardList, Code, Crown, Flame, Gamepad2, Gavel, Heart, House, Image, LayoutGrid, LifeBuoy, Link,
-  ListChecks, Mail, MessageSquare, Newspaper, Radio, Scale, ScrollText, Shield, ShoppingCart, Siren, Star,
+  ListChecks, Mail, MessageSquare, Minimize2, Newspaper, Radio, Scale, ScrollText, Shield, ShoppingCart, Siren, Star,
   SlidersHorizontal, Stethoscope, Store, Tag, Ticket, Users, UserCog, Wrench,
 };
 
