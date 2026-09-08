@@ -20,6 +20,7 @@ export const GUARDS = [
   { path: "/management/image-hosting", permission: "media.manage" },
   { path: "/management/image-compressor", permission: "media.compress" },
   { path: "/management/link-shortener", permission: "shortener.use" },
+  { path: "/staff-hub/bans", permission: "bans.view" },
   { path: "/management/emails", permission: "emails.view" },
   { path: "/management/broadcast", permission: "truthsocial.post" },
   { path: "/management/store", permission: "store.manage" },

@@ -305,6 +305,19 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "bans",
+    label: "Discord ban list",
+    description:
+      "The active global Discord ban list — who the florida-roleplay-manager bot has banned across every server, shown in the Staff Hub.",
+    permissions: [
+      {
+        key: "bans.view",
+        label: "View the ban list",
+        detail: "See the active Discord bans in the Staff Hub — display name, id, reason and who banned them.",
+      },
+    ],
+  },
+  {
     id: "shortener",
     label: "Link shortener",
     description:
@@ -561,6 +574,7 @@ export const DEFAULT_GRANTS = {
   // leadership (head_admin as a stand-in — add your exact Lead Dev Discord role
   // on the Access & Roles page), Directorship and Ownership. shortener.admin —
   // adding the subdomains links live on, which also needs DNS — is Ownership.
+  "bans.view": staffFrom("mod"),
   "shortener.use": ["fhp_colonel", "bso_sheriff", "mpd_chief", "head_admin", "directorship", "ownership"],
   "shortener.admin": ["ownership"],
 

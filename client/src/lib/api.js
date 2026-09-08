@@ -394,6 +394,7 @@ export const api = {
   hubDashboard: () => get("/staff-hub/dashboard", hub.dashboard),
   hubChecklist: () => get("/staff-hub/checklist", hub.checklist),
   hubDisciplinary: () => get("/staff-hub/disciplinary", hub.disciplinaryActions),
+  hubBans: () => get("/bans", { bans: [] }),
 
   hubExamDashboard: () =>
     get("/staff-hub/exams/dashboard", buildExamDashboard(hub.attempts)),

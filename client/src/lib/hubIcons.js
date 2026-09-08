@@ -7,7 +7,7 @@
  * Adding an icon makes it available to every department at once.
  */
 import {
-  Activity, Anchor, Award, BadgeCheck, BookOpen, Briefcase, Building2, Calendar,
+  Activity, Anchor, Award, BadgeCheck, Ban, BookOpen, Briefcase, Building2, Calendar,
   Car, ChartColumn, CircleDollarSign, ClipboardList, Clock, Crown, Dog, Flame,
   FileSpreadsheet, Fuel, Gavel, GraduationCap, Home, House, IdCard,
   Inbox, Key, KeyRound, Landmark, LayoutGrid, LifeBuoy, ListChecks, MapPin, Megaphone,
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 const HUB_ICONS = {
-  Activity, Anchor, Award, BadgeCheck, BookOpen, Briefcase, Building2, Calendar,
+  Activity, Anchor, Award, BadgeCheck, Ban, BookOpen, Briefcase, Building2, Calendar,
   Car, ChartColumn, CircleDollarSign, ClipboardList, Clock, Crown, Dog, Flame,
   FileSpreadsheet, Fuel, Gavel, GraduationCap, Home, House, IdCard,
   Inbox, Key, KeyRound, Landmark, LayoutGrid, LifeBuoy, ListChecks, MapPin, Megaphone,

@@ -58,6 +58,7 @@ import HubHome from "./pages/hub/HubHome";
 import HubRoster from "./pages/hub/HubRoster";
 import HubDashboard from "./pages/hub/HubDashboard";
 import HubChecklist from "./pages/hub/HubChecklist";
+import HubBanList from "./pages/hub/HubBanList";
 import HubDaHub from "./pages/hub/HubDaHub";
 import HubAdminLog from "./pages/hub/HubAdminLog";
 import HubReports from "./pages/hub/HubReports";
@@ -273,6 +274,7 @@ export default function App() {
             <Route path="/staff-hub/dashboard" element={<HubDashboard />} />
             <Route path="/staff-hub/trial-checklist" element={<HubChecklist />} />
             <Route path="/staff-hub/da-hub" element={<HubDaHub />} />
+            <Route path="/staff-hub/bans" element={<HubBanList />} />
             <Route path="/staff-hub/admin-log" element={<HubAdminLog />} />
             <Route path="/staff-hub/reports" element={<HubReports />} />
             <Route path="/staff-hub/training" element={<HubTraining />} />
