@@ -19,6 +19,7 @@ import Reports from "./pages/Reports";
 import ImageHost from "./pages/ImageHost";
 import ImageHostAdmin from "./pages/management/ImageHostAdmin";
 import ImageCompressor from "./pages/management/ImageCompressor";
+import LinkShortener from "./pages/management/LinkShortener";
 import EmailDirectory from "./pages/management/EmailDirectory";
 import TruthSocial from "./pages/management/TruthSocial";
 import FivemConfig from "./pages/management/FivemConfig";
@@ -174,6 +175,7 @@ export default function App() {
             <Route path="image-host" element={<ImageHost />} />
             <Route path="management/image-hosting" element={<ImageHostAdmin />} />
             <Route path="management/image-compressor" element={<ImageCompressor />} />
+            <Route path="management/link-shortener" element={<LinkShortener />} />
             <Route path="management/emails" element={<EmailDirectory />} />
             <Route path="management/broadcast" element={<TruthSocial />} />
             <Route path="management/fivem-config" element={<FivemConfig />} />

@@ -315,6 +315,17 @@ export const api = {
   },
   storeMyPurchases: () => get("/store/purchases/me", { purchases: [] }),
 
+  // URL shortener (Management). All gated server-side: list/create/edit/remove
+  // need shortener.use; the domain calls need shortener.admin.
+  links: () => get("/links", { links: [], domains: [] }),
+  createLink: (payload) => post("/links", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  updateLink: (id, payload) =>
+    patchJson(`/links/${encodeURIComponent(id)}`, payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  deleteLink: (id) => del(`/links/${encodeURIComponent(id)}`, () => ({ ok: false, message: NOT_PERSISTED })),
+  addLinkDomain: (payload) => post("/links/domains", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  deleteLinkDomain: (id) =>
+    del(`/links/domains/${encodeURIComponent(id)}`, () => ({ ok: false, message: NOT_PERSISTED })),
+
   // Ownership-only Store Management. Every one of these hits a store.manage-gated
   // endpoint; the server is the boundary, these are just the calls the page makes.
   storeOverview: () => get("/store/manage/overview", null),

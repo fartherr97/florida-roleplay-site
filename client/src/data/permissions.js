@@ -305,6 +305,27 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "shortener",
+    label: "Link shortener",
+    description:
+      "The community URL shortener — paste a long URL and get a short one on a chosen subdomain. Links redirect for everyone; only holders here can mint or manage them.",
+    permissions: [
+      {
+        key: "shortener.use",
+        label: "Create & manage short links",
+        detail:
+          "Shorten a URL onto a set-up subdomain, and edit, disable or remove short links. Department Heads, dev leadership, Directorship and Ownership.",
+      },
+      {
+        key: "shortener.admin",
+        label: "Manage shortener subdomains",
+        detail:
+          "Add or remove the subdomains short links live on. Setting one up also needs a DNS change, so this sits with Ownership.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "development",
     label: "Development Hub",
     description:
@@ -535,6 +556,13 @@ export const DEFAULT_GRANTS = {
   // sits higher. Opening a request needs nothing but a Discord account.
   "development.work": [...staffFrom("admin"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "development.manage": ["head_admin", "directorship", "ownership"],
+
+  // The URL shortener. shortener.use is seeded to department command, dev
+  // leadership (head_admin as a stand-in — add your exact Lead Dev Discord role
+  // on the Access & Roles page), Directorship and Ownership. shortener.admin —
+  // adding the subdomains links live on, which also needs DNS — is Ownership.
+  "shortener.use": ["fhp_colonel", "bso_sheriff", "mpd_chief", "head_admin", "directorship", "ownership"],
+  "shortener.admin": ["ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

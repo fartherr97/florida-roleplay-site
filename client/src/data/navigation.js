@@ -50,6 +50,7 @@ export const navGroups = [
       { label: "Miami Police Department", to: "/departments/mpd", icon: "Building2" },
       { label: "Transfer Portal", to: "/transfers", icon: "ArrowLeftRight" },
       { label: "Image Hosting", to: "/image-host", icon: "Image" },
+      { label: "Link Shortener", to: "/management/link-shortener", icon: "Link", permission: "shortener.use" },
     ],
   },
   {

@@ -27,6 +27,7 @@ import supportRouter from "./support.js";
 import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
 import storeRouter from "./store.js";
+import linksRouter from "./links.js";
 import authRouter from "./auth.js";
 import fivemRouter from "./fivem.js";
 import {
@@ -87,6 +88,7 @@ router.use("/media", mediaRouter);
 // Tebex's payment webhook. The webhook verifies its own signature; every
 // management route is gated by store.manage.
 router.use("/store", storeRouter);
+router.use("/links", linksRouter);
 // Discord OAuth. Mounted here with the rest so it shares the /api prefix and the
 // same-origin cookie; the handshake itself needs no session, and attachUser
 // above never blocks, so a signed-out visitor reaches /auth/login fine.

@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import router from "./routes/index.js";
 import { serve as mediaServe } from "./routes/media.js";
+import { resolveAndCount as resolveShortLink } from "./lib/shortener.js";
 import { startRosterSync } from "./lib/rosterSync.js";
 import { migrateLegacyDepartmentIds } from "./lib/legacyIds.js";
 import { close, ping } from "./db.js";
@@ -77,6 +78,23 @@ app.use("/api", router);
 // database at /images/<id> — a clean, CDN-friendly URL, deliberately outside the
 // /api prefix and the SPA fallback below.
 app.use("/images", mediaServe);
+
+// The URL shortener's public redirect. A request is treated as a short link
+// only when its Host is a registered shortener subdomain and the path is a
+// single slug — so this never shadows the main site's real routes, and its own
+// assets (with a dot, or under /api and /images) still load on that subdomain.
+// Anything that doesn't resolve falls through to the normal site below.
+app.get(/^\/([A-Za-z0-9_-]{1,80})$/, async (req, res, next) => {
+  const slug = req.params[0];
+  const host = String(req.hostname || "").toLowerCase();
+  try {
+    const target = await resolveShortLink(host, slug);
+    if (target) return res.redirect(302, target);
+  } catch {
+    // fall through to the site
+  }
+  return next();
+});
 
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
