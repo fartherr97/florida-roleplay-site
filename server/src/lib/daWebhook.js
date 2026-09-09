@@ -36,9 +36,9 @@ export function daLogWebhookUrl() {
  * in the main guild). Override any of them with DA_PING_ROLES if roles change.
  */
 const DEFAULT_PING_ROLES = {
-  fhp: ["1534498144870727680", "1534498145633833124"], // Colonel, Lt. Colonel
-  bso: ["1534498938080460890", "1534498939099943064"], // Sheriff, Undersheriff
-  mpd: ["1534522987007443065", "1534522987779195000"], // Chief of Police, Deputy Chief
+  fhp: ["1534920645333356645", "1534920695929245857"], // Colonel, Lt. Colonel
+  bso: ["1534920359831404645", "1534920597040005201"], // Sheriff, Undersheriff
+  mpd: ["1534920748681007114", "1534920797922132169"], // Chief of Police, Deputy Chief
 };
 
 /** Embed colour by action severity, matching the DA Hub's own palette. */
