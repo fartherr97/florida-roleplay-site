@@ -344,15 +344,13 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
     return [head, ...shown, ...rest];
   };
 
-  // Staff and department read as one list here — the entry names the department
-  // itself, so the reviewer sees the whole verbal (or non-verbal) history in one
-  // place rather than split across two headings.
-  const verbal = [...background.verbal.staff, ...background.verbal.department].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-  );
-  const nonVerbal = [...background.nonVerbal.staff, ...background.nonVerbal.department].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-  );
+  // Split by who filed it — department vs staff — matching the reference bot's
+  // layout, with each side's verbal and non-verbal actions together, newest
+  // first. The entry itself names the action type, so the two headings are all
+  // the grouping a reviewer needs.
+  const byDate = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+  const department = [...background.nonVerbal.department, ...background.verbal.department].sort(byDate);
+  const staff = [...background.nonVerbal.staff, ...background.verbal.staff].sort(byDate);
 
   const severity = background.total === 0 ? "clean" : background.nonVerbal.total > 0 ? "heavy" : "light";
   const months = Math.round(background.windowDays / 30);
@@ -368,8 +366,8 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
       value: `**${background.total}** active · **${background.voided.length}** revoked`,
       inline: false,
     },
-    ...sectionFields(`Non-Verbal Disciplinary Logs — last ${months} months`, nonVerbal),
-    ...sectionFields(`Verbal Disciplinary Logs — last ${months} months`, verbal),
+    ...sectionFields(`Department Disciplinary Logs — last ${months} months`, department),
+    ...sectionFields(`Staff Disciplinary Logs — last ${months} months`, staff),
   ];
 
   return {
