@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Globe, Link2, Pencil, Plus, Power, Trash2, X } from "lucide-react";
+import { ExternalLink, Globe, Link2, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import Section from "../../components/layout/Section";
 import PageHeader from "../../components/layout/PageHeader";
 import Card from "../../components/ui/Card";
@@ -378,6 +378,11 @@ function DomainManager({ domains, onChanged, onError }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
 
+  // Make the setup example concrete: use whatever host they're typing (falling
+  // back to go.flrp.us), and split off the record name (the part before the root).
+  const exampleHost = (host.trim() || "go.flrp.us").toLowerCase();
+  const exampleName = exampleHost.split(".")[0] || "go";
+
   const add = async (event) => {
     event.preventDefault();
     if (!host.trim()) return;
@@ -466,29 +471,62 @@ function DomainManager({ domains, onChanged, onError }) {
         {open ? "Hide" : "Show"} DNS setup steps
       </button>
       {open && (
-        <ol className="mt-3 space-y-2 rounded-xl bg-white/[0.02] p-4 text-sm text-slate-300 ring-1 ring-inset ring-white/[0.06]">
-          <li className="flex gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-            At your DNS provider (e.g. Cloudflare), add a <strong>CNAME</strong> record for the subdomain
-            (the part before your root domain, e.g. <code className="text-slate-200">go</code>) pointing at
-            the same target your main site uses. On Cloudflare, leave it <strong>Proxied</strong>.
-          </li>
-          <li className="flex gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-            In your hosting provider (Railway/Northflank/etc.), add the full subdomain as a{" "}
-            <strong>custom domain</strong> on the same service, so it issues a TLS certificate for it.
-          </li>
-          <li className="flex gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-            Add the exact host above in this panel. Once DNS has propagated (usually minutes), links on it
-            resolve — test one by opening its short URL.
-          </li>
-          <li className="flex gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-            Use a <strong>dedicated</strong> subdomain (not your main site host) so short slugs never
-            collide with real pages.
-          </li>
-        </ol>
+        <div className="mt-3 rounded-xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.06]">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            One-time DNS setup
+          </p>
+          <ol className="space-y-4 text-sm text-slate-400">
+            <li className="flex gap-3">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-500/15 text-xs font-bold text-primary-300">
+                1
+              </span>
+              <div className="space-y-2">
+                <p className="font-semibold text-white">Add a DNS record at your registrar</p>
+                <p>
+                  In your DNS provider (Cloudflare, Namecheap, etc.), create a CNAME record that points
+                  the subdomain at the same target your main site already uses. On Cloudflare, keep the
+                  proxy on (the orange cloud).
+                </p>
+                <div className="rounded-lg bg-black/30 px-3 py-2 font-mono text-xs text-slate-300 ring-1 ring-inset ring-white/[0.06]">
+                  <div>Type&nbsp;&nbsp;&nbsp;<span className="text-white">CNAME</span></div>
+                  <div>Name&nbsp;&nbsp;&nbsp;<span className="text-white">{exampleName}</span>&nbsp;&nbsp;
+                    <span className="text-slate-500">(the part before your root domain, for {exampleHost})</span>
+                  </div>
+                  <div>Target&nbsp;<span className="text-white">same as your main site</span></div>
+                </div>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-500/15 text-xs font-bold text-primary-300">
+                2
+              </span>
+              <div className="space-y-1">
+                <p className="font-semibold text-white">Add it as a custom domain on your host</p>
+                <p>
+                  In your hosting provider (Railway, Northflank, etc.), add the full subdomain
+                  (<span className="text-slate-200">{exampleHost}</span>) as a custom domain on this
+                  site's service. That's what makes it issue an HTTPS certificate for the subdomain.
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-500/15 text-xs font-bold text-primary-300">
+                3
+              </span>
+              <div className="space-y-1">
+                <p className="font-semibold text-white">Register the host here</p>
+                <p>
+                  Add the exact host in the field above and save. Once DNS finishes propagating (usually
+                  a few minutes), short links on it start resolving — test by opening one.
+                </p>
+              </div>
+            </li>
+          </ol>
+          <p className="mt-4 border-t border-white/[0.06] pt-3 text-xs text-slate-500">
+            <span className="font-semibold text-slate-400">Tip:</span> use a dedicated subdomain — not
+            your main site's host — so short slugs never collide with real pages.
+          </p>
+        </div>
       )}
     </Card>
   );
