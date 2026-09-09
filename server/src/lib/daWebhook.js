@@ -8,11 +8,11 @@
  * embed, so the dept heads are notified. Staff/management DAs post without a
  * department ping.
  *
- * Config is one channel webhook plus, optionally, an explicit per-body ping
- * override. Without an override, the head role(s) are resolved from the Discord
- * role map for the department's command rank, so it works out of the box once
- * the role map is set. Fired server-side on the filing request; best-effort, so
- * a webhook failure never fails the DA that already saved.
+ * Config is one channel webhook. Each department's DA pings its head and deputy
+ * head (the 01 and 02) — their real records-log-server role ids are built in
+ * below and can be overridden with DA_PING_ROLES. Fired server-side on the
+ * filing request; best-effort, so a webhook failure never fails the DA that
+ * already saved.
  */
 import { query } from "../db.js";
 import { sendWebhook } from "./deptWebhook.js";
@@ -28,6 +28,18 @@ import {
 export function daLogWebhookUrl() {
   return String(process.env.DA_LOG_WEBHOOK_URL ?? "").trim();
 }
+
+/**
+ * The head + deputy-head Discord role ids pinged for each department's DAs — the
+ * 01 and 02. These are the real roles in the records-log server, so they always
+ * resolve (the role map holds department-guild ids, which show as @unknown-role
+ * in the main guild). Override any of them with DA_PING_ROLES if roles change.
+ */
+const DEFAULT_PING_ROLES = {
+  fhp: ["1534498144870727680", "1534498145633833124"], // Colonel, Lt. Colonel
+  bso: ["1534498938080460890", "1534498939099943064"], // Sheriff, Undersheriff
+  mpd: ["1534522987007443065", "1534522987779195000"], // Chief of Police, Deputy Chief
+};
 
 /** Embed colour by action severity, matching the DA Hub's own palette. */
 function colorFor(typeId) {
@@ -64,16 +76,19 @@ function pingOverrides() {
 const DEPT_PING_DEPTH = 2;
 
 /**
- * The role ids to ping for a body: an explicit override if set, else — for a
- * department body — the Discord role ids of its two highest-ranked roles from
- * the role map (the head and deputy head: Sheriff + Undersheriff, Chief +
- * Deputy Chief, and so on). Reading them by rank order means it always tracks
- * the current 01 and 02 without hardcoding ids, and adapts if ranks change.
- * Staff/management bodies ping nobody unless overridden.
+ * The role ids to ping for a body: an explicit DA_PING_ROLES override if set,
+ * else the department's built-in head + deputy-head roles (the 01 and 02). As a
+ * last resort — for a department with no built-in entry — the two highest-ranked
+ * roles from the role map are used. Staff/management bodies ping nobody unless
+ * overridden.
  */
 async function pingRoleIdsFor(bodyId) {
+  // An env override wins, for setups that prefer configuration by variable.
   const override = pingOverrides()[bodyId];
   if (override) return override;
+
+  // The head + deputy head role ids per department (the 01 and 02).
+  if (DEFAULT_PING_ROLES[bodyId]) return DEFAULT_PING_ROLES[bodyId];
 
   const body = ACTION_BODY_MAP[bodyId];
   if (!body || body.source !== "department") return [];
@@ -115,7 +130,7 @@ export function buildDaPayload(action, pingRoleIds = []) {
     .join(" ");
   const issuedValue = [
     action.issuedByName || "Unknown",
-    action.issuedByDiscordId ? `<@${action.issuedByDiscordId}>` : null,
+    action.issuedByDiscordId ? `(${action.issuedByDiscordId})` : null,
   ]
     .filter(Boolean)
     .join(" ");
