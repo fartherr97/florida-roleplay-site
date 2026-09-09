@@ -28,8 +28,8 @@ export const SITE = {
   //       Royalty-free Florida coastline placeholder (Unsplash, free licence).
   heroImage:
     "https://images.unsplash.com/photo-1535498730771-e735b998cd64?auto=format&fit=crop&w=2400&q=70",
-  // TODO: replace with the live FiveM connect endpoint.
-  fivemConnect: "fivem://connect/play.flrp.us",
+  // The FiveM "Connect to Server" link — cfx.re hands the player off into the game.
+  fivemConnect: "https://cfx.re/join/kqqajza",
   serverAddress: "play.flrp.us",
   discordInvite: "https://discord.gg/floridarp",
   // Applications, forms and CAD are handled by Sonoran now, not by this site.

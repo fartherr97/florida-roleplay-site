@@ -175,7 +175,7 @@ export default function TopBar() {
             </span>
 
             <span className="hidden sm:block">
-              <Button as="a" href={SITE.fivemConnect} variant="primary" size="sm">
+              <Button as="a" href={SITE.fivemConnect} target="_blank" rel="noreferrer noopener" variant="primary" size="sm">
                 Connect
                 <ExternalLink className="size-4" />
               </Button>

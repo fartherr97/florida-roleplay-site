@@ -183,7 +183,7 @@ export default function MobileNav({ open, onClose, primaryLinks, groups }) {
                 Apply
                 <ExternalLink className="size-4" />
               </Button>
-              <Button as="a" href={SITE.fivemConnect} variant="primary" block>
+              <Button as="a" href={SITE.fivemConnect} target="_blank" rel="noreferrer noopener" variant="primary" block>
                 Connect to Server
                 <ExternalLink className="size-4" />
               </Button>
