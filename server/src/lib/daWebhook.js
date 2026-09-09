@@ -60,10 +60,16 @@ function pingOverrides() {
   return map;
 }
 
+/** How many top ranks a department DA pings — the head and their deputy (01 & 02). */
+const DEPT_PING_DEPTH = 2;
+
 /**
  * The role ids to ping for a body: an explicit override if set, else — for a
- * department body — the Discord role id(s) of its command rank, resolved from
- * the role map. Staff/management bodies ping nobody unless overridden.
+ * department body — the Discord role ids of its two highest-ranked roles from
+ * the role map (the head and deputy head: Sheriff + Undersheriff, Chief +
+ * Deputy Chief, and so on). Reading them by rank order means it always tracks
+ * the current 01 and 02 without hardcoding ids, and adapts if ranks change.
+ * Staff/management bodies ping nobody unless overridden.
  */
 async function pingRoleIdsFor(bodyId) {
   const override = pingOverrides()[bodyId];
@@ -71,14 +77,26 @@ async function pingRoleIdsFor(bodyId) {
 
   const body = ACTION_BODY_MAP[bodyId];
   if (!body || body.source !== "department") return [];
-  const commandKey = DEPARTMENT_COMMAND_KEYS[bodyId];
-  if (!commandKey) return [];
   try {
+    // The department id is the body id for a department body; take its top ranks
+    // by seniority (sort_order), highest first.
     const rows = await query(
+      `SELECT role_id FROM roster_role_map
+         WHERE department = $1 AND kind = 'rank' AND role_id IS NOT NULL
+         ORDER BY sort_order DESC
+         LIMIT $2`,
+      [bodyId, DEPT_PING_DEPTH],
+    );
+    const ids = rows.map((r) => String(r.role_id)).filter((id) => /^\d{17,20}$/.test(id));
+    if (ids.length) return ids;
+    // Fall back to the single mapped command rank if the map has no ordered rows.
+    const commandKey = DEPARTMENT_COMMAND_KEYS[bodyId];
+    if (!commandKey) return [];
+    const head = await query(
       "SELECT role_id FROM roster_role_map WHERE role_key = $1 AND role_id IS NOT NULL",
       [commandKey],
     );
-    return rows.map((r) => String(r.role_id)).filter((id) => /^\d{17,20}$/.test(id));
+    return head.map((r) => String(r.role_id)).filter((id) => /^\d{17,20}$/.test(id));
   } catch {
     return [];
   }
