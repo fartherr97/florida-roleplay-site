@@ -16,7 +16,7 @@
  * Everything here is pure. Mirrored from client/src/lib/discipline.js.
  */
 import { DEPARTMENTS } from "../rosterSeed.js";
-import { formatPlayTime } from "./txadmin.js";
+import { formatPlayTime } from "./playerMeta.js";
 
 export const CONFIG_VERSION = 1;
 
@@ -356,8 +356,8 @@ export function buildBackgroundEmbed(background, { memberName, meta } = {}) {
   const severity = background.total === 0 ? "clean" : background.nonVerbal.total > 0 ? "heavy" : "light";
   const months = Math.round(background.windowDays / 30);
 
-  // Optional txAdmin metadata (play time, join date, last connection), shown as
-  // inline fields when a bridge is configured and knows this player.
+  // Optional player metadata (play time, join date, last connection) mirrored
+  // from the FiveM `players` table, shown as inline fields when we know them.
   const metaFields = [];
   if (meta) {
     const play = formatPlayTime(meta.playTimeMinutes);

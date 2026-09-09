@@ -21,7 +21,7 @@ import { fetchMemberRoles } from "../lib/discord.js";
 import { resolveRoleKeys } from "../lib/roleSync.js";
 import { str } from "../validate.js";
 import { fireDaWebhook } from "../lib/daWebhook.js";
-import { fetchPlayerMeta } from "../lib/txadmin.js";
+import { fetchPlayerMeta } from "../lib/playerMeta.js";
 import {
   ACTION_TYPE_MAP,
   ACTION_BODY_MAP,
@@ -360,8 +360,8 @@ router.get("/bot/background/:discordId", requireBot, async (req, res) => {
   // itself with even when the bot only had an id to go on.
   const memberName = str(req.query.name) || actions.find((a) => a.targetName)?.targetName || null;
 
-  // Best-effort txAdmin metadata (play time, join date, last connection). Null
-  // unless a bridge is configured; never blocks the check.
+  // Best-effort player metadata (play time, join date, last connection) mirrored
+  // from the FiveM `players` table. Null until the game pushes it; never blocks.
   const meta = await fetchPlayerMeta(discordId);
 
   res.json({

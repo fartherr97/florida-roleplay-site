@@ -20,6 +20,7 @@ import { fivemConfigSeed } from "../fivemSeed.js";
 import { attachUser } from "../middleware/requireRole.js";
 import { requirePermission } from "../middleware/requirePermission.js";
 import { ingestSession, ingestSessions, setLive } from "../lib/dutyHours.js";
+import { ingestPlayer, ingestPlayers } from "../lib/playerMeta.js";
 
 const router = Router();
 
@@ -238,6 +239,30 @@ router.post("/duty/live", requireFivemSecret, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ ok: false, code: "LIVE_FAILED", message: err.message });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Player-meta ingest (machine): the FiveM server pushes its `players`
+ * rows here (play time, first/last seen, keyed by Discord id). We mirror
+ * them so the /bgcheck embed can show a player's play time, join date and
+ * last connection. Best-effort; drives nothing else.
+ * ------------------------------------------------------------------ */
+router.post("/players", requireFivemSecret, async (req, res) => {
+  try {
+    const ok = await ingestPlayer(req.body?.player || req.body);
+    res.json({ ok });
+  } catch (err) {
+    res.status(500).json({ ok: false, code: "INGEST_FAILED", message: err.message });
+  }
+});
+
+router.post("/players_bulk", requireFivemSecret, async (req, res) => {
+  try {
+    const n = await ingestPlayers(req.body?.players || []);
+    res.json({ ok: true, ingested: n });
+  } catch (err) {
+    res.status(500).json({ ok: false, code: "INGEST_FAILED", message: err.message });
   }
 });
 
