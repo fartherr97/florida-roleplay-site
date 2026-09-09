@@ -303,40 +303,44 @@ function embedDate(value) {
  * the site owns what a record means, and a second renderer would be a second
  * opinion about somebody's history.
  *
- * The body is monospace on purpose: a background check is read like a form, so
- * every entry lays out the same labelled fields — Action Type, Reason, Date,
- * Department, Revocation — under a PLAYER INFO header, and a section with
- * nothing in it says so rather than vanishing.
+ * Laid out with native embed fields and proportional text — bold labels, one
+ * field per entry — rather than a monospace code block, so it reflows and stays
+ * readable on mobile. A section with nothing in it says so rather than vanishing.
  */
 export function buildBackgroundEmbed(background, { memberName } = {}) {
-  const clampBlock = (text, max = 1000) =>
-    text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  // The most fields Discord allows is 25; keep well under it. Four player-info
+  // fields plus two section headers leaves room for this many entries per
+  // section, with a trailing "+N older" note when a member has more.
+  const MAX_PER_SECTION = 8;
+  const clamp = (text, max = 1024) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
-  // One record as the labelled block the reference lays out.
-  const entry = (action) => {
-    const revoked = action.voided
-      ? `Revoked${action.voidReason ? ` — ${action.voidReason}` : ""}`
-      : "Not Revoked";
-    return [
-      `Action Type: ${actionLabel(action.type)}`,
-      `Reason:      ${action.reason || "—"}`,
-      `Date:        ${embedDate(action.createdAt)}`,
-      `Department:  ${bodyLabel(action.bodyId)}`,
-      `Revocation:  ${revoked}`,
+  // One record as a field: the type and department in the name, the details in
+  // the value with bold labels so it reads like a form but wraps like prose.
+  const entryField = (action, emoji) => {
+    const status = action.voided
+      ? `🔓 Revoked${action.voidReason ? ` — ${action.voidReason}` : ""}`
+      : "🔒 Active";
+    const value = [
+      `**Reason:** ${action.reason || "—"}`,
+      `**Date:** ${embedDate(action.createdAt)}`,
+      `**Status:** ${status}`,
     ].join("\n");
-  };
-
-  // A whole section, always shown, wrapped in a code fence so it renders
-  // monospace. "No records found." when the member has nothing of that kind.
-  const section = (name, list) => {
-    const body = list.length
-      ? list.map(entry).join("\n\n")
-      : "No records found.";
     return {
-      name,
-      value: `\`\`\`\n${clampBlock(body)}\n\`\`\``,
+      name: clamp(`${emoji} ${actionLabel(action.type)} · ${bodyLabel(action.bodyId)}`, 256),
+      value: clamp(value),
       inline: false,
     };
+  };
+
+  // A section header field plus one field per entry (capped), or a single
+  // "No records found." field when the member has nothing of that kind.
+  const sectionFields = (header, list, emoji) => {
+    if (!list.length) return [{ name: header, value: "*No records found.*", inline: false }];
+    const shown = list.slice(0, MAX_PER_SECTION).map((a) => entryField(a, emoji));
+    const extra = list.length - shown.length;
+    const head = { name: header, value: `${list.length} on record`, inline: false };
+    const rest = extra > 0 ? [{ name: "​", value: `*…and ${extra} older not shown.*`, inline: false }] : [];
+    return [head, ...shown, ...rest];
   };
 
   // Staff and department read as one list here — the entry names the department
@@ -350,28 +354,30 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
   );
 
   const severity = background.total === 0 ? "clean" : background.nonVerbal.total > 0 ? "heavy" : "light";
-
-  const playerInfo = [
-    `Name:       ${memberName || "Unknown"}`,
-    `Discord ID: ${background.discordId}`,
-    `Window:     last ${Math.round(background.windowDays / 30)} months`,
-    `Summary:    ${background.total} active · ${background.voided.length} revoked`,
-  ].join("\n");
+  const months = Math.round(background.windowDays / 30);
 
   const fields = [
-    section("NON-VERBAL DISCIPLINARY LOGS (last 6 mo)", nonVerbal),
-    section("VERBAL DISCIPLINARY LOGS (last 6 mo)", verbal),
+    // Player info as short inline fields — they pack across on desktop and stack
+    // on mobile, instead of a fixed-width monospace block that overflows.
+    { name: "Member", value: clamp(memberName || "Unknown", 256), inline: true },
+    { name: "Discord ID", value: `\`${background.discordId}\``, inline: true },
+    { name: "Window", value: `Last ${months} month${months === 1 ? "" : "s"}`, inline: true },
+    {
+      name: "Summary",
+      value: `**${background.total}** active · **${background.voided.length}** revoked`,
+      inline: false,
+    },
+    ...sectionFields("🔴 Non-Verbal — last 6 months", nonVerbal, "⚠️"),
+    ...sectionFields("🟡 Verbal — last 6 months", verbal, "💬"),
   ];
 
   return {
     embeds: [
       {
         title: "Background Check Results",
-        description:
-          `**PLAYER INFO**\n\`\`\`\n${clampBlock(playerInfo)}\n\`\`\`\n` +
-          `<@${background.discordId}> — ${background.headline}`,
+        description: `<@${background.discordId}> — ${background.headline}`,
         color: EMBED_COLORS[severity],
-        fields,
+        fields: fields.slice(0, 25),
         footer: { text: "Florida Roleplay · Disciplinary record" },
         timestamp: new Date().toISOString(),
       },
