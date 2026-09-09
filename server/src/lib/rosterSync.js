@@ -15,6 +15,7 @@ import { query } from "../db.js";
 import * as seed from "../rosterSeed.js";
 import { DEPARTMENT_CONFIGS } from "../departmentSeed.js";
 import { normalizeConfig } from "./departmentConfig.js";
+import { planCallsigns, divisionRanges } from "./callsigns.js";
 import { resolveRole, buildNickname, renderDisplayName } from "./roster.js";
 import { fetchGuildMembers, fetchGuildMember } from "./discord.js";
 
@@ -260,13 +261,39 @@ async function loadDeptMeta() {
 }
 
 /**
- * Give every member of one department a callsign from its range, keeping the one
- * they already have. A member who carries a callsign in their nickname keeps it
- * and reserves that number; everyone else keeps a still-valid stored number or
- * is handed the next free one. Rows for members who left, or who now carry a
- * nickname callsign, are removed. Best-effort — a failure never fails the sync.
+ * Every department's normalized config, keyed by id — seeds overlaid by any
+ * stored config. Used to read each division's callsign range.
  */
-async function assignDeptCallsigns(deptId, members, meta) {
+async function loadDeptConfigs() {
+  const out = {};
+  for (const [id, cfg] of Object.entries(DEPARTMENT_CONFIGS)) out[id] = normalizeConfig(cfg, id);
+  try {
+    const rows = await query("SELECT id, config FROM department_configs");
+    for (const row of rows) {
+      const raw = typeof row.config === "object" ? row.config : JSON.parse(row.config);
+      out[row.id] = normalizeConfig(raw, row.id);
+    }
+  } catch {
+    // No database — the seed configs stand.
+  }
+  return out;
+}
+
+/**
+ * Give a department's members callsigns from their DIVISION's range: whoever is
+ * placed in a division with a configured range gets the lowest free number in it
+ * (seniors first), so a rank that lands someone in a division mints its top
+ * available callsign. A member who carries a callsign in their nickname keeps it
+ * and reserves that number; a member who resolves to no range gets none. The
+ * decision is made by planCallsigns; here we just read the current numbers and
+ * persist the plan. Best-effort — a failure never fails the sync.
+ *
+ * `members` are `{ discordId, nickCallsign, roleKeys, order }`.
+ */
+async function assignDeptCallsigns(deptId, members, deptConfig) {
+  // With no division carrying a configured range, this department doesn't use
+  // auto-callsigns — leave any existing rows exactly as they are.
+  if (divisionRanges(deptConfig).length === 0) return;
   try {
     const rows = await query(
       "SELECT discord_id, callsign FROM dept_callsigns WHERE department = $1",
@@ -274,31 +301,7 @@ async function assignDeptCallsigns(deptId, members, meta) {
     );
     const existing = new Map(rows.map((r) => [r.discord_id, String(r.callsign)]));
 
-    // Numbers already spoken for: every present member's nickname callsign.
-    const occupied = new Set();
-    for (const m of members) if (m.nickCallsign) occupied.add(String(m.nickCallsign));
-
-    const assign = new Map(); // discordId -> number string, for members without a nick callsign
-    // Keep a still-valid stored number that no nickname now claims.
-    for (const m of members) {
-      if (m.nickCallsign) continue;
-      const prev = existing.get(m.discordId);
-      const n = prev ? Number(prev) : NaN;
-      if (Number.isFinite(n) && n >= meta.min && n <= meta.max && !occupied.has(prev)) {
-        assign.set(m.discordId, prev);
-        occupied.add(prev);
-      }
-    }
-    // Hand the next free number to anyone still without one.
-    let cursor = meta.min;
-    for (const m of members) {
-      if (m.nickCallsign || assign.has(m.discordId)) continue;
-      while (cursor <= meta.max && occupied.has(String(cursor))) cursor += 1;
-      if (cursor > meta.max) break; // range exhausted — leave the rest blank
-      assign.set(m.discordId, String(cursor));
-      occupied.add(String(cursor));
-      cursor += 1;
-    }
+    const assign = planCallsigns(members, deptConfig, existing);
 
     for (const [discordId, cs] of assign) {
       await query(
@@ -320,6 +323,23 @@ async function assignDeptCallsigns(deptId, members, meta) {
   } catch {
     // Auto-callsigns are a convenience; never let them break a roster sync.
   }
+}
+
+/**
+ * The role keys a member holds within one department, and their top seniority
+ * order there — everything planCallsigns needs to place them in a division.
+ */
+function deptRoleInfo(roleIds, roleMap, deptId) {
+  const roleKeys = [];
+  let order = 0;
+  for (const id of roleIds) {
+    const role = roleMap.find((r) => String(r.roleId) === String(id));
+    if (role && role.department === deptId) {
+      roleKeys.push(String(role.key));
+      order = Math.max(order, Number(role.order) || 0);
+    }
+  }
+  return { roleKeys, order };
 }
 
 let lastSyncAt = 0;
@@ -406,7 +426,8 @@ export async function syncRosterFromGuild() {
           byDept[d] = (byDept[d] ?? 0) + 1;
           const gid = deptMeta[d]?.guildId;
           const nickCallsign = gid && data.nicks[gid] ? parseNick(data.nicks[gid]).callsign : "";
-          (deptMembers[d] ??= []).push({ discordId, nickCallsign });
+          const { roleKeys, order } = deptRoleInfo(roleIds, roleMap, d);
+          (deptMembers[d] ??= []).push({ discordId, nickCallsign, roleKeys, order });
         }
       }
     }
@@ -429,11 +450,11 @@ export async function syncRosterFromGuild() {
       }
 
       // Hand out auto callsigns once the read is clean, so numbers aren't churned
-      // by a partial view of a department. Only departments with a real range and
-      // auto-assignment on are touched.
-      for (const [deptId, meta] of Object.entries(deptMeta)) {
-        if (!meta.auto || meta.min <= 0 || meta.max < meta.min) continue;
-        await assignDeptCallsigns(deptId, deptMembers[deptId] ?? [], meta);
+      // by a partial view of a department. Each department's own config decides
+      // which divisions have ranges; a department with none is left untouched.
+      const deptConfigs = await loadDeptConfigs();
+      for (const [deptId, members] of Object.entries(deptMembers)) {
+        await assignDeptCallsigns(deptId, members, deptConfigs[deptId]);
       }
     }
 
@@ -569,7 +590,8 @@ export async function syncRosterForDept(deptId) {
         // cross-department member's callsign in their home department is untouched.
         const gid = meta?.guildId;
         const nickCallsign = gid && data.nicks[gid] ? parseNick(data.nicks[gid]).callsign : "";
-        deptMembersList.push({ discordId, nickCallsign });
+        const { roleKeys, order } = deptRoleInfo(roleIds, roleMap, deptId);
+        deptMembersList.push({ discordId, nickCallsign, roleKeys, order });
       }
       seen.add(discordId);
     }
@@ -587,9 +609,8 @@ export async function syncRosterForDept(deptId) {
           // Best-effort; a failed delete just leaves a stale row for the full sync.
         }
       }
-      if (meta?.auto && meta.min > 0 && meta.max >= meta.min) {
-        await assignDeptCallsigns(deptId, deptMembersList, meta);
-      }
+      const deptConfigs = await loadDeptConfigs();
+      await assignDeptCallsigns(deptId, deptMembersList, deptConfigs[deptId]);
     }
 
     return {
@@ -683,21 +704,22 @@ export async function syncRosterMember(discordUserId) {
     // full allocator can run without another guild scan.
     const dept = resolved.entry.department;
     const meta = deptMeta[dept];
-    if (meta?.auto && meta.min > 0 && meta.max >= meta.min) {
-      try {
-        const rows = await query(
-          "SELECT discord_id, nicks FROM roster_members WHERE department = $1 AND source = 'discord-sync'",
-          [dept],
-        );
-        const members = rows.map((r) => {
-          const nicks = typeof r.nicks === "object" && r.nicks ? r.nicks : {};
-          const nick = meta.guildId ? nicks[meta.guildId] : "";
-          return { discordId: r.discord_id, nickCallsign: nick ? parseNick(nick).callsign : "" };
-        });
-        await assignDeptCallsigns(dept, members, meta);
-      } catch {
-        // Callsigns are a convenience; the interval sync settles them regardless.
-      }
+    try {
+      const deptConfigs = await loadDeptConfigs();
+      const rows = await query(
+        "SELECT discord_id, nicks, role_ids FROM roster_members WHERE department = $1 AND source = 'discord-sync'",
+        [dept],
+      );
+      const members = rows.map((r) => {
+        const nicks = typeof r.nicks === "object" && r.nicks ? r.nicks : {};
+        const nick = meta?.guildId ? nicks[meta.guildId] : "";
+        const roleIdList = Array.isArray(r.role_ids) ? r.role_ids.map(String) : [];
+        const { roleKeys, order } = deptRoleInfo(roleIdList, roleMap, dept);
+        return { discordId: r.discord_id, nickCallsign: nick ? parseNick(nick).callsign : "", roleKeys, order };
+      });
+      await assignDeptCallsigns(dept, members, deptConfigs[dept]);
+    } catch {
+      // Callsigns are a convenience; the interval sync settles them regardless.
     }
 
     return { configured: true, member: id, action: "upsert", department: dept, present, errors };

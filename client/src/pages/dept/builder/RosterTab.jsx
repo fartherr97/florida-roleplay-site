@@ -11,6 +11,94 @@ import { useDeptConfig } from "../../../context/useDeptConfig";
 import { api } from "../../../lib/api";
 
 /**
+ * A division's own callsign range. Members placed in this division are handed
+ * the lowest free number in [first, last] (seniors first), optionally behind a
+ * short prefix like "S-". Leaving the range at 0 means the division has none of
+ * its own — its members draw from the main roster's range instead.
+ */
+function CallsignRange({ sub, onChange }) {
+  const cs = sub.callsigns ?? { auto: true, min: 0, max: 0, prefix: "" };
+  const on = cs.auto !== false;
+  const set = (changes) =>
+    onChange({ auto: on, min: cs.min || 0, max: cs.max || 0, prefix: cs.prefix || "", ...changes });
+  const num = (v) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  return (
+    <div className="mb-4 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-inset ring-white/[0.06]">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white">
+            Callsigns for {sub.main ? "the main roster" : `the ${sub.name} unit`}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Members here get the lowest free number in the range — seniors first. Leave it at
+            0 to use {sub.main ? "no auto-numbers" : "the main roster's numbers"} instead.
+          </p>
+        </div>
+        <label className="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-400">
+          <input
+            type="checkbox"
+            checked={on}
+            onChange={(e) => set({ auto: e.target.checked })}
+            className="size-4 accent-brand-500"
+          />
+          Auto-assign
+        </label>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="First number" htmlFor={`cs-min-${sub.id}`} className="w-28">
+          <TextInput
+            id={`cs-min-${sub.id}`}
+            inputMode="numeric"
+            value={cs.min || ""}
+            placeholder="0"
+            disabled={!on}
+            onChange={(e) => set({ min: num(e.target.value) })}
+          />
+        </Field>
+        <Field label="Last number" htmlFor={`cs-max-${sub.id}`} className="w-28">
+          <TextInput
+            id={`cs-max-${sub.id}`}
+            inputMode="numeric"
+            value={cs.max || ""}
+            placeholder="0"
+            disabled={!on}
+            onChange={(e) => set({ max: num(e.target.value) })}
+          />
+        </Field>
+        <Field label="Prefix (optional)" htmlFor={`cs-pre-${sub.id}`} className="w-36">
+          <TextInput
+            id={`cs-pre-${sub.id}`}
+            value={cs.prefix || ""}
+            placeholder="e.g. S-"
+            maxLength={8}
+            disabled={!on}
+            onChange={(e) => set({ prefix: e.target.value })}
+          />
+        </Field>
+        {on && cs.min > 0 && cs.max >= cs.min && (
+          <p className="pb-3 text-xs text-slate-500">
+            e.g.{" "}
+            <span className="font-mono text-slate-300">
+              {cs.prefix || ""}
+              {cs.min}
+            </span>{" "}
+            …{" "}
+            <span className="font-mono text-slate-300">
+              {cs.prefix || ""}
+              {cs.max}
+            </span>{" "}
+            ({cs.max - cs.min + 1} slots)
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * How this department's roster is arranged.
  *
  * The only thing that decides who appears on a roster is which Discord role
@@ -142,6 +230,11 @@ export default function RosterTab({ config }) {
               the Access &amp; roles page and will then place members here themselves.
             </p>
           )}
+
+          <CallsignRange
+            sub={sub}
+            onChange={(callsigns) => updateSub(sub.id, { callsigns })}
+          />
 
           <div className="space-y-3">
             {sub.categories.map((category, catIndex) => (
