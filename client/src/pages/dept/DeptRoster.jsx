@@ -482,6 +482,8 @@ export default function DeptRoster({ page, config }) {
         />
       )}
 
+      <CallsignChartPanel config={config} />
+
       {editing && (
         <StatusEditor
           key={editing.id}
@@ -1158,4 +1160,42 @@ function MemberCell({ field, member, editable, onEdit }) {
     return <Badge tone="slate">{value}</Badge>;
   }
   return value ? <span className="text-slate-400">{value}</span> : <span className="text-slate-600">—</span>;
+}
+
+/** Read-only callsign chart, shown under the roster when command has enabled it. */
+function CallsignChartPanel({ config }) {
+  const chart = config.roster?.callsignChart;
+  if (!chart?.enabled || !chart.slots?.length) return null;
+  return (
+    <Card className="mt-6 p-5">
+      <h3 className="mb-1 text-sm font-bold uppercase tracking-[0.14em] text-white">Callsign chart</h3>
+      <p className="mb-4 text-sm text-slate-400">The department&rsquo;s assigned callsigns.</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2 font-semibold">Callsign</th>
+              <th className="px-3 py-2 font-semibold">Position</th>
+              <th className="px-3 py-2 font-semibold">Member</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chart.slots.map((slot) => (
+              <tr key={slot.id} className="border-t border-white/[0.06]">
+                <td className="whitespace-nowrap px-3 py-2 font-bold dept-accent-text">{slot.number}</td>
+                <td className="px-3 py-2 text-slate-200">{slot.label}</td>
+                <td className="px-3 py-2">
+                  {slot.memberName ? (
+                    <span className="text-slate-200">{slot.memberName}</span>
+                  ) : (
+                    <span className="text-slate-500">Vacant</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
 }

@@ -8,6 +8,7 @@ import Select from "../../../components/ui/Select";
 import { TextInput } from "../../../components/ui/TextInput";
 import TabIntro from "./TabIntro";
 import { useDeptConfig } from "../../../context/useDeptConfig";
+import { MPD_CALLSIGN_CHART } from "../../../lib/departmentConfig";
 import { api } from "../../../lib/api";
 
 /**
@@ -306,9 +307,191 @@ export default function RosterTab({ config }) {
         </p>
       </div>
 
+      <CallsignChart config={config} onChange={setRoster} />
       <MemberFields config={config} onChange={setRoster} />
       <RosterStats config={config} onChange={setRoster} />
     </>
+  );
+}
+
+/**
+ * The callsign chart: a fixed list of numbered slots (a position each), with a
+ * member optionally assigned to each. Website-only — it records who holds which
+ * callsign and shows it on the roster; it never touches Discord. Command builds
+ * the list here and assigns whoever holds each number.
+ */
+function CallsignChart({ config, onChange }) {
+  const chart = config.roster.callsignChart ?? { enabled: false, slots: [] };
+  const [members, setMembers] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .deptRoster(config.id)
+      .then((result) => {
+        if (!active) return;
+        const seen = new Map();
+        for (const sub of result?.subdivisions ?? []) {
+          for (const cat of sub.categories ?? []) {
+            for (const m of cat.members ?? []) {
+              if (m?.id && !seen.has(m.id)) {
+                seen.set(m.id, {
+                  id: m.id,
+                  name: m.displayName || m.characterName || m.name || "Member",
+                  callsign: m.callsign || "",
+                });
+              }
+            }
+          }
+        }
+        setMembers([...seen.values()].sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [config.id]);
+
+  const setChart = (changes) => onChange({ callsignChart: { ...chart, ...changes } });
+  const newId = () =>
+    globalThis.crypto?.randomUUID?.() ?? `cs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const updateSlot = (id, changes) =>
+    setChart({ slots: chart.slots.map((s) => (s.id === id ? { ...s, ...changes } : s)) });
+  const removeSlot = (id) => setChart({ slots: chart.slots.filter((s) => s.id !== id) });
+  const moveSlot = (id, dir) => {
+    const slots = [...chart.slots];
+    const i = slots.findIndex((s) => s.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= slots.length) return;
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+    setChart({ slots });
+  };
+  const addSlot = () =>
+    setChart({
+      slots: [...chart.slots, { id: newId(), number: "", label: "", memberId: "", memberName: "" }],
+    });
+  const loadTemplate = () => {
+    if (chart.slots.length && !window.confirm("Replace the current chart with the MPD template?")) return;
+    setChart({
+      enabled: true,
+      slots: MPD_CALLSIGN_CHART.map((s) => ({
+        id: newId(),
+        number: s.number,
+        label: s.label,
+        memberId: "",
+        memberName: "",
+      })),
+    });
+  };
+  const assign = (id, memberId) => {
+    const m = members.find((x) => String(x.id) === String(memberId));
+    updateSlot(id, { memberId: memberId || "", memberName: m ? m.name : "" });
+  };
+
+  // Options for the per-slot member picker: vacant, plus every roster member.
+  const memberOptions = (slot) => {
+    const opts = [{ value: "", label: "— Vacant —" }];
+    // Keep a stale assignment selectable/visible even if the person left the roster.
+    if (slot.memberId && !members.some((m) => String(m.id) === String(slot.memberId))) {
+      opts.push({ value: slot.memberId, label: slot.memberName || "Assigned member" });
+    }
+    for (const m of members) {
+      opts.push({ value: String(m.id), label: m.callsign ? `${m.callsign} · ${m.name}` : m.name });
+    }
+    return opts;
+  };
+
+  return (
+    <Card className="mb-5 p-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Callsign chart</h3>
+        <label className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+          <input
+            type="checkbox"
+            checked={chart.enabled}
+            onChange={(e) => setChart({ enabled: e.target.checked })}
+            className="size-4 accent-brand-500"
+          />
+          Show on the roster
+        </label>
+      </div>
+      <p className="mb-4 text-sm text-slate-400">
+        A fixed list of callsign numbers, each a position. Assign whoever holds it. This is a
+        website chart only — it never changes anyone&rsquo;s Discord nickname.
+      </p>
+
+      {chart.slots.length === 0 ? (
+        <p className="mb-3 text-sm text-slate-500">No callsign slots yet.</p>
+      ) : (
+        <div className="mb-3 space-y-2">
+          {chart.slots.map((slot, i) => (
+            <div key={slot.id} className="flex flex-wrap items-center gap-2">
+              <TextInput
+                value={slot.number}
+                onChange={(e) => updateSlot(slot.id, { number: e.target.value })}
+                placeholder="701"
+                inputMode="numeric"
+                className="w-20"
+                aria-label="Callsign number"
+              />
+              <TextInput
+                value={slot.label}
+                onChange={(e) => updateSlot(slot.id, { label: e.target.value })}
+                placeholder="Position (e.g. Admin Captain)"
+                className="min-w-48 flex-1"
+                aria-label="Position"
+              />
+              <Select
+                value={slot.memberId || ""}
+                onChange={(value) => assign(slot.id, value)}
+                options={memberOptions(slot)}
+                placeholder="Vacant"
+                className="min-w-44"
+              />
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={i === 0}
+                  onClick={() => moveSlot(slot.id, -1)}
+                  className="rounded p-1 text-slate-400 transition hover:bg-white/5 disabled:opacity-30"
+                  aria-label="Move up"
+                >
+                  <ChevronUp className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={i === chart.slots.length - 1}
+                  onClick={() => moveSlot(slot.id, 1)}
+                  className="rounded p-1 text-slate-400 transition hover:bg-white/5 disabled:opacity-30"
+                  aria-label="Move down"
+                >
+                  <ChevronDown className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeSlot(slot.id)}
+                  className="rounded p-1 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300"
+                  aria-label="Delete slot"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ghost" size="sm" onClick={addSlot}>
+          <Plus className="size-4" />
+          Add slot
+        </Button>
+        <Button variant="ghost" size="sm" onClick={loadTemplate}>
+          Load MPD template
+        </Button>
+      </div>
+    </Card>
   );
 }
 
