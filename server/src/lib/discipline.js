@@ -16,6 +16,7 @@
  * Everything here is pure. Mirrored from client/src/lib/discipline.js.
  */
 import { DEPARTMENTS } from "../rosterSeed.js";
+import { formatPlayTime } from "./txadmin.js";
 
 export const CONFIG_VERSION = 1;
 
@@ -307,7 +308,7 @@ function embedDate(value) {
  * field per entry — rather than a monospace code block, so it reflows and stays
  * readable on mobile. A section with nothing in it says so rather than vanishing.
  */
-export function buildBackgroundEmbed(background, { memberName } = {}) {
+export function buildBackgroundEmbed(background, { memberName, meta } = {}) {
   // The most fields Discord allows is 25; keep well under it. Four player-info
   // fields plus two section headers leaves room for this many entries per
   // section, with a trailing "+N older" note when a member has more.
@@ -355,12 +356,25 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
   const severity = background.total === 0 ? "clean" : background.nonVerbal.total > 0 ? "heavy" : "light";
   const months = Math.round(background.windowDays / 30);
 
+  // Optional txAdmin metadata (play time, join date, last connection), shown as
+  // inline fields when a bridge is configured and knows this player.
+  const metaFields = [];
+  if (meta) {
+    const play = formatPlayTime(meta.playTimeMinutes);
+    if (play) metaFields.push({ name: "Play Time", value: play, inline: true });
+    if (meta.joinedAt) metaFields.push({ name: "Joined", value: embedDate(meta.joinedAt), inline: true });
+    if (meta.lastConnection) {
+      metaFields.push({ name: "Last Connection", value: embedDate(meta.lastConnection), inline: true });
+    }
+  }
+
   const fields = [
     // Player info as short inline fields — they pack across on desktop and stack
     // on mobile, instead of a fixed-width monospace block that overflows.
     { name: "Member", value: clamp(memberName || "Unknown", 256), inline: true },
     { name: "Discord ID", value: `\`${background.discordId}\``, inline: true },
     { name: "Window", value: `Last ${months} month${months === 1 ? "" : "s"}`, inline: true },
+    ...metaFields,
     {
       name: "Summary",
       value: `**${background.total}** active · **${background.voided.length}** revoked`,
