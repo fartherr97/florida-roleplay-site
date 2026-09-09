@@ -436,17 +436,6 @@ export function normalizeConfig(raw, id) {
           main: !!sub.main,
           accent: sub.accent || "",
           banner: sub.banner || {},
-          // Per-division callsign range: members placed in this division are handed
-          // the lowest free number in [min, max] (optionally with a text prefix,
-          // e.g. "S-" for SWAT). A zero range means this division has none of its
-          // own, so its members fall back to the main roster's range. Set from the
-          // Roster builder.
-          callsigns: {
-            auto: sub.callsigns?.auto !== false,
-            min: Number.isFinite(sub.callsigns?.min) ? Math.max(0, Math.trunc(sub.callsigns.min)) : 0,
-            max: Number.isFinite(sub.callsigns?.max) ? Math.max(0, Math.trunc(sub.callsigns.max)) : 0,
-            prefix: String(sub.callsigns?.prefix ?? "").slice(0, 8),
-          },
           // Which role keys from ROLE_MAP land in this subdivision. Empty on the
           // main roster means "every role mapped to this department".
           roleKeys: Array.isArray(sub.roleKeys) ? sub.roleKeys.map(String) : [],
