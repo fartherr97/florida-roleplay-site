@@ -335,69 +335,6 @@ function normalizeIdList(raw) {
   return out;
 }
 
-/**
- * The MPD callsign chart — the "Load MPD template" the builder offers and the
- * shape a department can seed from. Each slot is a fixed number bound to a
- * position (rank + district/unit); some positions carry more than one slot on
- * purpose (two Recruiting Sergeants, doubled Operations Corporals per district).
- */
-export const MPD_CALLSIGN_CHART = [
-  { number: "701", label: "Chief" },
-  { number: "702", label: "Deputy Chief" },
-  { number: "703", label: "Assistant Chief" },
-  { number: "704", label: "Operations Major" },
-  { number: "705", label: "Admin Major" },
-  { number: "706", label: "Operations Captain" },
-  { number: "707", label: "Special Operations Captain" },
-  { number: "708", label: "Admin Captain" },
-  { number: "709", label: "Training Captain" },
-  { number: "710", label: "Operations Lieutenant (District 1 & District 2)" },
-  { number: "711", label: "Operations Lieutenant (District 3 & District 4)" },
-  { number: "712", label: "Special Operations Lieutenant" },
-  { number: "713", label: "Admin Lieutenant" },
-  { number: "714", label: "Training Lieutenant" },
-  { number: "715", label: "Operations Sergeant (District 1)" },
-  { number: "716", label: "Operations Sergeant (District 2)" },
-  { number: "717", label: "Operations Sergeant (District 3)" },
-  { number: "718", label: "Operations Sergeant (District 4)" },
-  { number: "719", label: "Recruiting Sergeant" },
-  { number: "720", label: "Recruiting Sergeant" },
-  { number: "721", label: "Training Sergeant" },
-  { number: "722", label: "Training Sergeant" },
-  { number: "723", label: "Operations Corporal (District 1)" },
-  { number: "724", label: "Operations Corporal (District 1)" },
-  { number: "725", label: "Operations Corporal (District 2)" },
-  { number: "726", label: "Operations Corporal (District 2)" },
-  { number: "727", label: "Operations Corporal (District 3)" },
-  { number: "728", label: "Operations Corporal (District 3)" },
-  { number: "729", label: "Operations Corporal (District 4)" },
-  { number: "730", label: "Operations Corporal (District 4)" },
-  { number: "731", label: "Training Corporal" },
-  { number: "732", label: "Training Corporal" },
-];
-
-/**
- * A department's callsign chart: an ordered list of numbered slots, each with an
- * optional assigned member. Website-only — it records who holds which callsign
- * and shows it on the roster; it never touches Discord. `enabled` shows it.
- */
-function normalizeCallsignChart(raw) {
-  const chart = raw && typeof raw === "object" ? raw : {};
-  const slots = Array.isArray(chart.slots) ? chart.slots : [];
-  return {
-    enabled: chart.enabled === true,
-    slots: slots
-      .map((slot, index) => ({
-        id: String(slot?.id ?? `cs-${index}`),
-        number: String(slot?.number ?? "").slice(0, 12),
-        label: String(slot?.label ?? "").slice(0, 120),
-        memberId: String(slot?.memberId ?? "").slice(0, 64),
-        memberName: String(slot?.memberName ?? "").slice(0, 120),
-      }))
-      .filter((slot) => slot.number || slot.label),
-  };
-}
-
 export function normalizeConfig(raw, id) {
   const config = raw && typeof raw === "object" ? raw : {};
   const branding = config.branding || {};
@@ -487,10 +424,6 @@ export function normalizeConfig(raw, id) {
         min: Number.isFinite(roster.callsigns?.min) ? Math.max(0, Math.trunc(roster.callsigns.min)) : 0,
         max: Number.isFinite(roster.callsigns?.max) ? Math.max(0, Math.trunc(roster.callsigns.max)) : 0,
       },
-      // The callsign chart: a fixed list of numbered slots (a position each),
-      // with a member optionally assigned to each. Website-only; shown on the
-      // roster when enabled. Set from the Roster builder.
-      callsignChart: normalizeCallsignChart(roster.callsignChart),
       // A department-local override of rank seniority — { roleKey: order } — set
       // from the roster's Rank order control, so command can reorder ranks (e.g.
       // put a Lieutenant Colonel below a Colonel) without touching the site-wide
