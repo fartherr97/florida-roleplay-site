@@ -43,6 +43,7 @@ const OWNERSHIP_SEATS = [
   seatStub("co-owner-2", "Co-Owner"),
 ];
 const DIRECTOR_SEATS = [
+  seatStub("executive-director", "Executive Director"),
   seatStub("staff-director", "Staff Director"),
   seatStub("es-director", "ES Director"),
   seatStub("dev-director", "Dev. Director"),

@@ -455,14 +455,15 @@ const LEADERSHIP_FALLBACK_SEATS = [
   { seatKey: "owner", grp: "ownership", title: "Owner", order: 0 },
   { seatKey: "co-owner", grp: "ownership", title: "Co-Owner", order: 1 },
   { seatKey: "co-owner-2", grp: "ownership", title: "Co-Owner", order: 2 },
-  { seatKey: "staff-director", grp: "directors", title: "Staff Director", order: 0 },
-  { seatKey: "es-director", grp: "directors", title: "ES Director", order: 1 },
-  { seatKey: "dev-director", grp: "directors", title: "Dev. Director", order: 2 },
-  { seatKey: "civilian-director", grp: "directors", title: "Civilian Director", order: 3 },
-  { seatKey: "asst-staff-director", grp: "directors", title: "Asst. Staff Director", order: 4 },
-  { seatKey: "asst-es-director", grp: "directors", title: "Asst. ES Director", order: 5 },
-  { seatKey: "asst-dev-director", grp: "directors", title: "Asst. Dev. Director", order: 6 },
-  { seatKey: "asst-civilian-director", grp: "directors", title: "Asst. Civilian Director", order: 7 },
+  { seatKey: "executive-director", grp: "directors", title: "Executive Director", order: 0 },
+  { seatKey: "staff-director", grp: "directors", title: "Staff Director", order: 1 },
+  { seatKey: "es-director", grp: "directors", title: "ES Director", order: 2 },
+  { seatKey: "dev-director", grp: "directors", title: "Dev. Director", order: 3 },
+  { seatKey: "civilian-director", grp: "directors", title: "Civilian Director", order: 4 },
+  { seatKey: "asst-staff-director", grp: "directors", title: "Asst. Staff Director", order: 5 },
+  { seatKey: "asst-es-director", grp: "directors", title: "Asst. ES Director", order: 6 },
+  { seatKey: "asst-dev-director", grp: "directors", title: "Asst. Dev. Director", order: 7 },
+  { seatKey: "asst-civilian-director", grp: "directors", title: "Asst. Civilian Director", order: 8 },
 ];
 
 // The leadership_seats table is created and seeded here at runtime as well as in

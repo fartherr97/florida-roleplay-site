@@ -538,14 +538,15 @@ INSERT INTO leadership_seats (seat_key, grp, title, sort_order) VALUES
   ('owner',                  'ownership', 'Owner',                   0),
   ('co-owner',               'ownership', 'Co-Owner',                1),
   ('co-owner-2',             'ownership', 'Co-Owner',                2),
-  ('staff-director',         'directors', 'Staff Director',          0),
-  ('es-director',            'directors', 'ES Director',             1),
-  ('dev-director',           'directors', 'Dev. Director',           2),
-  ('civilian-director',      'directors', 'Civilian Director',       3),
-  ('asst-staff-director',    'directors', 'Asst. Staff Director',    4),
-  ('asst-es-director',       'directors', 'Asst. ES Director',       5),
-  ('asst-dev-director',      'directors', 'Asst. Dev. Director',     6),
-  ('asst-civilian-director', 'directors', 'Asst. Civilian Director', 7)
+  ('executive-director',     'directors', 'Executive Director',      0),
+  ('staff-director',         'directors', 'Staff Director',          1),
+  ('es-director',            'directors', 'ES Director',             2),
+  ('dev-director',           'directors', 'Dev. Director',           3),
+  ('civilian-director',      'directors', 'Civilian Director',       4),
+  ('asst-staff-director',    'directors', 'Asst. Staff Director',    5),
+  ('asst-es-director',       'directors', 'Asst. ES Director',       6),
+  ('asst-dev-director',      'directors', 'Asst. Dev. Director',     7),
+  ('asst-civilian-director', 'directors', 'Asst. Civilian Director', 8)
 ON CONFLICT (seat_key) DO NOTHING;
 
 -- Append-only record of what the bot changed, so a wrong rank can be traced.
