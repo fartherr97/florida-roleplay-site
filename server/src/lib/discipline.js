@@ -312,13 +312,17 @@ export function buildBackgroundEmbed(background, { memberName, meta } = {}) {
   // The most fields Discord allows is 25; keep well under it. Four player-info
   // fields plus two section headers leaves room for this many entries per
   // section, with a trailing "+N older" note when a member has more.
-  const MAX_PER_SECTION = 8;
+  // Field values render Discord markdown (names don't), and the whole embed is
+  // capped at 25 fields — player info + meta + summary + two section headers +
+  // per-section caps has to fit under that, so keep this modest.
+  const MAX_PER_SECTION = 6;
   const clamp = (text, max = 1024) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+  const RULE = "━━━━━━━━━━━━━━━━━━━━";
 
-  // One record as a field, styled like the DA Hub embed: the type and
-  // department in the name, the details in the value with bold labels so it
-  // reads like a form but wraps like prose. No emojis.
-  const entryField = (action) => {
+  // One record as its own field: a numbered, bold title (type · department) with
+  // the details beneath as bold-labelled lines, so each entry reads as a
+  // self-contained block instead of blurring into the next. No emojis.
+  const entryField = (action, index) => {
     const status = action.voided
       ? `Revoked${action.voidReason ? ` — ${action.voidReason}` : ""}`
       : "Active";
@@ -328,21 +332,31 @@ export function buildBackgroundEmbed(background, { memberName, meta } = {}) {
       `**Status:** ${status}`,
     ].join("\n");
     return {
-      name: clamp(`${actionLabel(action.type)} · ${bodyLabel(action.bodyId)}`, 256),
+      name: clamp(`${index}.  ${actionLabel(action.type)} · ${bodyLabel(action.bodyId)}`, 256),
       value: clamp(value),
       inline: false,
     };
   };
 
-  // A section header field plus one field per entry (capped), or a single
-  // "No records found." field when the member has nothing of that kind.
-  const sectionFields = (header, list) => {
-    if (!list.length) return [{ name: header, value: "No records found.", inline: false }];
-    const shown = list.slice(0, MAX_PER_SECTION).map(entryField);
+  // A section: a horizontal rule and an underlined, bold header (with an italic
+  // count beneath) — the markdown lives in the value because field names can't
+  // be underlined — then one field per entry, or "No records found." when empty.
+  const sectionFields = (title, sub, list) => {
+    const count = list.length ? `${list.length} on record` : "no records";
+    const header = {
+      name: "​",
+      value: `${RULE}\n__**${title}**__\n*${sub} · ${count}*`,
+      inline: false,
+    };
+    if (!list.length) {
+      return [header, { name: "​", value: "*No records found.*", inline: false }];
+    }
+    const shown = list.slice(0, MAX_PER_SECTION).map((a, i) => entryField(a, i + 1));
     const extra = list.length - shown.length;
-    const head = { name: header, value: `${list.length} on record`, inline: false };
-    const rest = extra > 0 ? [{ name: "​", value: `…and ${extra} older not shown.`, inline: false }] : [];
-    return [head, ...shown, ...rest];
+    const rest = extra > 0
+      ? [{ name: "​", value: `*…and ${extra} older not shown.*`, inline: false }]
+      : [];
+    return [header, ...shown, ...rest];
   };
 
   // Split by who filed it — department vs staff — matching the reference bot's
@@ -380,8 +394,8 @@ export function buildBackgroundEmbed(background, { memberName, meta } = {}) {
       value: `**${background.total}** active · **${background.voided.length}** revoked`,
       inline: false,
     },
-    ...sectionFields(`Department Disciplinary Logs — last ${months} months`, department),
-    ...sectionFields(`Staff Disciplinary Logs — last ${months} months`, staff),
+    ...sectionFields("Department Disciplinary Logs", `Last ${months} months`, department),
+    ...sectionFields("Staff Disciplinary Logs", `Last ${months} months`, staff),
   ];
 
   return {
