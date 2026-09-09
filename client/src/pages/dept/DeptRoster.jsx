@@ -310,17 +310,15 @@ export default function DeptRoster({ page, config }) {
             width: "w-28",
             render: (member) => (
               <div className="flex items-center gap-1">
-                {(editableFields.length > 0 || bandOptions.length > 0) && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingFields(member)}
-                    aria-label={`Edit ${member.characterName}'s band and details`}
-                    title="Place in a band / edit roster columns"
-                    className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
-                  >
-                    <SlidersHorizontal className="size-3.5" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setEditingFields(member)}
+                  aria-label={`Edit ${member.characterName}'s callsign, band and details`}
+                  title="Set callsign / place in a band / edit roster columns"
+                  className="grid size-7 place-items-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
+                >
+                  <SlidersHorizontal className="size-3.5" />
+                </button>
                 {canEditRoster && member.source === "manual" && (
                   <>
                     <button
@@ -556,6 +554,7 @@ function MemberFieldsModal({ deptId, subdivisionId, unit = false, member, fields
   // synced member starts Unassigned and stays there until command places them;
   // on a unit roster, clearing the band takes them off the unit.
   const [band, setBand] = useState(member.categoryId ?? "");
+  const [callsign, setCallsign] = useState(member.callsign ?? "");
   const [values, setValues] = useState(() => {
     const initial = {};
     for (const field of fields) {
@@ -583,13 +582,19 @@ function MemberFieldsModal({ deptId, subdivisionId, unit = false, member, fields
           return;
         }
       }
-      if (fields.length > 0) {
-        const result = await api.saveMemberFields(deptId, member.id, values);
-        if (result?.ok === false) {
-          setError(result.message || "Could not save.");
-          setSaving(false);
-          return;
-        }
+      // Always save: the callsign column is editable even when the roster has no
+      // other hand-entered columns. Only send the callsign when it changed.
+      const callsignChanged = callsign.trim() !== (member.callsign ?? "");
+      const result = await api.saveMemberFields(
+        deptId,
+        member.id,
+        values,
+        callsignChanged ? callsign.trim() : undefined,
+      );
+      if (result?.ok === false) {
+        setError(result.message || "Could not save.");
+        setSaving(false);
+        return;
       }
       onSaved();
     } catch (err) {
@@ -599,11 +604,21 @@ function MemberFieldsModal({ deptId, subdivisionId, unit = false, member, fields
   };
 
   return (
-    <Modal open onClose={onClose} title={`Edit ${member.characterName}`} subtitle="Band and roster columns" className="max-w-lg">
-      {fields.length === 0 && bands.length === 0 ? (
-        <p className="text-sm text-slate-400">This roster has no bands or editable columns configured.</p>
-      ) : (
+    <Modal open onClose={onClose} title={`Edit ${member.characterName}`} subtitle="Callsign, band and roster columns" className="max-w-lg">
         <form onSubmit={submit} className="space-y-4">
+          <Field
+            label="Callsign"
+            htmlFor="mf-callsign"
+            hint="Assigned here on the roster. Overrides the callsign from Discord; leave blank to use the synced one."
+          >
+            <TextInput
+              id="mf-callsign"
+              value={callsign}
+              onChange={(e) => setCallsign(e.target.value)}
+              placeholder="e.g. 708"
+              maxLength={32}
+            />
+          </Field>
           {bands.length > 0 && (
             <Field
               label="Band"
@@ -676,7 +691,6 @@ function MemberFieldsModal({ deptId, subdivisionId, unit = false, member, fields
             </Button>
           </div>
         </form>
-      )}
     </Modal>
   );
 }

@@ -421,6 +421,12 @@ async function ensureMemberFieldsTable() {
       .then(() =>
         query("ALTER TABLE roster_member_fields ADD COLUMN IF NOT EXISTS placements JSONB NOT NULL DEFAULT '{}'::jsonb"),
       )
+      // A manually-assigned callsign for this member, which wins over the one the
+      // Discord nickname or the auto-range carries. Lets command set callsigns on
+      // the roster directly. Added after the table shipped.
+      .then(() =>
+        query("ALTER TABLE roster_member_fields ADD COLUMN IF NOT EXISTS callsign VARCHAR(32) NULL"),
+      )
       .catch((err) => {
         memberFieldsReady = null;
         throw err;
@@ -439,7 +445,7 @@ async function loadMemberFields(deptId, config = null) {
   try {
     await ensureMemberFieldsTable();
     const rows = await query(
-      "SELECT member_id, values, category_id, placements FROM roster_member_fields WHERE department = $1",
+      "SELECT member_id, values, category_id, placements, callsign FROM roster_member_fields WHERE department = $1",
       [deptId],
     );
     const mainId = config ? mainSubdivisionId(config) : null;
@@ -452,7 +458,7 @@ async function loadMemberFields(deptId, config = null) {
         if (Object.keys(placements).length === 0 && r.category_id && mainId) {
           placements[mainId] = String(r.category_id);
         }
-        return [String(r.member_id), { values: r.values || {}, placements }];
+        return [String(r.member_id), { values: r.values || {}, placements, callsign: r.callsign || "" }];
       }),
     );
   } catch {
@@ -615,6 +621,8 @@ async function loadRosterAndMap(deptId, deptGuildId = "", config = null) {
           const stored = fieldsMap.get(member.id);
           if (!stored) continue;
           overlayMemberFields(member, stored.values);
+          // A callsign command typed on the roster wins over the nickname/auto one.
+          if (stored.callsign) member.callsign = stored.callsign;
           // The band command placed them in on each roster; absent means Unassigned.
           if (Object.keys(stored.placements).length) member.placements = stored.placements;
         }
@@ -771,16 +779,23 @@ router.post(
       values[key] = typeof raw === "boolean" ? raw : str(raw).slice(0, 200);
     }
 
+    // The callsign is its own column (it overrides the synced/nickname one). Only
+    // touched when the request includes it; an empty string clears the override.
+    const hasCallsign = Object.prototype.hasOwnProperty.call(req.body ?? {}, "callsign");
+    const callsign = hasCallsign ? str(req.body.callsign).slice(0, 32) || null : null;
+
     try {
       await ensureMemberFieldsTable();
       await query(
-        `INSERT INTO roster_member_fields (department, member_id, values, updated_at)
-           VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP)
+        `INSERT INTO roster_member_fields (department, member_id, values, callsign, updated_at)
+           VALUES ($1, $2, $3::jsonb, $4, CURRENT_TIMESTAMP)
          ON CONFLICT (department, member_id)
-           DO UPDATE SET values = $3::jsonb, updated_at = CURRENT_TIMESTAMP`,
-        [req.departmentId, memberId, JSON.stringify(values)],
+           DO UPDATE SET values = $3::jsonb,
+             callsign = CASE WHEN $5 THEN $4 ELSE roster_member_fields.callsign END,
+             updated_at = CURRENT_TIMESTAMP`,
+        [req.departmentId, memberId, JSON.stringify(values), callsign, hasCallsign],
       );
-      return res.json({ ok: true, values });
+      return res.json({ ok: true, values, callsign });
     } catch {
       return res.status(500).json({ ok: false, message: "Could not save the member's details." });
     }

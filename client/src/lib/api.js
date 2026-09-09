@@ -488,12 +488,16 @@ export const api = {
       ok: false,
       message: NOT_PERSISTED,
     })),
-  /** Save a member's hand-entered column values (hire date, troop, dates, …). */
-  saveMemberFields: (deptId, memberId, values) =>
-    post(`/dept/${encodeURIComponent(deptId)}/roster/member-fields`, { memberId, values }, () => ({
-      ok: false,
-      message: NOT_PERSISTED,
-    })),
+  /**
+   * Save a member's hand-entered column values (hire date, troop, dates, …) and,
+   * when `callsign` is provided, their manually-assigned callsign (empty clears it).
+   */
+  saveMemberFields: (deptId, memberId, values, callsign) =>
+    post(
+      `/dept/${encodeURIComponent(deptId)}/roster/member-fields`,
+      callsign === undefined ? { memberId, values } : { memberId, values, callsign },
+      () => ({ ok: false, message: NOT_PERSISTED }),
+    ),
 
   /** The guild's live Discord roles, or configured:false when no bot token is set. */
   guildRoles: (guildId) =>
