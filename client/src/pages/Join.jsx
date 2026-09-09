@@ -4,7 +4,6 @@ import Section from "../components/layout/Section";
 import PageHeader from "../components/layout/PageHeader";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import CopyField from "../components/ui/CopyField";
 import { SITE } from "../data/mockData";
 
 const STEPS = [
@@ -100,7 +99,6 @@ export default function Join() {
 
                 {index === STEPS.length - 1 && (
                   <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center">
-                    <CopyField label="Server" value={SITE.serverAddress} />
                     <Button as="a" href={SITE.fivemConnect} target="_blank" rel="noreferrer noopener" size="sm">
                       Connect now
                       <ExternalLink className="size-4" />
