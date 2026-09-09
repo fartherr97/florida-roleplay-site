@@ -20,6 +20,7 @@ import { requireBot } from "../middleware/requireBot.js";
 import { fetchMemberRoles } from "../lib/discord.js";
 import { resolveRoleKeys } from "../lib/roleSync.js";
 import { str } from "../validate.js";
+import { fireDaWebhook } from "../lib/daWebhook.js";
 import {
   ACTION_TYPE_MAP,
   ACTION_BODY_MAP,
@@ -198,16 +199,20 @@ router.post("/", async (req, res) => {
     return noStore(res);
   }
 
-  res.status(201).json({
-    ok: true,
-    action: normalizeAction({
-      ...draft,
-      id: insertId,
-      issuedByName: ctx.user.displayName ?? ctx.user.username,
-      issuedByDiscordId: ctx.user.id,
-      createdAt: new Date().toISOString(),
-    }),
+  const action = normalizeAction({
+    ...draft,
+    id: insertId,
+    issuedByName: ctx.user.displayName ?? ctx.user.username,
+    issuedByDiscordId: ctx.user.id,
+    createdAt: new Date().toISOString(),
   });
+
+  res.status(201).json({ ok: true, action });
+
+  // Announce it to the records-log channel (and ping dept heads for a
+  // department DA). After the response, best-effort — never blocks or fails the
+  // filing that already saved.
+  fireDaWebhook(action).catch(() => {});
 });
 
 /** Correct one. Whoever filed it may fix their own; `discipline.manage` may fix any. */
