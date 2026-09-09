@@ -314,19 +314,20 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
   const MAX_PER_SECTION = 8;
   const clamp = (text, max = 1024) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
-  // One record as a field: the type and department in the name, the details in
-  // the value with bold labels so it reads like a form but wraps like prose.
-  const entryField = (action, emoji) => {
+  // One record as a field, styled like the DA Hub embed: the type and
+  // department in the name, the details in the value with bold labels so it
+  // reads like a form but wraps like prose. No emojis.
+  const entryField = (action) => {
     const status = action.voided
-      ? `🔓 Revoked${action.voidReason ? ` — ${action.voidReason}` : ""}`
-      : "🔒 Active";
+      ? `Revoked${action.voidReason ? ` — ${action.voidReason}` : ""}`
+      : "Active";
     const value = [
       `**Reason:** ${action.reason || "—"}`,
       `**Date:** ${embedDate(action.createdAt)}`,
       `**Status:** ${status}`,
     ].join("\n");
     return {
-      name: clamp(`${emoji} ${actionLabel(action.type)} · ${bodyLabel(action.bodyId)}`, 256),
+      name: clamp(`${actionLabel(action.type)} · ${bodyLabel(action.bodyId)}`, 256),
       value: clamp(value),
       inline: false,
     };
@@ -334,12 +335,12 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
 
   // A section header field plus one field per entry (capped), or a single
   // "No records found." field when the member has nothing of that kind.
-  const sectionFields = (header, list, emoji) => {
-    if (!list.length) return [{ name: header, value: "*No records found.*", inline: false }];
-    const shown = list.slice(0, MAX_PER_SECTION).map((a) => entryField(a, emoji));
+  const sectionFields = (header, list) => {
+    if (!list.length) return [{ name: header, value: "No records found.", inline: false }];
+    const shown = list.slice(0, MAX_PER_SECTION).map(entryField);
     const extra = list.length - shown.length;
     const head = { name: header, value: `${list.length} on record`, inline: false };
-    const rest = extra > 0 ? [{ name: "​", value: `*…and ${extra} older not shown.*`, inline: false }] : [];
+    const rest = extra > 0 ? [{ name: "​", value: `…and ${extra} older not shown.`, inline: false }] : [];
     return [head, ...shown, ...rest];
   };
 
@@ -367,8 +368,8 @@ export function buildBackgroundEmbed(background, { memberName } = {}) {
       value: `**${background.total}** active · **${background.voided.length}** revoked`,
       inline: false,
     },
-    ...sectionFields("🔴 Non-Verbal — last 6 months", nonVerbal, "⚠️"),
-    ...sectionFields("🟡 Verbal — last 6 months", verbal, "💬"),
+    ...sectionFields(`Non-Verbal Disciplinary Logs — last ${months} months`, nonVerbal),
+    ...sectionFields(`Verbal Disciplinary Logs — last ${months} months`, verbal),
   ];
 
   return {
