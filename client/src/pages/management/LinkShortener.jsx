@@ -21,6 +21,17 @@ import { api } from "../../lib/api";
  * links live on is Ownership-only (shortener.admin). The redirect itself is
  * served by the API host, so a bare short link resolves without loading the app.
  */
+/**
+ * Normalise a slug as it's typed: lowercase, and every run of anything that
+ * isn't a letter or digit becomes a single dash — so "Training Document" and
+ * "Training_document" both head toward "training-document". A trailing dash is
+ * left in place so multi-word slugs can still be typed; the server trims the
+ * edges to the canonical form on save.
+ */
+function cleanSlug(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 80);
+}
+
 export default function LinkShortener() {
   const { hasPermission } = useAuth();
   const canAdmin = hasPermission("shortener.admin");
@@ -156,10 +167,10 @@ function CreateLink({ domains, onDone, onError }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!targetUrl.trim() || !host) return;
+    if (!targetUrl.trim() || !host || !cleanSlug(slug)) return;
     setBusy(true);
     try {
-      const res = await api.createLink({ targetUrl: targetUrl.trim(), host, slug: slug.trim(), note: note.trim() });
+      const res = await api.createLink({ targetUrl: targetUrl.trim(), host, slug: cleanSlug(slug), note: note.trim() });
       if (res?.ok === false) {
         onError(res.message || "Couldn't create that short link.");
         return;
@@ -203,15 +214,20 @@ function CreateLink({ domains, onDone, onError }) {
               options={domains.map((d) => ({ value: d.host, label: d.host }))}
             />
           </Field>
-          <Field label="Custom slug (optional)" htmlFor="ls-slug" hint="Leave blank for a random one.">
+          <Field
+            label="Slug (required)"
+            htmlFor="ls-slug"
+            hint="Lowercase words with dashes — spaces and capitals are converted automatically. e.g. training-document"
+          >
             <div className="flex items-center gap-2">
               <span className="shrink-0 text-sm text-slate-500">{host}/</span>
               <TextInput
                 id="ls-slug"
-                placeholder="promo"
+                placeholder="training-document"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => setSlug(cleanSlug(e.target.value))}
                 className="flex-1"
+                required
               />
             </div>
           </Field>
@@ -220,7 +236,7 @@ function CreateLink({ domains, onDone, onError }) {
           <TextInput id="ls-note" placeholder="Summer event signup" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
         </Field>
         <div className="flex justify-end">
-          <Button type="submit" disabled={busy || !targetUrl.trim() || !host}>
+          <Button type="submit" disabled={busy || !targetUrl.trim() || !host || !cleanSlug(slug)}>
             <Plus className="size-4" />
             {busy ? "Creating…" : "Create short link"}
           </Button>
@@ -253,7 +269,7 @@ function LinkTable({ links, loading, onEdit, onChanged, onError }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <CopyField value={link.shortUrl} />
+                <CopyField value={link.shortUrl} codeClassName="text-primary-300 font-semibold" />
                 {!link.active && <Badge tone="slate">Disabled</Badge>}
                 <Badge tone="slate">{link.clicks} {link.clicks === 1 ? "click" : "clicks"}</Badge>
               </div>
@@ -323,7 +339,7 @@ function EditLinkModal({ link, onClose, onSaved }) {
     setBusy(true);
     setError("");
     try {
-      const res = await api.updateLink(link.id, { targetUrl: targetUrl.trim(), slug: slug.trim(), note: note.trim() });
+      const res = await api.updateLink(link.id, { targetUrl: targetUrl.trim(), slug: cleanSlug(slug), note: note.trim() });
       if (res?.ok === false) {
         setError(res.message || "Couldn't save.");
         setBusy(false);
@@ -350,8 +366,13 @@ function EditLinkModal({ link, onClose, onSaved }) {
           <Field label="Long URL" htmlFor="el-url">
             <TextInput id="el-url" type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} required />
           </Field>
-          <Field label="Slug" htmlFor="el-slug">
-            <TextInput id="el-slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+          <Field label="Slug" htmlFor="el-slug" hint="Lowercase words with dashes, e.g. training-document.">
+            <TextInput
+              id="el-slug"
+              value={slug}
+              onChange={(e) => setSlug(cleanSlug(e.target.value))}
+              required
+            />
           </Field>
           <Field label="Note" htmlFor="el-note">
             <TextInput id="el-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />

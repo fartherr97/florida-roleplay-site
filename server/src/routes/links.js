@@ -28,7 +28,9 @@ router.post("/", requirePermission("shortener.use"), async (req, res) => {
   const host = shortener.normalizeHost(req.body?.host);
   const targetUrl = str(req.body?.targetUrl).trim();
   const note = str(req.body?.note).slice(0, 200);
-  let slug = str(req.body?.slug).trim();
+  // The slug is required and always stored in its canonical lowercase-dash form,
+  // so "Training Document" and "Training-document" both become "training-document".
+  const slug = shortener.slugify(req.body?.slug);
 
   if (!shortener.validTarget(targetUrl)) {
     return res.status(400).json({ ok: false, message: "Enter a full URL starting with http:// or https://." });
@@ -37,12 +39,8 @@ router.post("/", requirePermission("shortener.use"), async (req, res) => {
   if (!domain || !domain.active) {
     return res.status(400).json({ ok: false, message: "Pick a subdomain that's been set up." });
   }
-  if (slug) {
-    if (!shortener.validSlug(slug)) {
-      return res.status(400).json({ ok: false, message: "A custom slug can use letters, numbers, dashes and underscores only." });
-    }
-  } else {
-    slug = shortener.randomSlug();
+  if (!slug) {
+    return res.status(400).json({ ok: false, message: "A slug is required — use lowercase words separated by dashes, e.g. training-document." });
   }
 
   try {
@@ -73,9 +71,9 @@ router.patch("/:id", requirePermission("shortener.use"), async (req, res) => {
     fields.targetUrl = targetUrl;
   }
   if (req.body?.slug !== undefined) {
-    const slug = str(req.body.slug).trim();
-    if (!shortener.validSlug(slug)) {
-      return res.status(400).json({ ok: false, message: "A slug can use letters, numbers, dashes and underscores only." });
+    const slug = shortener.slugify(req.body.slug);
+    if (!slug) {
+      return res.status(400).json({ ok: false, message: "A slug is required — use lowercase words separated by dashes, e.g. training-document." });
     }
     fields.slug = slug;
   }

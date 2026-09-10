@@ -75,6 +75,22 @@ export function validSlug(slug) {
   return SLUG_RE.test(slug);
 }
 
+/**
+ * The canonical form of a slug: lowercase, with every run of anything that isn't
+ * a letter or digit collapsed to a single dash, and no leading/trailing dashes.
+ * So "Training Document", "Training-document" and "  training__document  " all
+ * become "training-document". Returns "" when there's nothing usable left.
+ */
+export function slugify(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/g, ""); // a trailing dash left by the length cap
+}
+
 /** A short random slug. */
 export function randomSlug(len = 7) {
   let out = "";

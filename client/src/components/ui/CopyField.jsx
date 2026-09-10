@@ -3,7 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { cn } from "../../lib/cn";
 
 /** Monospace address with a copy-to-clipboard affordance. */
-export default function CopyField({ value, label, className }) {
+export default function CopyField({ value, label, className, codeClassName }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,12 @@ export default function CopyField({ value, label, className }) {
           {label}
         </span>
       )}
-      <code className="truncate rounded-lg bg-black/30 px-2.5 py-1 text-xs text-slate-300 ring-1 ring-inset ring-white/10">
+      <code
+        className={cn(
+          "truncate rounded-lg bg-black/30 px-2.5 py-1 text-xs ring-1 ring-inset ring-white/10",
+          codeClassName || "text-slate-300",
+        )}
+      >
         {value}
       </code>
       <button
