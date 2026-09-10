@@ -71,6 +71,9 @@ async function loadRoster() {
  */
 async function loadRoleMap({ withSpecial = false } = {}) {
   try {
+    // Heal an older database that predates the `color` column, so reads and the
+    // next save both see it. Best-effort — a failure just falls through to seed.
+    await ensureRoleMapColumns().catch(() => {});
     const rows = await query("SELECT * FROM roster_role_map ORDER BY sort_order DESC");
     if (rows.length) {
       const roles = rows
@@ -135,6 +138,27 @@ async function loadRemovedKeys() {
   } catch {
     return [];
   }
+}
+
+/**
+ * The `color` column was added to roster_role_map after it shipped, via an ALTER
+ * in schema.sql — but production doesn't re-run schema.sql, so on an older
+ * database the column can be missing. Without it every save that writes `color`
+ * throws and the whole role map falls back to "not persisted", which is why
+ * saved rank colours vanished. This idempotent runtime migration adds it, so the
+ * feature heals itself on the next save. Memoised per process.
+ */
+let roleMapColumnsReady = null;
+async function ensureRoleMapColumns() {
+  if (!roleMapColumnsReady) {
+    roleMapColumnsReady = query(
+      "ALTER TABLE roster_role_map ADD COLUMN IF NOT EXISTS color VARCHAR(9) NULL",
+    ).catch((err) => {
+      roleMapColumnsReady = null;
+      throw err;
+    });
+  }
+  return roleMapColumnsReady;
 }
 
 /** The mapped LOA tag, falling back to the seeded one. */
@@ -360,6 +384,7 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
     : [];
 
   try {
+    await ensureRoleMapColumns();
     await query("DELETE FROM roster_role_map");
     for (const role of cleanRoles) {
       await query(`INSERT INTO roster_role_map
