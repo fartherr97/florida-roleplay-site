@@ -104,6 +104,26 @@ export default function RosterTab({ config }) {
         set here is how they are grouped and what the table shows.
       </TabIntro>
 
+      <Card className="mb-5 p-5">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={config.roster.autoSync !== false}
+            onChange={(e) => setRoster({ autoSync: e.target.checked })}
+            className="mt-0.5 size-4 accent-brand-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-white">Sync this roster from Discord</p>
+            <p className="mt-0.5 text-sm text-slate-400">
+              On: the Discord bot auto-adds members, keeps their rank and name current, and hands
+              out callsigns. Off: this roster is <strong>manual</strong> — nobody is added, renamed
+              or removed automatically; you maintain it with &ldquo;Add member&rdquo; and the row
+              editor. Existing members become editable by hand when you turn this off.
+            </p>
+          </div>
+        </label>
+      </Card>
+
       {subdivisions.map((sub) => (
         <Card key={sub.id} className="mb-5 p-5">
           <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -321,21 +341,53 @@ function MemberFields({ config, onChange }) {
       memberFields: fields.map((field) => (field.id === id ? { ...field, ...changes } : field)),
     });
 
+  // Move a column up or down — the order here is the order of the columns on the
+  // roster table, so command can slot a new column in without deleting others.
+  const move = (id, dir) => {
+    const next = [...fields];
+    const i = next.findIndex((f) => f.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange({ memberFields: next });
+  };
+
   return (
     <Card className="mb-5 p-5">
       <h3 className="mb-1 text-sm font-bold uppercase tracking-[0.14em] text-white">Columns</h3>
       <p className="mb-4 text-sm text-slate-400">
-        Shown after rank and name. The <code className="text-slate-300">status</code> column is the
-        member's community-wide activity status, so editing it here changes it everywhere.
+        Shown after rank and name, in this order — use the arrows to reorder. The{" "}
+        <code className="text-slate-300">status</code> column is the member's community-wide activity
+        status, so editing it here changes it everywhere.
       </p>
 
       <div className="space-y-2">
-        {fields.map((field) => (
+        {fields.map((field, index) => (
           <div
             key={field.id}
             className="rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]"
           >
             <div className="flex flex-wrap items-end gap-3">
+              <div className="mb-1 flex shrink-0 items-center gap-0.5">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => move(field.id, -1)}
+                  aria-label={`Move ${field.label} up`}
+                  className="rounded-lg p-1 text-slate-400 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
+                >
+                  <ChevronUp className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={index === fields.length - 1}
+                  onClick={() => move(field.id, 1)}
+                  aria-label={`Move ${field.label} down`}
+                  className="rounded-lg p-1 text-slate-400 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
+                >
+                  <ChevronDown className="size-4" />
+                </button>
+              </div>
               <Field label="Label" htmlFor={`f-${field.id}`} className="min-w-40 flex-1">
                 <TextInput
                   id={`f-${field.id}`}

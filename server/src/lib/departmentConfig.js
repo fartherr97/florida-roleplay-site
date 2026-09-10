@@ -410,6 +410,11 @@ export function normalizeConfig(raw, id) {
       // "shared" projects the community roster; "config" uses members stored on
       // the subdivision, for a unit the Discord bot does not track.
       source: roster.source === "config" ? "config" : "shared",
+      // When false, the Discord role sync leaves this department alone entirely —
+      // it never auto-adds, updates, renames or prunes its members, and never
+      // auto-assigns callsigns. The roster is then maintained by hand ("Add
+      // member" + the row editor). Default true (bot-driven).
+      autoSync: roster.autoSync !== false,
       memberFields: Array.isArray(roster.memberFields) && roster.memberFields.length
         ? roster.memberFields
         : DEFAULT_MEMBER_FIELDS,

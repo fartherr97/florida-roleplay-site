@@ -237,7 +237,7 @@ async function loadDeptMeta() {
   const meta = {};
   const setFrom = (cfg, id) => {
     const c = normalizeConfig(cfg, id);
-    const cur = meta[c.id] || { guildId: "", min: 0, max: 0, auto: true };
+    const cur = meta[c.id] || { guildId: "", min: 0, max: 0, auto: true, autoSync: true };
     const guildId = SNOWFLAKE.test(String(c.guildId ?? "")) ? String(c.guildId) : "";
     const cs = c.roster?.callsigns ?? {};
     meta[c.id] = {
@@ -245,6 +245,9 @@ async function loadDeptMeta() {
       min: cs.min || cur.min,
       max: cs.max || cur.max,
       auto: cs.auto !== false,
+      // A stored config wins; the seed default is on. Manual departments are
+      // skipped wholesale by the sync.
+      autoSync: c.roster?.autoSync !== false,
     };
   };
   for (const [id, cfg] of Object.entries(DEPARTMENT_CONFIGS)) setFrom(cfg, id);
@@ -380,6 +383,23 @@ export async function syncRosterFromGuild() {
 
     const roleMap = await loadRankMap();
     const deptMeta = await loadDeptMeta();
+    // Departments set to manual: the sync never touches them (no add, update,
+    // rename, prune or callsigns). Their members are maintained by hand.
+    const manualDepts = new Set(
+      Object.entries(deptMeta).filter(([, m]) => m.autoSync === false).map(([id]) => id),
+    );
+    // Any of their members still marked as bot-synced become manual rows, so they
+    // survive the switch and can be edited or removed by hand from now on.
+    if (manualDepts.size) {
+      try {
+        await query(
+          "UPDATE roster_members SET source = 'manual' WHERE source = 'discord-sync' AND department = ANY($1)",
+          [[...manualDepts]],
+        );
+      } catch {
+        // Best-effort — a manual dept simply keeps its rows either way.
+      }
+    }
     // Which held roles to persist per member: only the ones the map knows, so a
     // department roster can bucket a member by any of their mapped ranks.
     const mappedRoleIds = new Set(roleMap.map((r) => String(r.roleId)));
@@ -394,6 +414,8 @@ export async function syncRosterFromGuild() {
         seed.DEPARTMENTS,
       );
       if (resolved.action === "upsert") {
+        // A member whose resolved department is manual is left entirely alone.
+        if (manualDepts.has(resolved.entry.department)) continue;
         const roleIds = held.filter((id) => mappedRoleIds.has(id));
         await applyUpsert(resolved, null, roleIds, data.nicks);
         keep.push(discordId);
@@ -432,6 +454,7 @@ export async function syncRosterFromGuild() {
       // by a partial view of a department. Only departments with a real range and
       // auto-assignment on are touched.
       for (const [deptId, meta] of Object.entries(deptMeta)) {
+        if (manualDepts.has(deptId)) continue; // manual departments own their callsigns
         if (!meta.auto || meta.min <= 0 || meta.max < meta.min) continue;
         await assignDeptCallsigns(deptId, deptMembers[deptId] ?? [], meta);
       }
@@ -466,6 +489,19 @@ export async function syncRosterForDept(deptId) {
   try {
     const deptMeta = await loadDeptMeta();
     const meta = deptMeta[deptId];
+    // A manual department opts out of Discord sync entirely — its roster is kept
+    // by hand, so there is nothing to pull.
+    if (meta?.autoSync === false) {
+      try {
+        await query(
+          "UPDATE roster_members SET source = 'manual' WHERE source = 'discord-sync' AND department = $1",
+          [deptId],
+        );
+      } catch {
+        // Best-effort; the rows stay either way.
+      }
+      return { configured: true, manual: true };
+    }
     const main = String(process.env.DISCORD_GUILD_ID ?? "").trim();
     const guildIds = [
       ...new Set([meta?.guildId, main].map((g) => String(g ?? "").trim()).filter((g) => SNOWFLAKE.test(g))),
@@ -658,6 +694,12 @@ export async function syncRosterMember(discordUserId) {
       roleMap,
       seed.DEPARTMENTS,
     );
+
+    // A member resolving to a manual department is left alone — that roster is
+    // maintained by hand, so a role change never adds, updates or removes them.
+    if (resolved.action === "upsert" && deptMeta[resolved.entry.department]?.autoSync === false) {
+      return { configured: true, member: id, action: "manual" };
+    }
 
     if (resolved.action !== "upsert") {
       // They resolve nowhere. Remove their synced row — but only when every
