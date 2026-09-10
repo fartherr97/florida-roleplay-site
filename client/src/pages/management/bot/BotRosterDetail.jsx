@@ -373,6 +373,7 @@ function EditRoster({ roster, slug, onClose, onSaved }) {
     name: roster.name ?? "",
     description: roster.description ?? "",
     position: roster.position ?? 0,
+    nicknameSyncEnabled: roster.nicknameSyncEnabled !== false,
   });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -389,6 +390,7 @@ function EditRoster({ roster, slug, onClose, onSaved }) {
           // null clears the field; an empty string would set it to one.
           description: values.description.trim() || null,
           position: Number(values.position) || 0,
+          nicknameSyncEnabled: values.nicknameSyncEnabled,
         },
       });
       onSaved();
@@ -426,6 +428,22 @@ function EditRoster({ roster, slug, onClose, onSaved }) {
             className="max-w-28"
           />
         </Field>
+        <label className="flex items-start gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-inset ring-white/[0.06]">
+          <input
+            type="checkbox"
+            checked={values.nicknameSyncEnabled}
+            onChange={(e) => setValues((v) => ({ ...v, nicknameSyncEnabled: e.target.checked }))}
+            className="mt-0.5 size-4 accent-brand-500"
+          />
+          <span className="text-sm text-slate-300">
+            <span className="font-semibold text-white">Rename members&rsquo; Discord nicknames</span>
+            <span className="mt-0.5 block text-slate-400">
+              On: the bot keeps each member&rsquo;s nickname as{" "}
+              <code className="text-xs">callsign | rank | name</code>. Off: the bot never touches
+              their nickname — names are set by hand. (Turn off for a manually-run roster.)
+            </span>
+          </span>
+        </label>
         {error && <BotError error={error} />}
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
