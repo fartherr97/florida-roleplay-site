@@ -977,10 +977,16 @@ router.get("/:deptId/public", async (req, res) => {
 
   const { roster, roleMap } = await loadRosterAndMap(id, config.guildId, config);
 
-  // The rank ladder is every rank mapped to this department, highest first.
+  // The rank ladder is every rank mapped to this department, highest first —
+  // honouring the department's own rank-order override (config.roster.rankOrder,
+  // the "Rank order" control), the same way the roster and chain of command do,
+  // so this page can't disagree with them (e.g. Colonel above Lieutenant Colonel).
+  const rankOrder = config.roster?.rankOrder || {};
+  const orderOf = (role) =>
+    (role.key != null && role.key in rankOrder ? rankOrder[role.key] : role.order) ?? 0;
   const ranks = roleMap
     .filter((role) => role.department === id)
-    .sort((a, b) => (b.order ?? 0) - (a.order ?? 0))
+    .sort((a, b) => orderOf(b) - orderOf(a))
     .map((role) => ({ rank: role.rank, rankFull: role.rankFull }));
 
   // Featured fleet: the vehicles the department chose, else the first few. The
