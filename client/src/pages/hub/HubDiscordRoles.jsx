@@ -43,18 +43,28 @@ const SAMPLE = { characterName: "Aaron Jones", callsign: "122" };
  * one save fills the map out in full. Saved rows with no seed match (custom ranks)
  * are kept on the end.
  */
-function mergeMaps(seedList, savedList, matchKey = "key") {
+function mergeMaps(seedList, savedList, matchKey = "key", removed = new Set()) {
   const saved = new Map((savedList ?? []).map((row) => [row[matchKey], row]));
-  const merged = seedList.map((seedRow) => {
+  const merged = [];
+  for (const seedRow of seedList) {
     const match = saved.get(seedRow[matchKey]);
-    return match ? { ...seedRow, ...match } : seedRow;
-  });
+    if (match) {
+      merged.push({ ...seedRow, ...match });
+      continue;
+    }
+    // A seed rank the user deleted stays gone — otherwise it comes back on reload.
+    if (removed.has(seedRow[matchKey])) continue;
+    merged.push(seedRow);
+  }
   const seedKeys = new Set(seedList.map((row) => row[matchKey]));
   (savedList ?? []).forEach((row) => {
     if (!seedKeys.has(row[matchKey])) merged.push(row);
   });
   return merged;
 }
+
+/** Every key the shipped seed defines — a deletion of one of these is tombstoned. */
+const SEED_KEYS = new Set([...ROLE_MAP, ...SPECIAL_ROLES].map((r) => r.key));
 
 let newRoleSeq = 0;
 
@@ -131,7 +141,8 @@ function guessDepartment(name, departments) {
 export default function HubDiscordRoles() {
   const [roles, setRoles] = useState(ROLE_MAP);
   const [special, setSpecial] = useState(SPECIAL_ROLES);
-  const [saved, setSaved] = useState({ roles: ROLE_MAP, special: SPECIAL_ROLES });
+  const [removed, setRemoved] = useState([]); // seed keys the user deleted (tombstones)
+  const [saved, setSaved] = useState({ roles: ROLE_MAP, special: SPECIAL_ROLES, removed: [] });
   const [departments, setDepartments] = useState(DEPARTMENTS);
   const [scope, setScope] = useState("staff");
   const [query, setQuery] = useState("");
@@ -145,12 +156,16 @@ export default function HubDiscordRoles() {
     api.discordRoleMap().then((data) => {
       if (!active || !data?.roles) return;
       // Merge over the seed so every rank stays on the page even if the saved map
-      // only holds a subset — otherwise whole divisions look empty.
-      const roles = mergeMaps(ROLE_MAP, data.roles);
-      const special = mergeMaps(SPECIAL_ROLES, data.special);
+      // only holds a subset — otherwise whole divisions look empty. Ranks the user
+      // deleted (the tombstone list) are left out of that merge.
+      const removedSet = new Set(data.removed ?? []);
+      const roles = mergeMaps(ROLE_MAP, data.roles, "key", removedSet);
+      const special = mergeMaps(SPECIAL_ROLES, data.special, "key", removedSet);
+      const removed = data.removed ?? [];
       setRoles(roles);
       setSpecial(special);
-      setSaved({ roles, special });
+      setRemoved(removed);
+      setSaved({ roles, special, removed });
       if (data.departments?.length) setDepartments(data.departments);
     });
     return () => {
@@ -220,7 +235,7 @@ export default function HubDiscordRoles() {
   );
 
   const dirty =
-    JSON.stringify({ roles, special }) !== JSON.stringify(saved);
+    JSON.stringify({ roles, special, removed }) !== JSON.stringify(saved);
 
   const updateRole = (key, field, value) =>
     setRoles((prev) =>
@@ -280,8 +295,8 @@ export default function HubDiscordRoles() {
   const save = async () => {
     setSaving(true);
     try {
-      const result = await api.saveDiscordRoleMap({ roles, special });
-      setSaved({ roles, special });
+      const result = await api.saveDiscordRoleMap({ roles, special, removed });
+      setSaved({ roles, special, removed });
       setStatus({
         tone: result?.message ? "amber" : "green",
         text: result?.message ?? "Discord role mapping saved.",
@@ -303,11 +318,14 @@ export default function HubDiscordRoles() {
       // discards any unsaved edits — hence the button is disabled while dirty.
       const data = await api.discordRoleMap();
       if (data?.roles) {
-        const nextRoles = mergeMaps(ROLE_MAP, data.roles);
-        const nextSpecial = mergeMaps(SPECIAL_ROLES, data.special);
+        const removedSet = new Set(data.removed ?? []);
+        const nextRoles = mergeMaps(ROLE_MAP, data.roles, "key", removedSet);
+        const nextSpecial = mergeMaps(SPECIAL_ROLES, data.special, "key", removedSet);
+        const nextRemoved = data.removed ?? [];
         setRoles(nextRoles);
         setSpecial(nextSpecial);
-        setSaved({ roles: nextRoles, special: nextSpecial });
+        setRemoved(nextRemoved);
+        setSaved({ roles: nextRoles, special: nextSpecial, removed: nextRemoved });
       }
       const missing = result?.missing?.length ?? 0;
       const updated = result?.updated ?? 0;
@@ -544,9 +562,16 @@ export default function HubDiscordRoles() {
                       <td className="px-3 py-3.5 text-right">
                         <button
                           type="button"
-                          onClick={() =>
-                            setRoles((prev) => prev.filter((r) => r.key !== role.key))
-                          }
+                          onClick={() => {
+                            setRoles((prev) => prev.filter((r) => r.key !== role.key));
+                            // Tombstone a shipped seed rank so it stays gone after a
+                            // reload; a custom row just drops and needs no tombstone.
+                            if (SEED_KEYS.has(role.key)) {
+                              setRemoved((prev) =>
+                                prev.includes(role.key) ? prev : [...prev, role.key],
+                              );
+                            }
+                          }}
                           aria-label={`Remove ${role.key}`}
                           className="grid size-8 place-items-center rounded-lg text-slate-500 ring-1 ring-inset ring-white/10 transition hover:bg-rose-500/10 hover:text-rose-400"
                         >
@@ -611,6 +636,7 @@ export default function HubDiscordRoles() {
             onClick={() => {
               setRoles(saved.roles);
               setSpecial(saved.special);
+              setRemoved(saved.removed ?? []);
             }}
             disabled={!dirty}
           >

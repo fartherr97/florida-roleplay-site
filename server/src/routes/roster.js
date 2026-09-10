@@ -107,6 +107,36 @@ async function loadRoleMap({ withSpecial = false } = {}) {
     : seed.ROLE_MAP;
 }
 
+/**
+ * Seed ranks the page injects but the user has deleted. The mapping page always
+ * merges the shipped seed over the saved map so no division looks empty, which
+ * on its own resurrects any seed rank a user removed. This tombstone list is how
+ * a deletion sticks: the page excludes these keys from that merge. Self-creating,
+ * memoised, so an existing deploy picks it up without a manual migration.
+ */
+let removedKeysReady = null;
+async function ensureRemovedTable() {
+  if (!removedKeysReady) {
+    removedKeysReady = query(`CREATE TABLE IF NOT EXISTS roster_role_map_removed (
+        role_key VARCHAR(64) PRIMARY KEY
+      )`).catch((err) => {
+      removedKeysReady = null;
+      throw err;
+    });
+  }
+  return removedKeysReady;
+}
+
+async function loadRemovedKeys() {
+  try {
+    await ensureRemovedTable();
+    const rows = await query("SELECT role_key FROM roster_role_map_removed");
+    return rows.map((r) => r.role_key);
+  } catch {
+    return [];
+  }
+}
+
 /** The mapped LOA tag, falling back to the seeded one. */
 async function loaRoleId() {
   const { special } = await loadRoleMap({ withSpecial: true });
@@ -134,6 +164,7 @@ router.get("/role-map", async (_req, res) => {
     departments: seed.DEPARTMENTS,
     roles,
     special,
+    removed: await loadRemovedKeys(),
   });
 });
 
@@ -315,6 +346,19 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
 
   if (errors.length) return res.status(400).json({ ok: false, errors });
 
+  // Deleted seed ranks (tombstones). Never tombstone a key that is actually
+  // mapped — a live mapping always wins over a stale deletion.
+  const savedKeys = new Set([...cleanRoles, ...cleanSpecial].map((r) => r.key));
+  const removed = Array.isArray(req.body?.removed)
+    ? [
+        ...new Set(
+          req.body.removed
+            .map((k) => str(k))
+            .filter((k) => /^[a-z0-9_]{2,64}$/.test(k) && !savedKeys.has(k)),
+        ),
+      ]
+    : [];
+
   try {
     await query("DELETE FROM roster_role_map");
     for (const role of cleanRoles) {
@@ -331,12 +375,21 @@ router.post("/role-map", requirePermission("discord.roles.manage"), async (req, 
         [role.roleId, role.key, role.kind, role.label, role.detail],
       );
     }
-    return res.json({ ok: true, roles: cleanRoles, special: cleanSpecial });
+    await ensureRemovedTable();
+    await query("DELETE FROM roster_role_map_removed");
+    for (const key of removed) {
+      await query(
+        "INSERT INTO roster_role_map_removed (role_key) VALUES ($1) ON CONFLICT DO NOTHING",
+        [key],
+      );
+    }
+    return res.json({ ok: true, roles: cleanRoles, special: cleanSpecial, removed });
   } catch {
     return res.json({
       ok: true,
       roles: cleanRoles,
       special: cleanSpecial,
+      removed,
       message:
         "Accepted, but not persisted — no database is configured, so this will reset on reload.",
     });
