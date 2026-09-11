@@ -50,7 +50,7 @@ function formatUntil(value) {
   });
 }
 
-const EMPTY_DRAFT = { name: "", shortName: "", accent: "", blurb: "", logoUrl: "", applyUrl: "" };
+const EMPTY_DRAFT = { name: "", shortName: "", accent: "", blurb: "", logoUrl: "", backdropUrl: "", applyUrl: "" };
 
 export default function ApplicationsDirectory() {
   const { hasPermission } = useAuth();
@@ -141,6 +141,7 @@ export default function ApplicationsDirectory() {
       accent: dept.accent,
       blurb: dept.blurb,
       logoUrl: dept.logoUrl,
+      backdropUrl: dept.backdropUrl,
       applyUrl: dept.applyUrl,
     });
     setEditing(dept.id);
@@ -275,6 +276,16 @@ export default function ApplicationsDirectory() {
               placeholder="https://www.flrp.us/images/…png"
             />
           </Field>
+          <Field
+            label="Background image URL"
+            hint="An in-game screenshot works well — shown faded behind the card. Leave blank for none."
+          >
+            <TextInput
+              value={draft.backdropUrl}
+              onChange={(e) => setDraft((d) => ({ ...d, backdropUrl: e.target.value }))}
+              placeholder="https://www.flrp.us/images/…jpg"
+            />
+          </Field>
           <Field label="Blurb" hint="A short line describing the department.">
             <TextArea
               rows={3}
@@ -332,6 +343,28 @@ function DepartmentCard({
         open ? "" : "opacity-[0.92]"
       }`}
     >
+      {/* Department screenshot, faded far back so it sets the mood without
+          fighting the text. A scrim over it keeps everything readable. */}
+      {dept.backdropUrl && (
+        <>
+          <img
+            src={dept.backdropUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="pointer-events-none absolute inset-0 size-full object-cover opacity-[0.22] transition-opacity duration-500 group-hover:opacity-30"
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, color-mix(in srgb, var(--color-surface-1) 62%, transparent) 0%, color-mix(in srgb, var(--color-surface-1) 82%, transparent) 55%, color-mix(in srgb, var(--color-surface-1) 94%, transparent) 100%)",
+            }}
+          />
+        </>
+      )}
+
       {/* Accent wash bleeding down from the top edge, deepening on hover. */}
       <span
         aria-hidden="true"

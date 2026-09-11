@@ -73,6 +73,7 @@ router.post("/", requirePermission("applications.admin"), async (req, res) => {
   const accent = str(req.body?.accent).trim().slice(0, 40);
   const blurb = str(req.body?.blurb).trim().slice(0, 400);
   const logoUrl = str(req.body?.logoUrl).trim();
+  const backdropUrl = str(req.body?.backdropUrl).trim();
   const applyUrl = str(req.body?.applyUrl).trim();
 
   if (!name) {
@@ -84,6 +85,9 @@ router.post("/", requirePermission("applications.admin"), async (req, res) => {
   if (!recruitment.validApplyUrl(logoUrl)) {
     return res.status(400).json({ ok: false, message: "The logo must be a full http:// or https:// image URL." });
   }
+  if (!recruitment.validApplyUrl(backdropUrl)) {
+    return res.status(400).json({ ok: false, message: "The background must be a full http:// or https:// image URL." });
+  }
 
   try {
     const department = await recruitment.createDepartment({
@@ -92,6 +96,7 @@ router.post("/", requirePermission("applications.admin"), async (req, res) => {
       accent,
       blurb,
       logoUrl,
+      backdropUrl,
       applyUrl,
       actorId: req.user?.id ?? null,
       actorName: req.user?.displayName ?? null,
@@ -118,6 +123,13 @@ router.put("/:id", requirePermission("applications.admin"), async (req, res) => 
       return res.status(400).json({ ok: false, message: "The logo must be a full http:// or https:// image URL." });
     }
     fields.logoUrl = logoUrl;
+  }
+  if (req.body?.backdropUrl !== undefined) {
+    const backdropUrl = str(req.body.backdropUrl).trim();
+    if (!recruitment.validApplyUrl(backdropUrl)) {
+      return res.status(400).json({ ok: false, message: "The background must be a full http:// or https:// image URL." });
+    }
+    fields.backdropUrl = backdropUrl;
   }
   if (req.body?.applyUrl !== undefined) {
     const applyUrl = str(req.body.applyUrl).trim();

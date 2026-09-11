@@ -66,6 +66,7 @@ export function ensureTables() {
         accent           VARCHAR(40)  NULL,
         blurb            VARCHAR(400) NULL,
         logo_url         TEXT         NULL,
+        backdrop_url     TEXT         NULL,
         status           VARCHAR(24)  NOT NULL DEFAULT 'closed',
         interviews_until DATE         NULL,
         apply_url        TEXT         NULL,
@@ -75,9 +76,11 @@ export function ensureTables() {
         created_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
-      // logo_url was added after first ship — add it in place on installs whose
-      // table predates it, since the schema is never re-run in prod.
+      // logo_url and backdrop_url were added after first ship — add them in
+      // place on installs whose table predates them, since the schema is never
+      // re-run in prod.
       await execute("ALTER TABLE application_departments ADD COLUMN IF NOT EXISTS logo_url TEXT");
+      await execute("ALTER TABLE application_departments ADD COLUMN IF NOT EXISTS backdrop_url TEXT");
       await seedDefaults();
       await backfillCrests();
     })().catch((err) => {
@@ -131,6 +134,7 @@ function mapDept(row) {
     accent: row.accent ?? "",
     blurb: row.blurb ?? "",
     logoUrl: row.logo_url ?? "",
+    backdropUrl: row.backdrop_url ?? "",
     status: row.status,
     interviewsUntil: row.interviews_until
       ? new Date(row.interviews_until).toISOString().slice(0, 10)
@@ -173,7 +177,7 @@ export async function listDepartments() {
   return rows.map(mapDept);
 }
 
-export async function createDepartment({ name, shortName, accent, blurb, logoUrl, applyUrl, actorId, actorName }) {
+export async function createDepartment({ name, shortName, accent, blurb, logoUrl, backdropUrl, applyUrl, actorId, actorName }) {
   await ensureTables();
   const orderRows = await query(
     "SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM application_departments",
@@ -181,8 +185,8 @@ export async function createDepartment({ name, shortName, accent, blurb, logoUrl
   const nextOrder = orderRows[0]?.next ?? 0;
   const rows = await query(
     `INSERT INTO application_departments
-       (id, name, short_name, accent, blurb, logo_url, status, apply_url, sort_order, updated_by, updated_by_name)
-       VALUES ($1, $2, $3, $4, $5, $6, 'closed', $7, $8, $9, $10)
+       (id, name, short_name, accent, blurb, logo_url, backdrop_url, status, apply_url, sort_order, updated_by, updated_by_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'closed', $8, $9, $10, $11)
      RETURNING *`,
     [
       `ad-${randomUUID()}`,
@@ -191,6 +195,7 @@ export async function createDepartment({ name, shortName, accent, blurb, logoUrl
       accent || null,
       blurb || null,
       logoUrl || null,
+      backdropUrl || null,
       applyUrl || null,
       nextOrder,
       actorId ?? null,
@@ -225,10 +230,11 @@ export async function updateDepartment(id, fields) {
        name       = COALESCE($2, name),
        short_name = COALESCE($3, short_name),
        accent     = COALESCE($4, accent),
-       blurb      = COALESCE($5, blurb),
-       logo_url   = COALESCE($6, logo_url),
-       apply_url  = COALESCE($7, apply_url),
-       updated_at = CURRENT_TIMESTAMP
+       blurb        = COALESCE($5, blurb),
+       logo_url     = COALESCE($6, logo_url),
+       backdrop_url = COALESCE($7, backdrop_url),
+       apply_url    = COALESCE($8, apply_url),
+       updated_at   = CURRENT_TIMESTAMP
      WHERE id = $1
      RETURNING *`,
     [
@@ -238,6 +244,7 @@ export async function updateDepartment(id, fields) {
       fields.accent ?? null,
       fields.blurb ?? null,
       fields.logoUrl ?? null,
+      fields.backdropUrl ?? null,
       fields.applyUrl ?? null,
     ],
   );
