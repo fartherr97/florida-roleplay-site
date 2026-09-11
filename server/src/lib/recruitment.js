@@ -29,6 +29,31 @@ export function validStatus(value) {
   return STATUS_IDS.has(String(value ?? ""));
 }
 
+/** The three saved departments and their community-hosted crests. */
+const DEFAULT_DEPTS = [
+  {
+    id: "fhp",
+    name: "Florida Highway Patrol",
+    short: "FHP",
+    accent: "#d2b48c",
+    logo: "https://www.flrp.us/images/480f8f75e967b7e4.png",
+  },
+  {
+    id: "bso",
+    name: "Broward County Sheriff's Office",
+    short: "BSO",
+    accent: "#16a34a",
+    logo: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
+  },
+  {
+    id: "mpd",
+    name: "Miami Police Department",
+    short: "MPD",
+    accent: "#3b82f6",
+    logo: "https://www.flrp.us/images/72517584c4a23ba3.png",
+  },
+];
+
 let ready = null;
 
 export function ensureTables() {
@@ -40,6 +65,7 @@ export function ensureTables() {
         short_name       VARCHAR(40)  NULL,
         accent           VARCHAR(40)  NULL,
         blurb            VARCHAR(400) NULL,
+        logo_url         TEXT         NULL,
         status           VARCHAR(24)  NOT NULL DEFAULT 'closed',
         interviews_until DATE         NULL,
         apply_url        TEXT         NULL,
@@ -49,7 +75,11 @@ export function ensureTables() {
         created_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
+      // logo_url was added after first ship — add it in place on installs whose
+      // table predates it, since the schema is never re-run in prod.
+      await execute("ALTER TABLE application_departments ADD COLUMN IF NOT EXISTS logo_url TEXT");
       await seedDefaults();
+      await backfillCrests();
     })().catch((err) => {
       ready = null;
       throw err;
@@ -66,18 +96,29 @@ export function ensureTables() {
 async function seedDefaults() {
   const existing = await query("SELECT 1 FROM application_departments LIMIT 1");
   if (existing.length) return;
-  const seeds = [
-    { id: "fhp", name: "Florida Highway Patrol", short: "FHP", accent: "#d2b48c" },
-    { id: "bso", name: "Broward County Sheriff's Office", short: "BSO", accent: "#22c55e" },
-    { id: "mpd", name: "Miami Police Department", short: "MPD", accent: "#3b82f6" },
-  ];
-  for (let i = 0; i < seeds.length; i += 1) {
-    const s = seeds[i];
+  for (let i = 0; i < DEFAULT_DEPTS.length; i += 1) {
+    const s = DEFAULT_DEPTS[i];
     await execute(
-      `INSERT INTO application_departments (id, name, short_name, accent, status, sort_order)
-         VALUES ($1, $2, $3, $4, 'closed', $5)
+      `INSERT INTO application_departments (id, name, short_name, accent, logo_url, status, sort_order)
+         VALUES ($1, $2, $3, $4, $5, 'closed', $6)
        ON CONFLICT (id) DO NOTHING`,
-      [`ad-${s.id}`, s.name, s.short, s.accent, i],
+      [`ad-${s.id}`, s.name, s.short, s.accent, s.logo, i],
+    );
+  }
+}
+
+/**
+ * Fill in the known department crests where they're still blank. Only touches
+ * rows that have no logo yet, so a logo an Owner has set is never overwritten —
+ * this is what gives the already-seeded departments their crest on upgrade.
+ */
+async function backfillCrests() {
+  for (const s of DEFAULT_DEPTS) {
+    await execute(
+      `UPDATE application_departments
+          SET logo_url = $1
+        WHERE id = $2 AND (logo_url IS NULL OR logo_url = '')`,
+      [s.logo, `ad-${s.id}`],
     );
   }
 }
@@ -89,6 +130,7 @@ function mapDept(row) {
     shortName: row.short_name ?? "",
     accent: row.accent ?? "",
     blurb: row.blurb ?? "",
+    logoUrl: row.logo_url ?? "",
     status: row.status,
     interviewsUntil: row.interviews_until
       ? new Date(row.interviews_until).toISOString().slice(0, 10)
@@ -131,7 +173,7 @@ export async function listDepartments() {
   return rows.map(mapDept);
 }
 
-export async function createDepartment({ name, shortName, accent, blurb, applyUrl, actorId, actorName }) {
+export async function createDepartment({ name, shortName, accent, blurb, logoUrl, applyUrl, actorId, actorName }) {
   await ensureTables();
   const orderRows = await query(
     "SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM application_departments",
@@ -139,8 +181,8 @@ export async function createDepartment({ name, shortName, accent, blurb, applyUr
   const nextOrder = orderRows[0]?.next ?? 0;
   const rows = await query(
     `INSERT INTO application_departments
-       (id, name, short_name, accent, blurb, status, apply_url, sort_order, updated_by, updated_by_name)
-       VALUES ($1, $2, $3, $4, $5, 'closed', $6, $7, $8, $9)
+       (id, name, short_name, accent, blurb, logo_url, status, apply_url, sort_order, updated_by, updated_by_name)
+       VALUES ($1, $2, $3, $4, $5, $6, 'closed', $7, $8, $9, $10)
      RETURNING *`,
     [
       `ad-${randomUUID()}`,
@@ -148,6 +190,7 @@ export async function createDepartment({ name, shortName, accent, blurb, applyUr
       shortName || null,
       accent || null,
       blurb || null,
+      logoUrl || null,
       applyUrl || null,
       nextOrder,
       actorId ?? null,
@@ -183,7 +226,8 @@ export async function updateDepartment(id, fields) {
        short_name = COALESCE($3, short_name),
        accent     = COALESCE($4, accent),
        blurb      = COALESCE($5, blurb),
-       apply_url  = COALESCE($6, apply_url),
+       logo_url   = COALESCE($6, logo_url),
+       apply_url  = COALESCE($7, apply_url),
        updated_at = CURRENT_TIMESTAMP
      WHERE id = $1
      RETURNING *`,
@@ -193,6 +237,7 @@ export async function updateDepartment(id, fields) {
       fields.shortName ?? null,
       fields.accent ?? null,
       fields.blurb ?? null,
+      fields.logoUrl ?? null,
       fields.applyUrl ?? null,
     ],
   );

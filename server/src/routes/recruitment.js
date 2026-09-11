@@ -72,6 +72,7 @@ router.post("/", requirePermission("applications.admin"), async (req, res) => {
   const shortName = str(req.body?.shortName).trim().slice(0, 40);
   const accent = str(req.body?.accent).trim().slice(0, 40);
   const blurb = str(req.body?.blurb).trim().slice(0, 400);
+  const logoUrl = str(req.body?.logoUrl).trim();
   const applyUrl = str(req.body?.applyUrl).trim();
 
   if (!name) {
@@ -80,6 +81,9 @@ router.post("/", requirePermission("applications.admin"), async (req, res) => {
   if (!recruitment.validApplyUrl(applyUrl)) {
     return res.status(400).json({ ok: false, message: "The Apply Now link must be a full http:// or https:// URL." });
   }
+  if (!recruitment.validApplyUrl(logoUrl)) {
+    return res.status(400).json({ ok: false, message: "The logo must be a full http:// or https:// image URL." });
+  }
 
   try {
     const department = await recruitment.createDepartment({
@@ -87,6 +91,7 @@ router.post("/", requirePermission("applications.admin"), async (req, res) => {
       shortName,
       accent,
       blurb,
+      logoUrl,
       applyUrl,
       actorId: req.user?.id ?? null,
       actorName: req.user?.displayName ?? null,
@@ -107,6 +112,13 @@ router.put("/:id", requirePermission("applications.admin"), async (req, res) => 
   if (req.body?.shortName !== undefined) fields.shortName = str(req.body.shortName).trim().slice(0, 40);
   if (req.body?.accent !== undefined) fields.accent = str(req.body.accent).trim().slice(0, 40);
   if (req.body?.blurb !== undefined) fields.blurb = str(req.body.blurb).trim().slice(0, 400);
+  if (req.body?.logoUrl !== undefined) {
+    const logoUrl = str(req.body.logoUrl).trim();
+    if (!recruitment.validApplyUrl(logoUrl)) {
+      return res.status(400).json({ ok: false, message: "The logo must be a full http:// or https:// image URL." });
+    }
+    fields.logoUrl = logoUrl;
+  }
   if (req.body?.applyUrl !== undefined) {
     const applyUrl = str(req.body.applyUrl).trim();
     if (!recruitment.validApplyUrl(applyUrl)) {

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CalendarClock,
+  CheckCircle2,
+  Clock,
+  Lock,
   Pencil,
   Plus,
   Trash2,
@@ -10,7 +13,6 @@ import Section from "../components/layout/Section";
 import PageHeader from "../components/layout/PageHeader";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import Badge from "../components/ui/Badge";
 import Field from "../components/ui/Field";
 import Select from "../components/ui/Select";
 import Modal from "../components/ui/Modal";
@@ -26,10 +28,14 @@ import { api } from "../lib/api";
  * external application link). Department Heads, Directorship and Ownership set
  * each department's status — Open, Closed, or Open Interviews with a close date
  * — via applications.manage. Ownership adds and removes departments and edits
- * the Apply Now links via applications.admin.
+ * the crest and Apply Now links via applications.admin.
  */
 
-const STATUS_TONE = { open: "green", interviews: "amber", closed: "rose" };
+const STATUS_META = {
+  open: { tone: "green", icon: CheckCircle2, glow: "#22c55e" },
+  interviews: { tone: "amber", icon: Clock, glow: "#f59e0b" },
+  closed: { tone: "rose", icon: Lock, glow: "#ef4444" },
+};
 
 /** "November 4, 2026" for a YYYY-MM-DD string, in a timezone-stable way. */
 function formatUntil(value) {
@@ -44,7 +50,7 @@ function formatUntil(value) {
   });
 }
 
-const EMPTY_DRAFT = { name: "", shortName: "", accent: "", blurb: "", applyUrl: "" };
+const EMPTY_DRAFT = { name: "", shortName: "", accent: "", blurb: "", logoUrl: "", applyUrl: "" };
 
 export default function ApplicationsDirectory() {
   const { hasPermission } = useAuth();
@@ -96,6 +102,11 @@ export default function ApplicationsDirectory() {
     [statuses],
   );
 
+  const openCount = useMemo(
+    () => departments.filter((d) => d.status !== "closed").length,
+    [departments],
+  );
+
   /* ------------------------------------------------ manage: status + date */
 
   async function saveStatus(dept, next) {
@@ -129,6 +140,7 @@ export default function ApplicationsDirectory() {
       shortName: dept.shortName,
       accent: dept.accent,
       blurb: dept.blurb,
+      logoUrl: dept.logoUrl,
       applyUrl: dept.applyUrl,
     });
     setEditing(dept.id);
@@ -170,7 +182,11 @@ export default function ApplicationsDirectory() {
       <PageHeader
         eyebrow="Join the community"
         title="Applications"
-        subtitle="Every department and where its recruitment stands right now. Hit Apply Now on any open department to start your application."
+        subtitle={
+          openCount > 0
+            ? `${openCount} ${openCount === 1 ? "department is" : "departments are"} recruiting right now. Pick one and apply — most positions require a whitelist first.`
+            : "Every department and where its recruitment stands. Check back soon — hiring opens up regularly."
+        }
         backTo="/"
         actions={
           canAdmin && (
@@ -196,19 +212,19 @@ export default function ApplicationsDirectory() {
       {loading ? (
         <p className="text-sm text-slate-400">Loading departments…</p>
       ) : departments.length === 0 ? (
-        <Card className="p-8 text-center">
+        <Card className="p-10 text-center">
           <p className="text-sm text-slate-400">
             No departments are listed yet.
             {canAdmin && " Use “Add department” to create the first one."}
           </p>
         </Card>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {departments.map((dept) => (
             <DepartmentCard
               key={dept.id}
               dept={dept}
-              tone={STATUS_TONE[dept.status] ?? "slate"}
+              meta={STATUS_META[dept.status] ?? STATUS_META.closed}
               statusLabel={statusLabel(dept.status)}
               statusOptions={statusOptions}
               canManage={canManage}
@@ -237,14 +253,14 @@ export default function ApplicationsDirectory() {
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Short name" hint="Shown as the card badge, e.g. FHP.">
+            <Field label="Short name" hint="Card badge, e.g. FHP.">
               <TextInput
                 value={draft.shortName}
                 onChange={(e) => setDraft((d) => ({ ...d, shortName: e.target.value }))}
                 placeholder="FHP"
               />
             </Field>
-            <Field label="Accent color" hint="Any CSS color, e.g. #d2b48c.">
+            <Field label="Accent color" hint="Any CSS color.">
               <TextInput
                 value={draft.accent}
                 onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value }))}
@@ -252,6 +268,13 @@ export default function ApplicationsDirectory() {
               />
             </Field>
           </div>
+          <Field label="Logo / crest URL" hint="A full image URL. Leave blank to show the short-name badge instead.">
+            <TextInput
+              value={draft.logoUrl}
+              onChange={(e) => setDraft((d) => ({ ...d, logoUrl: e.target.value }))}
+              placeholder="https://www.flrp.us/images/…png"
+            />
+          </Field>
           <Field label="Blurb" hint="A short line describing the department.">
             <TextArea
               rows={3}
@@ -288,7 +311,7 @@ export default function ApplicationsDirectory() {
 
 function DepartmentCard({
   dept,
-  tone,
+  meta,
   statusLabel,
   statusOptions,
   canManage,
@@ -301,54 +324,91 @@ function DepartmentCard({
   const open = status !== "closed";
   const applyable = open && Boolean(dept.applyUrl);
   const accent = dept.accent || "#f2800d";
+  const StatusIcon = meta.icon;
 
   return (
-    <Card className="flex flex-col p-6">
-      <div className="flex items-start justify-between gap-3">
+    <Card
+      className={`group relative flex flex-col overflow-hidden p-6 transition-colors ${
+        open ? "" : "opacity-[0.92]"
+      }`}
+    >
+      {/* Accent wash bleeding down from the top edge, deepening on hover. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-28 opacity-70 transition-opacity duration-500 group-hover:opacity-100"
+        style={{
+          background: `radial-gradient(115% 100% at 50% 0%, color-mix(in srgb, ${accent} 20%, transparent), transparent 72%)`,
+        }}
+      />
+      {/* Thin accent hairline along the very top. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
+      />
+
+      <div className="relative flex items-start justify-between gap-3">
         <span
-          className="grid min-h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-black uppercase tracking-wide ring-1 ring-inset"
+          className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl ring-1 ring-inset transition-transform duration-500 group-hover:-translate-y-0.5"
           style={{
-            color: accent,
-            backgroundColor: `${accent}1a`,
-            boxShadow: `inset 0 0 0 1px ${accent}40`,
+            backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)`,
+            "--tw-ring-color": `color-mix(in srgb, ${accent} 34%, transparent)`,
           }}
         >
-          {dept.shortName || dept.name.slice(0, 3)}
+          {dept.logoUrl ? (
+            <img
+              src={dept.logoUrl}
+              alt={`${dept.shortName || dept.name} crest`}
+              className="size-11 object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.45)]"
+              loading="lazy"
+            />
+          ) : (
+            <span className="text-base font-black uppercase tracking-wide" style={{ color: accent }}>
+              {(dept.shortName || dept.name).slice(0, 3)}
+            </span>
+          )}
         </span>
-        <Badge tone={tone} dot>
+
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset"
+          style={{
+            color: meta.glow,
+            backgroundColor: `color-mix(in srgb, ${meta.glow} 12%, transparent)`,
+            "--tw-ring-color": `color-mix(in srgb, ${meta.glow} 30%, transparent)`,
+          }}
+        >
+          <StatusIcon className="size-3.5" />
           {statusLabel}
-        </Badge>
+        </span>
       </div>
 
-      <h2 className="mt-5 text-base font-bold text-white">{dept.name}</h2>
+      <h2 className="relative mt-5 text-lg font-black tracking-tight text-white">{dept.name}</h2>
+      {dept.shortName && (
+        <p className="relative mt-0.5 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: accent }}>
+          {dept.shortName}
+        </p>
+      )}
       {dept.blurb && (
-        <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
+        <p className="relative mt-3 flex-1 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
       )}
 
       {status === "interviews" && dept.interviewsUntil && (
-        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+        <p className="relative mt-3 inline-flex w-fit items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 ring-1 ring-inset ring-amber-400/20">
           <CalendarClock className="size-3.5" />
-          Interviews open until {formatUntil(dept.interviewsUntil)}
+          Interviews until {formatUntil(dept.interviewsUntil)}
         </p>
       )}
 
-      <div className="mt-5 border-t border-white/[0.06] pt-4">
+      <div className="relative mt-6">
         {applyable ? (
-          <Button
-            as="a"
-            href={dept.applyUrl}
-            target="_blank"
-            rel="noreferrer"
-            size="sm"
-            block
-          >
+          <Button as="a" href={dept.applyUrl} target="_blank" rel="noreferrer" size="md" block>
             Apply Now
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Button>
         ) : (
-          <p className="text-center text-xs font-semibold text-slate-500">
+          <div className="flex h-11 items-center justify-center rounded-xl bg-white/[0.03] text-xs font-semibold text-slate-500 ring-1 ring-inset ring-white/[0.06]">
             {open ? "Apply link coming soon" : "Not accepting applications"}
-          </p>
+          </div>
         )}
       </div>
 
@@ -357,7 +417,7 @@ function DepartmentCard({
       )}
 
       {canAdmin && (
-        <div className="mt-3 flex items-center justify-end gap-2">
+        <div className="relative mt-3 flex items-center justify-end gap-1">
           <Button variant="ghost" size="sm" onClick={() => onEdit(dept)}>
             <Pencil className="size-3.5" />
             Edit
@@ -387,23 +447,20 @@ function ManageControls({ dept, statusOptions, onSave }) {
   const dirty = status !== dept.status || (until || "") !== (dept.interviewsUntil ?? "");
 
   return (
-    <div className="mt-4 space-y-3 rounded-xl bg-black/20 p-3 ring-1 ring-inset ring-white/[0.06]">
+    <div className="relative mt-4 space-y-3 rounded-xl bg-black/20 p-3 ring-1 ring-inset ring-white/[0.06]">
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
         Recruitment status
       </p>
       <Select value={status} onChange={setStatus} options={statusOptions} />
       {status === "interviews" && (
         <Field label="Interviews open until" className="!space-y-1.5">
-          <TextInput
-            type="date"
-            value={until}
-            onChange={(e) => setUntil(e.target.value)}
-          />
+          <TextInput type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
         </Field>
       )}
       <Button
         size="sm"
         block
+        variant="secondary"
         disabled={!dirty}
         onClick={() => onSave(dept, { status, interviewsUntil: until })}
       >
