@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, UserPlus } from "lucide-react";
+import { ArrowRight, UserPlus } from "lucide-react";
 import Section from "../components/layout/Section";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -9,7 +9,7 @@ import { SITE } from "../data/mockData";
 
 const STEPS = [
   "Sign in with Discord — we only read your username, avatar and roles.",
-  "Submit the community whitelist application on Sonoran.",
+  "Submit the community whitelist application right here on the site.",
   "Get approved and connect to the server.",
 ];
 
@@ -70,17 +70,9 @@ export default function CreateAccount() {
             Continue with Discord
           </Button>
 
-          <Button
-            as="a"
-            href={SITE.applyUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-            variant="secondary"
-            block
-            className="mt-3"
-          >
+          <Button as={Link} to="/whitelist" variant="secondary" block className="mt-3">
             Whitelist application
-            <ExternalLink className="size-4" />
+            <ArrowRight className="size-4" />
           </Button>
 
           <p className="mt-6 text-sm text-slate-400">
