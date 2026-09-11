@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import Section from "../components/layout/Section";
 import PageHeader from "../components/layout/PageHeader";
@@ -336,6 +337,8 @@ function DepartmentCard({
   const applyable = open && Boolean(dept.applyUrl);
   const accent = dept.accent || "#f2800d";
   const StatusIcon = meta.icon;
+  const canEdit = canManage || canAdmin;
+  const [editOpen, setEditOpen] = useState(false);
 
   return (
     <Card
@@ -380,18 +383,22 @@ function DepartmentCard({
         style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
       />
 
-      {/* Status pill floats in the top-right so the crest and name stay centered. */}
-      <span
-        className="absolute right-5 top-5 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset"
-        style={{
-          color: meta.glow,
-          backgroundColor: `color-mix(in srgb, ${meta.glow} 14%, transparent)`,
-          "--tw-ring-color": `color-mix(in srgb, ${meta.glow} 30%, transparent)`,
-        }}
-      >
-        <StatusIcon className="size-3.5" />
-        {statusLabel}
-      </span>
+      {/* Staff-only: a quiet pencil toggle that reveals the editing panel. */}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => setEditOpen((v) => !v)}
+          aria-label={editOpen ? "Close editing" : "Edit department"}
+          aria-expanded={editOpen}
+          className={`absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-lg ring-1 ring-inset transition ${
+            editOpen
+              ? "bg-white/[0.12] text-white ring-white/20"
+              : "bg-white/[0.04] text-slate-400 ring-white/10 hover:bg-white/[0.08] hover:text-white"
+          }`}
+        >
+          {editOpen ? <X className="size-4" /> : <Pencil className="size-3.5" />}
+        </button>
+      )}
 
       <div className="relative flex flex-col items-center text-center">
         <span className="grid h-24 place-items-center transition-transform duration-500 group-hover:-translate-y-0.5">
@@ -415,6 +422,19 @@ function DepartmentCard({
             {dept.shortName}
           </p>
         )}
+
+        <span
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset"
+          style={{
+            color: meta.glow,
+            backgroundColor: `color-mix(in srgb, ${meta.glow} 14%, transparent)`,
+            "--tw-ring-color": `color-mix(in srgb, ${meta.glow} 30%, transparent)`,
+          }}
+        >
+          <StatusIcon className="size-3.5" />
+          {statusLabel}
+        </span>
+
         {dept.blurb && (
           <p className="mt-3 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
         )}
@@ -440,20 +460,23 @@ function DepartmentCard({
         )}
       </div>
 
-      {canManage && (
-        <ManageControls dept={dept} statusOptions={statusOptions} onSave={onSaveStatus} />
-      )}
-
-      {canAdmin && (
-        <div className="relative mt-3 flex items-center justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(dept)}>
-            <Pencil className="size-3.5" />
-            Edit
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onRemove(dept)} className="text-rose-300">
-            <Trash2 className="size-3.5" />
-            Remove
-          </Button>
+      {canEdit && editOpen && (
+        <div className="relative mt-4 border-t border-white/[0.08] pt-4">
+          {canManage && (
+            <ManageControls dept={dept} statusOptions={statusOptions} onSave={onSaveStatus} />
+          )}
+          {canAdmin && (
+            <div className="mt-3 flex items-center justify-end gap-1">
+              <Button variant="ghost" size="sm" onClick={() => onEdit(dept)}>
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onRemove(dept)} className="text-rose-300">
+                <Trash2 className="size-3.5" />
+                Remove
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </Card>
@@ -475,7 +498,7 @@ function ManageControls({ dept, statusOptions, onSave }) {
   const dirty = status !== dept.status || (until || "") !== (dept.interviewsUntil ?? "");
 
   return (
-    <div className="relative mt-4 space-y-3 rounded-xl bg-black/20 p-3 ring-1 ring-inset ring-white/[0.06]">
+    <div className="relative space-y-3 rounded-xl bg-black/20 p-3 ring-1 ring-inset ring-white/[0.06]">
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
         Recruitment status
       </p>
