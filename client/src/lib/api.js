@@ -872,6 +872,26 @@ export const api = {
   deleteDevVehicle: (id) =>
     del(`/development/vehicles/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
 
+  /**
+   * Personal vehicle claims. A claim is a request with consequences (it locks
+   * the car for everyone else), so like every write here it refuses rather than
+   * pretends when the API is unreachable.
+   */
+  claimDevVehicle: (id, note = "") =>
+    post(`/development/vehicles/${encodeURIComponent(id)}/claim`, { note }, () => ({
+      ok: false,
+      message: "The API is unreachable, so the claim was not recorded.",
+    })),
+
+  withdrawDevVehicleClaim: (id) =>
+    del(`/development/vehicles/${encodeURIComponent(id)}/claim`, () => ({ ok: false, message: NOT_PERSISTED })),
+
+  decideDevVehicleClaim: (claimId, action, note = "") =>
+    post(`/development/vehicles/claims/${encodeURIComponent(claimId)}`, { action, note }, () => ({
+      ok: false,
+      message: "The API is unreachable, so the claim was not changed.",
+    })),
+
   devFeedback: () => get("/development/feedback", { feedback: devSeed.DEV_FEEDBACK }),
 
   submitDevFeedback: (payload) =>

@@ -370,3 +370,52 @@ export function makeRequestId(now = new Date(), random = Math.random) {
   const tail = Math.floor(random() * 46_656).toString(36).toUpperCase().padStart(3, "0");
   return `DEV-${stamp}-${tail}`;
 }
+
+/* ------------------------------------------------------------------ *
+ * Vehicle library — personal vehicle claims
+ * ------------------------------------------------------------------ */
+
+/**
+ * The two library tabs. A vehicle with no library (older entries added by hand)
+ * shows under "Other" so nothing added before this existed disappears.
+ */
+export const VEHICLE_LIBRARIES = [
+  { id: "leo", label: "Law Enforcement", tone: "sky" },
+  { id: "civ", label: "Civilian", tone: "green" },
+];
+export const VEHICLE_LIBRARY_MAP = Object.fromEntries(VEHICLE_LIBRARIES.map((l) => [l.id, l]));
+
+/**
+ * A claim opens `pending` — the member has asked for the car and is waiting on a
+ * Director or Owner. `active` is the activated claim: the car is theirs and the
+ * spawn code is theirs to see. `denied` and `released` are history; a released
+ * car goes back to the library.
+ */
+export const CLAIM_STATUSES = [
+  { id: "pending", label: "Awaiting activation", tone: "amber" },
+  { id: "active", label: "Activated", tone: "green" },
+  { id: "denied", label: "Denied", tone: "rose" },
+  { id: "released", label: "Released", tone: "slate" },
+];
+export const CLAIM_STATUS_MAP = Object.fromEntries(CLAIM_STATUSES.map((s) => [s.id, s]));
+export const OPEN_CLAIM_STATUSES = ["pending", "active"];
+
+export function claimStatusLabel(id) {
+  return CLAIM_STATUS_MAP[id]?.label ?? id;
+}
+export function claimStatusTone(id) {
+  return CLAIM_STATUS_MAP[id]?.tone ?? "slate";
+}
+
+/** Whether this caller may activate, deny or release a claim (Directors and Owners by default). */
+export function canActivateClaims({ permissions = new Set() } = {}) {
+  return permSet(permissions).has("development.claims.manage");
+}
+
+/** "2023 Chevrolet Camaro", or the stored name when year/make/model are not set. */
+export function vehicleDisplayName(vehicle = {}) {
+  const parts = [vehicle.year, vehicle.make, vehicle.model].map((p) => (p == null ? "" : String(p).trim())).filter(Boolean);
+  if (parts.length && vehicle.make && vehicle.make.toLowerCase() !== "unknown") return parts.join(" ");
+  if (vehicle.name) return vehicle.name;
+  return parts.length ? parts.join(" ") : "Unidentified vehicle";
+}

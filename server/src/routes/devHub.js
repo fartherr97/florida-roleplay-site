@@ -22,6 +22,9 @@ import { str } from "../validate.js";
 import {
   DEFAULT_REQUEST_TYPES,
   DEV_PRIORITY_MAP,
+  VEHICLE_LIBRARIES,
+  canActivateClaims,
+  vehicleDisplayName,
   DEV_STATUS_MAP,
   FEEDBACK_TYPE_MAP,
   canManageDev,
@@ -370,24 +373,260 @@ router.post("/requests/:id/messages", async (req, res) => {
  * ------------------------------------------------------------------ */
 
 const VEHICLE_COLUMNS = `
-  id, name, year, developer, spawn_code AS "spawnCode", available,
-  category, image_url AS "image", source_url AS "source"`;
+  id, name, year, make, model, developer, spawn_code AS "spawnCode", available,
+  category, library, claimable, resource, confidence, notes,
+  image_url AS "image", source_url AS "source", sort_order AS "sortOrder"`;
+
+const CLAIM_COLUMNS = `
+  c.id, c.vehicle_id AS "vehicleId", c.discord_id AS "discordId", c.member_name AS "memberName",
+  c.status, c.note, c.decision_note AS "decisionNote", c.decided_by_name AS "decidedByName",
+  c.decided_at AS "decidedAt", c.created_at AS "createdAt"`;
+
+const LIBRARY_IDS = new Set(VEHICLE_LIBRARIES.map((l) => l.id));
+const CONFIDENCE_IDS = new Set(["high", "medium", "low"]);
+
+function clip(value, max) {
+  return str(value).slice(0, max);
+}
+
+function shapeVehicle(row) {
+  return {
+    ...row,
+    available: Boolean(row.available),
+    claimable: Boolean(row.claimable),
+    library: row.library || null,
+    name: vehicleDisplayName(row),
+  };
+}
 
 async function loadVehicles() {
   try {
     const rows = await query(`SELECT ${VEHICLE_COLUMNS} FROM dev_vehicles ORDER BY sort_order, name`);
-    if (rows.length) return rows.map((r) => ({ ...r, available: Boolean(r.available) }));
+    if (rows.length) return rows.map(shapeVehicle);
   } catch {
     /* no database */
   }
-  return seed.VEHICLES;
+  return seed.VEHICLES.map(shapeVehicle);
 }
 
-/** The vehicle library — public to anyone signed in. */
+async function loadVehicle(id) {
+  try {
+    const rows = await query(`SELECT ${VEHICLE_COLUMNS} FROM dev_vehicles WHERE id = $1 LIMIT 1`, [id]);
+    return rows[0] ? shapeVehicle(rows[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Every pending or active claim: at most one per vehicle, by the partial unique index. */
+async function loadOpenClaims() {
+  try {
+    return await query(
+      `SELECT ${CLAIM_COLUMNS} FROM dev_vehicle_claims c
+        WHERE c.status IN ('pending', 'active') ORDER BY c.created_at ASC LIMIT 2000`,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** A member's own claims, newest first, history included so a denial is visible. */
+async function loadClaimsFor(discordId) {
+  try {
+    return await query(
+      `SELECT ${CLAIM_COLUMNS} FROM dev_vehicle_claims c
+        WHERE c.discord_id = $1 ORDER BY c.created_at DESC LIMIT 100`,
+      [discordId],
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function loadClaim(id) {
+  try {
+    const rows = await query(`SELECT ${CLAIM_COLUMNS} FROM dev_vehicle_claims c WHERE c.id = $1 LIMIT 1`, [id]);
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The public face of a claim: who holds it and since when, never their Discord id. */
+function publicClaim(claim, ctx) {
+  if (!claim) return null;
+  return {
+    id: claim.id,
+    status: claim.status,
+    memberName: claim.memberName,
+    createdAt: claim.createdAt,
+    mine: Boolean(ctx.user) && claim.discordId === ctx.user.id,
+  };
+}
+
+/**
+ * The library, public to anyone signed in. The spawn code of a claimable
+ * personal is withheld unless the caller manages the hub, activates claims, or
+ * holds the ACTIVATED claim on that very car. It is filtered here rather than
+ * hidden in the UI, so a code that reaches the browser was already theirs.
+ */
 router.get("/vehicles", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
-  res.json({ vehicles: await loadVehicles(), canManage: canManageDev(ctx) });
+
+  const canManage = canManageDev(ctx);
+  const canActivate = canActivateClaims(ctx);
+  const privileged = canManage || canActivate;
+  const [vehicles, open, mine] = await Promise.all([loadVehicles(), loadOpenClaims(), loadClaimsFor(ctx.user.id)]);
+  const byId = new Map(vehicles.map((v) => [v.id, v]));
+  const openByVehicle = new Map(open.map((c) => [c.vehicleId, c]));
+
+  const shaped = vehicles.map((v) => {
+    const claim = openByVehicle.get(v.id) ?? null;
+    const isMine = Boolean(claim) && claim.discordId === ctx.user.id;
+    const showCode = !v.claimable || privileged || (isMine && claim.status === "active");
+    const out = { ...v, spawnCode: showCode ? v.spawnCode : null, claim: publicClaim(claim, ctx) };
+    if (!privileged) {
+      delete out.notes;
+      delete out.confidence;
+      delete out.resource;
+    }
+    return out;
+  });
+
+  const withVehicle = (c) => {
+    const v = byId.get(c.vehicleId);
+    return {
+      ...c,
+      vehicle: v
+        ? {
+            id: v.id,
+            name: v.name,
+            year: v.year,
+            make: v.make,
+            model: v.model,
+            library: v.library,
+            spawnCode: c.status === "active" || privileged ? v.spawnCode : null,
+          }
+        : { id: c.vehicleId, name: "Removed vehicle", spawnCode: null },
+    };
+  };
+
+  res.json({
+    vehicles: shaped,
+    libraries: VEHICLE_LIBRARIES,
+    myClaims: mine.map((c) => ({ ...withVehicle(c), discordId: undefined })),
+    claims: privileged ? open.map(withVehicle) : [],
+    canManage,
+    canActivate,
+  });
+});
+
+/** Claim a personal vehicle for yourself. It then waits on a Director or Owner. */
+router.post("/vehicles/:id/claim", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+
+  const vehicle = await loadVehicle(clip(req.params.id, 64));
+  if (!vehicle) return res.status(404).json({ ok: false, message: "No such vehicle." });
+  if (!vehicle.claimable || !vehicle.available) {
+    return res.status(400).json({ ok: false, code: "CLAIM_NOT_CLAIMABLE", message: "That vehicle is not open to claims." });
+  }
+  const open = (await loadOpenClaims()).find((c) => c.vehicleId === vehicle.id);
+  if (open) {
+    const mine = open.discordId === ctx.user.id;
+    return res.status(409).json({
+      ok: false,
+      code: "CLAIM_TAKEN",
+      message: mine ? "You have already claimed this vehicle." : "Somebody else has already claimed this vehicle.",
+    });
+  }
+
+  const claim = {
+    id: `vc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    vehicleId: vehicle.id,
+    memberName: await rosterNameFor(ctx.user),
+    status: "pending",
+    note: clip(req.body?.note, 500),
+  };
+  try {
+    await query(
+      `INSERT INTO dev_vehicle_claims (id, vehicle_id, discord_id, member_name, status, note)
+       VALUES ($1, $2, $3, $4, 'pending', $5)`,
+      [claim.id, claim.vehicleId, ctx.user.id, claim.memberName, claim.note || null],
+    );
+  } catch (err) {
+    // The partial unique index: two members raced for the same car and the other won.
+    if (err?.code === "23505") {
+      return res.status(409).json({ ok: false, code: "CLAIM_TAKEN", message: "Somebody else has just claimed this vehicle." });
+    }
+    return noStore(res);
+  }
+  res.status(201).json({ ok: true, claim });
+});
+
+/** Withdraw your own pending claim. An activated claim is released by a Director or Owner. */
+router.delete("/vehicles/:id/claim", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  try {
+    const result = await execute(
+      `UPDATE dev_vehicle_claims SET status = 'released', updated_at = CURRENT_TIMESTAMP
+        WHERE vehicle_id = $1 AND discord_id = $2 AND status = 'pending'`,
+      [clip(req.params.id, 64), ctx.user.id],
+    );
+    if (!changedRows(result)) {
+      return res.status(404).json({ ok: false, message: "You have no pending claim on that vehicle." });
+    }
+  } catch {
+    return noStore(res);
+  }
+  res.json({ ok: true });
+});
+
+const CLAIM_ACTIONS = {
+  activate: { from: ["pending"], to: "active", past: "activated" },
+  deny: { from: ["pending"], to: "denied", past: "denied" },
+  release: { from: ["pending", "active"], to: "released", past: "released" },
+};
+
+/** Activate, deny or release a claim: Directors and Owners (development.claims.manage). */
+router.post("/vehicles/claims/:claimId", async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!canActivateClaims(ctx)) {
+    return res.status(403).json({
+      ok: false,
+      code: "AUTH_ROLE_MISSING",
+      message: "Activating vehicle claims needs development.claims.manage.",
+    });
+  }
+  const action = CLAIM_ACTIONS[str(req.body?.action)];
+  if (!action) return res.status(400).json({ ok: false, message: "Unknown claim action." });
+
+  const claim = await loadClaim(clip(req.params.claimId, 40));
+  if (!claim) return res.status(404).json({ ok: false, message: "No such claim." });
+  if (!action.from.includes(claim.status)) {
+    return res.status(409).json({
+      ok: false,
+      code: "CLAIM_STATE",
+      message: `That claim is already ${claim.status}, so it cannot be ${action.past}.`,
+    });
+  }
+
+  const decidedBy = await rosterNameFor(ctx.user);
+  try {
+    await query(
+      `UPDATE dev_vehicle_claims
+          SET status = $2, decision_note = $3, decided_by_id = $4, decided_by_name = $5,
+              decided_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1`,
+      [claim.id, action.to, clip(req.body?.note, 500) || null, ctx.user.id, decidedBy],
+    );
+  } catch {
+    return noStore(res);
+  }
+  res.json({ ok: true, claim: { ...claim, discordId: undefined, status: action.to, decidedByName: decidedBy } });
 });
 
 router.put("/vehicles/:id", async (req, res) => {
@@ -397,28 +636,50 @@ router.put("/vehicles/:id", async (req, res) => {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Managing the vehicle library needs development.manage." });
   }
   const b = req.body ?? {};
+  const library = LIBRARY_IDS.has(str(b.library)) ? str(b.library) : null;
+  const confidence = CONFIDENCE_IDS.has(str(b.confidence)) ? str(b.confidence) : null;
   const vehicle = {
-    id: str(req.params.id, 64) || `veh-${Date.now().toString(36)}`,
-    name: str(b.name, 160).trim(),
-    year: str(b.year, 8),
-    developer: str(b.developer, 160),
-    spawnCode: str(b.spawnCode, 80),
+    id: clip(req.params.id, 64) || `veh-${Date.now().toString(36)}`,
+    name: clip(b.name, 160),
+    year: clip(b.year, 8),
+    make: clip(b.make, 64),
+    model: clip(b.model, 96),
+    developer: clip(b.developer, 160),
+    spawnCode: clip(b.spawnCode, 80),
     available: b.available !== false,
-    category: str(b.category, 48),
-    image: str(b.image, 2000),
-    source: str(b.source, 2000),
+    category: clip(b.category, 48),
+    library,
+    claimable: b.claimable === true,
+    resource: clip(b.resource, 96),
+    confidence,
+    notes: clip(b.notes, 2000),
+    image: clip(b.image, 2000),
+    source: clip(b.source, 2000),
     sortOrder: Number.isFinite(b.sortOrder) ? b.sortOrder : 0,
   };
-  if (!vehicle.name) return res.status(400).json({ ok: false, message: "A vehicle needs a name." });
+  if (!vehicle.name && !(vehicle.make || vehicle.model)) {
+    return res.status(400).json({ ok: false, message: "A vehicle needs a name, or a make and model." });
+  }
+  if (!vehicle.name) vehicle.name = vehicleDisplayName(vehicle);
+  if (!vehicle.category) vehicle.category = library === "leo" ? "Law enforcement" : library === "civ" ? "Civilian" : "";
 
   try {
     await query(
-      `INSERT INTO dev_vehicles (id, name, year, developer, spawn_code, available, category, image_url, source_url, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, year = EXCLUDED.year, developer = EXCLUDED.developer,
-         spawn_code = EXCLUDED.spawn_code, available = EXCLUDED.available, category = EXCLUDED.category,
-         image_url = EXCLUDED.image_url, source_url = EXCLUDED.source_url, sort_order = EXCLUDED.sort_order`,
-      [vehicle.id, vehicle.name, vehicle.year, vehicle.developer, vehicle.spawnCode, vehicle.available, vehicle.category, vehicle.image, vehicle.source, vehicle.sortOrder],
+      `INSERT INTO dev_vehicles
+         (id, name, year, make, model, developer, spawn_code, available, category, library, claimable,
+          resource, confidence, notes, image_url, source_url, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, year = EXCLUDED.year, make = EXCLUDED.make,
+         model = EXCLUDED.model, developer = EXCLUDED.developer, spawn_code = EXCLUDED.spawn_code,
+         available = EXCLUDED.available, category = EXCLUDED.category, library = EXCLUDED.library,
+         claimable = EXCLUDED.claimable, resource = EXCLUDED.resource, confidence = EXCLUDED.confidence,
+         notes = EXCLUDED.notes, image_url = EXCLUDED.image_url, source_url = EXCLUDED.source_url,
+         sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP`,
+      [
+        vehicle.id, vehicle.name, vehicle.year, vehicle.make, vehicle.model, vehicle.developer, vehicle.spawnCode,
+        vehicle.available, vehicle.category, vehicle.library, vehicle.claimable, vehicle.resource, vehicle.confidence,
+        vehicle.notes, vehicle.image, vehicle.source, vehicle.sortOrder,
+      ],
     );
   } catch {
     return noStore(res);
@@ -433,7 +694,7 @@ router.delete("/vehicles/:id", async (req, res) => {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Managing the vehicle library needs development.manage." });
   }
   try {
-    const result = await execute("DELETE FROM dev_vehicles WHERE id = $1", [str(req.params.id, 64)]);
+    const result = await execute("DELETE FROM dev_vehicles WHERE id = $1", [clip(req.params.id, 64)]);
     if (!changedRows(result)) return res.status(404).json({ ok: false, message: "No such vehicle." });
   } catch {
     return noStore(res);

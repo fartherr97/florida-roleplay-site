@@ -1153,6 +1153,44 @@ CREATE TABLE IF NOT EXISTS dev_type_config (
   PRIMARY KEY (id)
 );
 
+-- Personal vehicles in the library. `library` sorts a vehicle onto the Law
+-- Enforcement ('leo') or Civilian ('civ') tab; `claimable` marks the personals a
+-- member may claim for themselves — for those the spawn code is withheld until a
+-- Director or Owner activates the claim. `notes` and `confidence` are internal:
+-- where the year/make/model came from and how sure the import was.
+ALTER TABLE dev_vehicles
+  ADD COLUMN IF NOT EXISTS make       VARCHAR(64)  NULL,
+  ADD COLUMN IF NOT EXISTS model      VARCHAR(96)  NULL,
+  ADD COLUMN IF NOT EXISTS library    VARCHAR(16)  NULL,
+  ADD COLUMN IF NOT EXISTS claimable  BOOLEAN      NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS resource   VARCHAR(96)  NULL,
+  ADD COLUMN IF NOT EXISTS confidence VARCHAR(8)   NULL,
+  ADD COLUMN IF NOT EXISTS notes      TEXT         NULL;
+
+-- A member's claim on a personal vehicle. One open claim (pending or active) per
+-- vehicle at a time — the partial unique index is the lock, so two members racing
+-- for the same car cannot both win. Denied and released claims stay as history.
+CREATE TABLE IF NOT EXISTS dev_vehicle_claims (
+  id              VARCHAR(40)  NOT NULL,
+  vehicle_id      VARCHAR(64)  NOT NULL,
+  discord_id      VARCHAR(20)  NOT NULL,
+  member_name     VARCHAR(128) NOT NULL,
+  status          VARCHAR(16)  NOT NULL DEFAULT 'pending',
+  note            TEXT         NULL,
+  decision_note   TEXT         NULL,
+  decided_by_id   VARCHAR(20)  NULL,
+  decided_by_name VARCHAR(128) NULL,
+  decided_at      TIMESTAMPTZ  NULL,
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_dev_vehicle_claims_vehicle FOREIGN KEY (vehicle_id)
+    REFERENCES dev_vehicles(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_dev_vehicle_claims_open
+  ON dev_vehicle_claims (vehicle_id) WHERE status IN ('pending', 'active');
+CREATE INDEX IF NOT EXISTS idx_dev_vehicle_claims_member ON dev_vehicle_claims (discord_id);
+
 -- ------------------------------------------------------------------ --
 -- Indexes
 --

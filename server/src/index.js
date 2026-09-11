@@ -9,6 +9,7 @@ import { serve as mediaServe } from "./routes/media.js";
 import { resolveAndCount as resolveShortLink } from "./lib/shortener.js";
 import { startRosterSync } from "./lib/rosterSync.js";
 import { migrateLegacyDepartmentIds } from "./lib/legacyIds.js";
+import { ensureDonatorPersonals } from "./devPersonalsSeed.js";
 import { close, ping } from "./db.js";
 
 /**
@@ -132,6 +133,13 @@ const server = app.listen(port, "0.0.0.0", () => {
       if (summary && Object.keys(summary).length) {
         console.log("legacy department ids migrated:", JSON.stringify(summary));
       }
+    })
+    .catch(() => {})
+    // The claimable personal vehicles: added to the library once, never
+    // overwritten, so the editor's corrections survive a redeploy.
+    .then(() => ensureDonatorPersonals())
+    .then((added) => {
+      if (added) console.log(`vehicle library: ${added} donator personal(s) added`);
     })
     .catch(() => {})
     // Keep the roster in step with Discord on its own: a sync shortly after boot,

@@ -378,6 +378,13 @@ export const PERMISSION_GROUPS = [
           "Maintain the vehicle library, triage suggestions and bug reports, and configure the request categories.",
         sensitive: true,
       },
+      {
+        key: "development.claims.manage",
+        label: "Activate personal vehicle claims",
+        detail:
+          "Approve, deny or release a member's claim on a personal vehicle in the library. Activating is what reveals the spawn code to them.",
+        sensitive: true,
+      },
     ],
   },
   {
@@ -590,6 +597,7 @@ export const DEFAULT_GRANTS = {
   // sits higher. Opening a request needs nothing but a Discord account.
   "development.work": [...staffFrom("admin"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "development.manage": ["head_admin", "directorship", "ownership"],
+  "development.claims.manage": ["directorship", "ownership"],
 
   // The URL shortener. shortener.use is seeded to department command, dev
   // leadership (head_admin as a stand-in — add your exact Lead Dev Discord role
