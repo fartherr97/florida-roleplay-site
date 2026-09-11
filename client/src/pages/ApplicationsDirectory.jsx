@@ -380,57 +380,52 @@ function DepartmentCard({
         style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
       />
 
-      <div className="relative flex items-start justify-between gap-3">
-        <span
-          className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl ring-1 ring-inset transition-transform duration-500 group-hover:-translate-y-0.5"
-          style={{
-            backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)`,
-            "--tw-ring-color": `color-mix(in srgb, ${accent} 34%, transparent)`,
-          }}
-        >
+      {/* Status pill floats in the top-right so the crest and name stay centered. */}
+      <span
+        className="absolute right-5 top-5 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset"
+        style={{
+          color: meta.glow,
+          backgroundColor: `color-mix(in srgb, ${meta.glow} 14%, transparent)`,
+          "--tw-ring-color": `color-mix(in srgb, ${meta.glow} 30%, transparent)`,
+        }}
+      >
+        <StatusIcon className="size-3.5" />
+        {statusLabel}
+      </span>
+
+      <div className="relative flex flex-col items-center text-center">
+        <span className="grid h-24 place-items-center transition-transform duration-500 group-hover:-translate-y-0.5">
           {dept.logoUrl ? (
             <img
               src={dept.logoUrl}
               alt={`${dept.shortName || dept.name} crest`}
-              className="size-11 object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.45)]"
+              className="max-h-24 w-auto object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.5)]"
               loading="lazy"
             />
           ) : (
-            <span className="text-base font-black uppercase tracking-wide" style={{ color: accent }}>
+            <span className="text-4xl font-black uppercase tracking-wide" style={{ color: accent }}>
               {(dept.shortName || dept.name).slice(0, 3)}
             </span>
           )}
         </span>
 
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset"
-          style={{
-            color: meta.glow,
-            backgroundColor: `color-mix(in srgb, ${meta.glow} 12%, transparent)`,
-            "--tw-ring-color": `color-mix(in srgb, ${meta.glow} 30%, transparent)`,
-          }}
-        >
-          <StatusIcon className="size-3.5" />
-          {statusLabel}
-        </span>
+        <h2 className="mt-4 text-xl font-black tracking-tight text-white">{dept.name}</h2>
+        {dept.shortName && (
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>
+            {dept.shortName}
+          </p>
+        )}
+        {dept.blurb && (
+          <p className="mt-3 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
+        )}
+
+        {status === "interviews" && dept.interviewsUntil && (
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 ring-1 ring-inset ring-amber-400/20">
+            <CalendarClock className="size-3.5" />
+            Interviews until {formatUntil(dept.interviewsUntil)}
+          </p>
+        )}
       </div>
-
-      <h2 className="relative mt-5 text-lg font-black tracking-tight text-white">{dept.name}</h2>
-      {dept.shortName && (
-        <p className="relative mt-0.5 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: accent }}>
-          {dept.shortName}
-        </p>
-      )}
-      {dept.blurb && (
-        <p className="relative mt-3 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
-      )}
-
-      {status === "interviews" && dept.interviewsUntil && (
-        <p className="relative mt-3 inline-flex w-fit items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 ring-1 ring-inset ring-amber-400/20">
-          <CalendarClock className="size-3.5" />
-          Interviews until {formatUntil(dept.interviewsUntil)}
-        </p>
-      )}
 
       <div className="relative mt-auto pt-6">
         {applyable ? (
