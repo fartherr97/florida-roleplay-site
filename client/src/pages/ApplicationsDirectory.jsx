@@ -339,7 +339,7 @@ function DepartmentCard({
 
   return (
     <Card
-      className={`group relative flex flex-col overflow-hidden p-6 transition-colors ${
+      className={`group relative flex min-h-[21rem] flex-col overflow-hidden p-6 transition-colors ${
         open ? "" : "opacity-[0.92]"
       }`}
     >
@@ -352,7 +352,7 @@ function DepartmentCard({
             alt=""
             aria-hidden="true"
             loading="lazy"
-            className="pointer-events-none absolute inset-0 size-full object-cover opacity-[0.22] transition-opacity duration-500 group-hover:opacity-30"
+            className="pointer-events-none absolute inset-0 size-full object-cover object-center opacity-[0.22] transition-opacity duration-500 group-hover:opacity-30"
           />
           <span
             aria-hidden="true"
@@ -422,7 +422,7 @@ function DepartmentCard({
         </p>
       )}
       {dept.blurb && (
-        <p className="relative mt-3 flex-1 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
+        <p className="relative mt-3 text-sm leading-relaxed text-slate-400">{dept.blurb}</p>
       )}
 
       {status === "interviews" && dept.interviewsUntil && (
@@ -432,7 +432,7 @@ function DepartmentCard({
         </p>
       )}
 
-      <div className="relative mt-6">
+      <div className="relative mt-auto pt-6">
         {applyable ? (
           <Button as="a" href={dept.applyUrl} target="_blank" rel="noreferrer" size="md" block>
             Apply Now
