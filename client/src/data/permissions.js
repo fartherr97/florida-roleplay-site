@@ -339,6 +339,27 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    id: "applications",
+    label: "Applications",
+    description:
+      "The public Applications page — each department's recruitment status and its Apply Now link.",
+    permissions: [
+      {
+        key: "applications.manage",
+        label: "Set recruitment status",
+        detail:
+          "Mark a department Open, Closed or Open Interviews (with an until-date). Department Heads, Directorship and Ownership.",
+      },
+      {
+        key: "applications.admin",
+        label: "Manage departments & apply links",
+        detail:
+          "Add or remove the departments shown on the Applications page and edit their Apply Now URLs. Ownership.",
+        sensitive: true,
+      },
+    ],
+  },
+  {
     id: "development",
     label: "Development Hub",
     description:
@@ -577,6 +598,13 @@ export const DEFAULT_GRANTS = {
   "bans.view": staffFrom("mod"),
   "shortener.use": ["fhp_colonel", "bso_sheriff", "mpd_chief", "head_admin", "directorship", "ownership"],
   "shortener.admin": ["ownership"],
+
+  // The public Applications page. applications.manage — set a department Open,
+  // Closed or Open Interviews — sits with Department Heads, Directorship and
+  // Ownership. applications.admin — add/remove departments and edit Apply Now
+  // URLs — is Ownership.
+  "applications.manage": ["fhp_colonel", "bso_sheriff", "mpd_chief", "directorship", "ownership"],
+  "applications.admin": ["ownership"],
 
   "site.staff_directory": STAFF_LADDER,
   "site.moderation": staffFrom("mod"),

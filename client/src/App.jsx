@@ -7,7 +7,7 @@ import { BotAuthProvider } from "./context/BotAuthContext";
 
 import Landing from "./pages/Landing";
 import Rules from "./pages/Rules";
-import Applications from "./pages/Applications";
+import ApplicationsDirectory from "./pages/ApplicationsDirectory";
 import ApplicationForm from "./pages/ApplicationForm";
 import Departments from "./pages/Departments";
 import DepartmentDetail from "./pages/DepartmentDetail";
@@ -136,7 +136,7 @@ export default function App() {
             <Route index element={<Landing />} />
             <Route path="rules" element={<Rules />} />
 
-            <Route path="applications" element={<Applications />} />
+            <Route path="applications" element={<ApplicationsDirectory />} />
             <Route path="applications/:type" element={<ApplicationForm />} />
 
 

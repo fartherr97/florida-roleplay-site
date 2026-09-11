@@ -28,6 +28,7 @@ import devHubRouter from "./devHub.js";
 import mediaRouter from "./media.js";
 import storeRouter from "./store.js";
 import linksRouter from "./links.js";
+import recruitmentRouter from "./recruitment.js";
 import bansRouter from "./bans.js";
 import authRouter from "./auth.js";
 import fivemRouter from "./fivem.js";
@@ -90,6 +91,7 @@ router.use("/media", mediaRouter);
 // management route is gated by store.manage.
 router.use("/store", storeRouter);
 router.use("/links", linksRouter);
+router.use("/recruitment", recruitmentRouter);
 router.use("/bans", bansRouter);
 // Discord OAuth. Mounted here with the rest so it shares the /api prefix and the
 // same-origin cookie; the handshake itself needs no session, and attachUser

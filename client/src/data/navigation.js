@@ -10,9 +10,9 @@ export const primaryLinks = [
   { label: "Rules", to: "/rules" },
   { label: "Penal Code", to: "/penal-code" },
   { label: "Whitelist", to: "/whitelist" },
-  // Applications are handled by Sonoran now — this hands off rather than
-  // opening a form on the site. SITE.applyUrl is the one place the URL lives.
-  { label: "Applications", href: SITE.applyUrl, external: true },
+  // The Applications page lists every department's recruitment status and its
+  // Apply Now link (which can point at Sonoran or anywhere else, per department).
+  { label: "Applications", to: "/applications" },
   { label: "Discord", href: SITE.discordInvite, external: true },
   { label: "Store", to: "/store" },
   { label: "Reports", to: "/reports" },

@@ -326,6 +326,19 @@ export const api = {
   deleteLinkDomain: (id) =>
     del(`/links/domains/${encodeURIComponent(id)}`, () => ({ ok: false, message: NOT_PERSISTED })),
 
+  // Applications directory (public read). Setting a department's status needs
+  // applications.manage; adding/removing departments and editing Apply Now URLs
+  // needs applications.admin — all gated server-side.
+  recruitment: () => get("/recruitment", { departments: [], statuses: [] }),
+  setRecruitmentStatus: (id, payload) =>
+    patchJson(`/recruitment/${encodeURIComponent(id)}/status`, payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  createRecruitmentDept: (payload) =>
+    post("/recruitment", payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  updateRecruitmentDept: (id, payload) =>
+    put(`/recruitment/${encodeURIComponent(id)}`, payload, () => ({ ok: false, message: NOT_PERSISTED })),
+  deleteRecruitmentDept: (id) =>
+    del(`/recruitment/${encodeURIComponent(id)}`, () => ({ ok: false, message: NOT_PERSISTED })),
+
   // Ownership-only Store Management. Every one of these hits a store.manage-gated
   // endpoint; the server is the boundary, these are just the calls the page makes.
   storeOverview: () => get("/store/manage/overview", null),
