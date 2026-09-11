@@ -374,7 +374,7 @@ router.post("/requests/:id/messages", async (req, res) => {
 
 const VEHICLE_COLUMNS = `
   id, name, year, make, model, developer, spawn_code AS "spawnCode", available,
-  category, library, claimable, resource, confidence, notes,
+  category, library, claimable, resource, confidence, notes, liveries,
   image_url AS "image", source_url AS "source", sort_order AS "sortOrder"`;
 
 const CLAIM_COLUMNS = `
@@ -506,6 +506,7 @@ router.get("/vehicles", async (req, res) => {
             make: v.make,
             model: v.model,
             library: v.library,
+            liveries: v.liveries,
             spawnCode: c.status === "active" || privileged ? v.spawnCode : null,
           }
         : { id: c.vehicleId, name: "Removed vehicle", spawnCode: null },
@@ -653,6 +654,7 @@ router.put("/vehicles/:id", async (req, res) => {
     resource: clip(b.resource, 96),
     confidence,
     notes: clip(b.notes, 2000),
+    liveries: clip(b.liveries, 160),
     image: clip(b.image, 2000),
     source: clip(b.source, 2000),
     sortOrder: Number.isFinite(b.sortOrder) ? b.sortOrder : 0,
@@ -667,18 +669,18 @@ router.put("/vehicles/:id", async (req, res) => {
     await query(
       `INSERT INTO dev_vehicles
          (id, name, year, make, model, developer, spawn_code, available, category, library, claimable,
-          resource, confidence, notes, image_url, source_url, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          resource, confidence, notes, liveries, image_url, source_url, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, year = EXCLUDED.year, make = EXCLUDED.make,
          model = EXCLUDED.model, developer = EXCLUDED.developer, spawn_code = EXCLUDED.spawn_code,
          available = EXCLUDED.available, category = EXCLUDED.category, library = EXCLUDED.library,
          claimable = EXCLUDED.claimable, resource = EXCLUDED.resource, confidence = EXCLUDED.confidence,
-         notes = EXCLUDED.notes, image_url = EXCLUDED.image_url, source_url = EXCLUDED.source_url,
-         sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP`,
+         notes = EXCLUDED.notes, liveries = EXCLUDED.liveries, image_url = EXCLUDED.image_url,
+         source_url = EXCLUDED.source_url, sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP`,
       [
         vehicle.id, vehicle.name, vehicle.year, vehicle.make, vehicle.model, vehicle.developer, vehicle.spawnCode,
         vehicle.available, vehicle.category, vehicle.library, vehicle.claimable, vehicle.resource, vehicle.confidence,
-        vehicle.notes, vehicle.image, vehicle.source, vehicle.sortOrder,
+        vehicle.notes, vehicle.liveries, vehicle.image, vehicle.source, vehicle.sortOrder,
       ],
     );
   } catch {

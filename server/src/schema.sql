@@ -1165,7 +1165,8 @@ ALTER TABLE dev_vehicles
   ADD COLUMN IF NOT EXISTS claimable  BOOLEAN      NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS resource   VARCHAR(96)  NULL,
   ADD COLUMN IF NOT EXISTS confidence VARCHAR(8)   NULL,
-  ADD COLUMN IF NOT EXISTS notes      TEXT         NULL;
+  ADD COLUMN IF NOT EXISTS notes      TEXT         NULL,
+  ADD COLUMN IF NOT EXISTS liveries   VARCHAR(160) NULL;
 
 -- A member's claim on a personal vehicle. One open claim (pending or active) per
 -- vehicle at a time — the partial unique index is the lock, so two members racing

@@ -104,7 +104,7 @@ export default function DevLibrary() {
         if (filter === "available" && (v.claim || !v.available)) return false;
         if (filter === "claimed" && !v.claim) return false;
         if (!needle) return true;
-        return [v.name, v.year, v.make, v.model, v.developer, v.spawnCode, v.category, v.claim?.memberName]
+        return [v.name, v.year, v.make, v.model, v.liveries, v.developer, v.spawnCode, v.category, v.claim?.memberName]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -455,6 +455,11 @@ function VehicleCard({ vehicle, canManage, canActivate, busy, onClaim, onWithdra
               .join(" · ") || "Details to be confirmed"}
             {vehicle.developer ? ` · ${vehicle.developer}` : ""}
           </p>
+          {vehicle.liveries && (
+            <p className="mt-1 text-xs text-slate-400">
+              <span className="font-semibold uppercase tracking-wider text-slate-500">Liveries</span> {vehicle.liveries}
+            </p>
+          )}
         </div>
 
         {vehicle.spawnCode ? (
@@ -612,6 +617,7 @@ function VehicleEditor({ vehicle, defaultLibrary = "", onClose, onSaved }) {
     available: vehicle?.available ?? true,
     confidence: vehicle?.confidence ?? "",
     notes: vehicle?.notes ?? "",
+    liveries: vehicle?.liveries ?? "",
     resource: vehicle?.resource ?? "",
     image: vehicle?.image ?? "",
     source: vehicle?.source ?? "",
@@ -676,6 +682,9 @@ function VehicleEditor({ vehicle, defaultLibrary = "", onClose, onSaved }) {
             <Select value={form.confidence} options={CONFIDENCE_OPTIONS} onChange={(v) => set({ confidence: v })} />
           </Field>
         </div>
+        <Field label="Department liveries" hint="What is painted on it, e.g. FHP · HCSO. Shown to members.">
+          <TextInput value={form.liveries} onChange={(e) => set({ liveries: e.target.value })} placeholder="FHP" />
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Developer">
             <TextInput value={form.developer} onChange={(e) => set({ developer: e.target.value })} />
