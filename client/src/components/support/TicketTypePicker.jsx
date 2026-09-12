@@ -24,6 +24,10 @@ export default function TicketTypePicker({ types, onSelect }) {
         {expanded === dept.id && <div id={`queues-${dept.id}`} className="space-y-2 border-t border-white/10 p-3">{dept.queues.map(option)}</div>}
       </div>)}</div>
     </div>}
+    {groups.length > 0 && general.length > 0 && <div role="separator" aria-label="Community support section" className="relative py-1">
+      <div className="h-px bg-gradient-to-r from-amber-300/10 via-amber-400/80 to-orange-500/20" />
+      <div aria-hidden="true" className="absolute inset-x-1/4 top-0 h-3 bg-amber-400/10 blur-lg" />
+    </div>}
     {general.length > 0 && <div><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-300"><LifeBuoy className="size-4" />Community support</h2><div className="grid gap-3 sm:grid-cols-2">{general.map(option)}</div></div>}
     {!types.length && <p className="rounded-xl border border-white/10 p-6 text-sm text-slate-400">No ticket queues are available right now.</p>}
   </div>;
