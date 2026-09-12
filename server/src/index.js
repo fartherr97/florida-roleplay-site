@@ -1,3 +1,4 @@
+import { startTicketDms } from './lib/ticketDms.js';
 import "dotenv/config";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -144,7 +145,7 @@ const server = app.listen(port, "0.0.0.0", () => {
     .catch(() => {})
     // Keep the roster in step with Discord on its own: a sync shortly after boot,
     // then on an interval. No-op unless a bot token and guild are configured.
-    .finally(() => startRosterSync());
+    .finally(() => { startRosterSync(); startTicketDms(); });
 });
 
 /**

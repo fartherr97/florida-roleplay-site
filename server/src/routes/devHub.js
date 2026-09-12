@@ -1,3 +1,4 @@
+import { ensureTicketDms, enqueueTicketDms, drainTicketDms } from '../lib/ticketDms.js';
 import { ticketStaff, validateTicketStaff } from "../lib/ticketStaff.js";
 import { ensureParticipants, managesParticipants, isParticipant, changeParticipant } from "../lib/devParticipants.js";
 import { devWebhookStatus, saveDevWebhook, notifyDevTicketOpened } from "../lib/devWebhooks.js";
@@ -407,17 +408,22 @@ router.post("/requests/:id/messages", async (req, res) => {
   };
 
   try {
-    await query(
+    await ensureTicketDms();
+    await transaction(async sql => {
+    await sql(
       `INSERT INTO dev_request_messages (id, request_id, internal, author_id, author_name, author_role, author_avatar, body, reply_to_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [message.id, request.id, Boolean(message.internal), message.authorId, message.authorName, message.authorRole, message.authorAvatar, body, message.replyToId],
     );
     if (!message.internal) {
-      await query("UPDATE dev_requests SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1", [request.id]);
+      await sql("UPDATE dev_requests SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1", [request.id]);
     }
+    await enqueueTicketDms('development',request,message,sql);
+    });
   } catch {
     return noStore(res);
   }
+  void drainTicketDms();
   res.status(201).json({ ok: true, message });
 });
 

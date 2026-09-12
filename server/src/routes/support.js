@@ -1,3 +1,4 @@
+import { ensureTicketDms, enqueueTicketDms, drainTicketDms } from '../lib/ticketDms.js';
 import { queueGuilds, queueRoles, grantQueueRoles, validateQueueRoles } from '../lib/supportQueueRoles.js';
 import { ensureParticipants, managesParticipants, isParticipant, changeParticipant } from "../lib/supportParticipants.js";
 import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
@@ -429,7 +430,9 @@ router.post("/:id/messages", async (req, res) => {
   };
 
   try {
-    await query(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, author_avatar, body, reply_to_id)
+    await ensureTicketDms();
+    await transaction(async sql => {
+    await sql(`INSERT INTO support_messages (id, ticket_id, internal, author_id, author_name, author_role, author_avatar, body, reply_to_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [message.id, ticket.id, Boolean(message.internal), message.authorId, message.authorName, message.authorRole, message.authorAvatar, body, message.replyToId],
     );
@@ -443,13 +446,16 @@ router.post("/:id/messages", async (req, res) => {
           : !isMember && ticket.status === "open"
             ? "pending"
             : ticket.status;
-      await query("UPDATE support_tickets SET last_message_at = CURRENT_TIMESTAMP, status = $1 WHERE id = $2",
+      await sql("UPDATE support_tickets SET last_message_at = CURRENT_TIMESTAMP, status = $1 WHERE id = $2",
         [nextStatus, ticket.id],
       );
     }
+    await enqueueTicketDms('support',ticket,message,sql);
+    });
   } catch {
     return noStore(res);
   }
+  void drainTicketDms();
   res.status(201).json({ ok: true, message });
 });
 
