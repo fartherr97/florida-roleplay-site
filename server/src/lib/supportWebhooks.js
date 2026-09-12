@@ -6,7 +6,7 @@
  *   - the **support team** webhook, used for every ticket type without its own
  *     department webhook — it posts the embed and pings the support team role above it;
  *   - a **per-department** webhook (keyed by ticket type id), used for that type's
- *     tickets — it posts the same embed with no ping, into the department's own Discord.
+ *     tickets — it posts the embed and pings the queue's selected Discord worker roles.
  *
  * A type with a department webhook set goes there; everything else falls to the support
  * webhook. Both carry a link back to the ticket in the portal. Everything here is
@@ -26,7 +26,7 @@ function siteOrigin() {
 }
 
 let ensured = false;
-async function ensureTable() {
+export async function ensureTable() {
   if (ensured) return;
   await query(`CREATE TABLE IF NOT EXISTS support_webhook_settings (
       id INTEGER PRIMARY KEY DEFAULT 1,
@@ -96,55 +96,73 @@ export async function saveSupportWebhooks({ supportWebhookUrl, supportPingRoleId
   return { supportWebhookUrl: cleanSupport, supportPingRoleId: pingRole, deptWebhooks: cleanDept };
 }
 
-/**
- * Post the "new ticket" announcement for a freshly opened ticket. Chooses the
- * department webhook when the ticket's type has one, otherwise the support webhook with a
- * ping. Never throws — a webhook problem must not fail the ticket.
- *
- * @param {{id: string}} ticket the created ticket
- * @param {{id: string, label: string}} type the ticket's category
- */
+/** Validate only edited webhook fields. Omitted fields keep their stored secret. */
+export async function queueWebhookEdits(rawTypes, types, previousTypes = []) {
+  const edits = {};
+  const saved = await loadSupportWebhooks();
+  for (const original of rawTypes || []) {
+    const raw = {...original};
+    if (!Object.hasOwn(raw, 'webhookUrl') && previousTypes.find(t=>t.id===raw.id)?.workGuildId !== raw.workGuildId && saved.deptWebhooks[raw.id]) raw.webhookUrl = saved.deptWebhooks[raw.id];
+    if (!Object.hasOwn(raw, 'webhookUrl')) continue;
+    const type = types.find(t => t.id === raw.id);
+    if (!type) continue;
+    const value = String(raw.webhookUrl ?? '').trim();
+    if (!value) { edits[type.id] = ''; continue; }
+    const url = cleanWebhookUrl(value);
+    if (!url) throw Object.assign(new Error(type.label + ': enter a valid Discord webhook URL.'), {status:400});
+    // Read webhook metadata only; saving never sends a message or pings anyone.
+    const response = await fetch(url, {redirect:'error',signal:AbortSignal.timeout(8000)});
+    if (!response.ok) throw Object.assign(new Error(type.label + ': Discord could not verify that webhook.'), {status:400});
+    const webhook = await response.json();
+    if (type.workGuildId && webhook.guild_id !== type.workGuildId) throw Object.assign(new Error(type.label + ': the webhook must belong to the guild selected under Worked by.'), {status:400});
+    edits[type.id] = url;
+  }
+  return edits;
+}
+
+export async function saveQueueWebhookEdits(edits, sql = query) {
+  if (!Object.keys(edits).length) return;
+  // Merge only edited keys; do not replace other queues or the general webhook.
+  await sql(`INSERT INTO support_webhook_settings(id,dept_webhooks) VALUES(1,$1::jsonb)
+    ON CONFLICT(id) DO UPDATE SET dept_webhooks=support_webhook_settings.dept_webhooks || EXCLUDED.dept_webhooks,
+    updated_at=CURRENT_TIMESTAMP`,[JSON.stringify(edits)]);
+}
+
+export function supportTicketPayload(ticket, type, roleIds = []) {
+  const roles = [...new Set(roleIds.filter(id=>SNOWFLAKE.test(id)))].slice(0,50);
+  const link = `${siteOrigin()}/support/${encodeURIComponent(ticket.id)}`;
+  const plain = value => String(value ?? '').replace(/[\\*_`~|<>]/g, '\\$&');
+  return {
+    content:roles.map(id=>`<@&${id}>`).join(' '),
+    allowed_mentions:{parse:[],roles,users:[]},
+    embeds:[{
+      title:String(ticket.subject || 'New support ticket').slice(0,256),url:link,color:0xf59e0b,
+      description:`A new support ticket has been opened. [Open ticket](${link})`,
+      fields:[
+        {name:'Opened by',value:`${plain(ticket.openedByName || 'Unknown').slice(0,800)}\nDiscord ID: ${String(ticket.openedByDiscordId || 'Unknown').slice(0,22)}`},
+        {name:'Ticket queue',value:plain(type?.label || 'Support').slice(0,1024)},
+      ],
+      footer:{text:`Ticket ${ticket.id}`},timestamp:new Date().toISOString(),
+    }],
+  };
+}
+
 export async function notifyTicketOpened(ticket, type) {
   try {
     const settings = await loadSupportWebhooks();
-    const label = type?.label || "support";
-    const deptUrl = cleanWebhookUrl(settings.deptWebhooks?.[type?.id] ?? "");
-
-    // A department queue with its own webhook goes there, silently (no ping). Everything
-    // else is a support-team ticket: the support webhook, pinging the support role.
-    // Confidential queues must never fall back to the general support channel.
-    const url = deptUrl || (type?.exclusive ? "" : settings.supportWebhookUrl);
-    if (!url) return;
-    const ping = deptUrl ? "" : settings.supportPingRoleId;
-
-    const link = `${siteOrigin()}/support/${encodeURIComponent(ticket.id)}`;
-    const body = {
-      embeds: [
-        {
-          title: `New ${label} ticket`,
-          url: link,
-          description: `A new **${label}** ticket has been created. [Click this link to access.](${link})`,
-          color: 0x2f81f7,
-          timestamp: new Date().toISOString(),
-          footer: { text: `Ticket ${ticket.id}` },
-        },
-      ],
-    };
-    if (ping) {
-      body.content = `<@&${ping}>`;
-      body.allowed_mentions = { roles: [ping] };
-    } else {
-      // A department post carries no ping, so make sure nothing in it is treated as one.
-      body.allowed_mentions = { parse: [] };
-    }
-
-    await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(8000),
-    }).catch(() => {});
+    const queueUrl = cleanWebhookUrl(settings.deptWebhooks?.[type?.id] ?? '');
+    // Confidential queues never fall back to a general support channel.
+    const url = queueUrl || (type?.exclusive ? '' : cleanWebhookUrl(settings.supportWebhookUrl));
+    if (!url) return false;
+    const roles = queueUrl ? (type?.workRoleIds || []) : [settings.supportPingRoleId].filter(Boolean);
+    const response = await fetch(url, {
+      method:'POST',redirect:'error',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(supportTicketPayload(ticket,type,roles)),signal:AbortSignal.timeout(8000),
+    });
+    if (!response.ok) console.warn('[support-webhook] Delivery failed:',response.status);
+    return response.ok;
   } catch {
-    // Best-effort: announcing a ticket must never break opening one.
+    console.warn('[support-webhook] Delivery unavailable');
+    return false;
   }
 }

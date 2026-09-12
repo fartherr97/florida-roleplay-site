@@ -20,13 +20,13 @@ import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildD
  * and when is the first thing anybody asks when one goes wrong.
  */
 import { Router } from "express";
-import { execute, query, changedRows } from "../db.js";
+import { execute, query, changedRows, transaction } from "../db.js";
 import * as seed from "../supportSeed.js";
 import { loadGrants, requirePermission } from "../middleware/requirePermission.js";
 import { rankFor, resolveUser } from "../middleware/requireRole.js";
 import { permissionsFor } from "../permissions.js";
 import { fetchGuildMembers } from "../lib/discord.js";
-import { loadSupportWebhooks, saveSupportWebhooks, notifyTicketOpened } from "../lib/supportWebhooks.js";
+import { loadSupportWebhooks, saveSupportWebhooks, notifyTicketOpened, queueWebhookEdits, saveQueueWebhookEdits, ensureTable as ensureSupportWebhookTable } from "../lib/supportWebhooks.js";
 import { str } from "../validate.js";
 import {
   DEFAULT_TICKET_TYPES,
@@ -288,7 +288,7 @@ router.post("/", async (req, res) => {
   // Announce the new ticket to Discord — the department's own webhook for a department
   // queue, or the support team's (with a ping) for everything else. Fire-and-forget: the
   // ticket is already saved, and a webhook problem must not turn its creation into a 500.
-  notifyTicketOpened({ id }, type).catch(() => {});
+  notifyTicketOpened({ id, subject:draft.subject, openedByName:speakerName, openedByDiscordId:ctx.user.id }, type).catch(() => {});
 
   res.status(201).json({ ok: true, ticket: { id, ...draft, details, status: "open", priority: "normal", openedByName: name, history } });
 });
@@ -705,7 +705,8 @@ router.get('/config/discord-roles',async(req,res)=>{
 router.get("/config/ticket-types", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
-  res.json({ types: ctx.types.map(t=>({...t,workAllowed:canWorkType(t,ctx.permissions)})), canConfigure: canConfigureTypes(ctx) });
+  const settings = canConfigureTypes(ctx) ? await loadSupportWebhooks() : null;
+  res.json({ types: ctx.types.map(t=>({...t,workAllowed:canWorkType(t,ctx.permissions), ...(settings ? {webhookConfigured:Boolean(settings.deptWebhooks[t.id])} : {})})), canConfigure: canConfigureTypes(ctx) });
 });
 
 router.put("/config/ticket-types", async (req, res) => {
@@ -728,16 +729,24 @@ router.put("/config/ticket-types", async (req, res) => {
     return res.status(400).json({ ok: false, code: "SUPPORT_TYPES_INVALID", problems });
   }
 
+  let webhookEdits;
+  try { webhookEdits = await queueWebhookEdits(req.body?.types,types,ctx.types); }
+  catch(e) { return res.status(e.status || 503).json({message:e.status ? e.message : 'Unable to verify the webhook. Nothing was saved.'}); }
   try {
-    await query(`INSERT INTO support_type_config (id, document, updated_by)
+    await ensureSupportWebhookTable();
+    await transaction(async sql => {
+    await sql(`INSERT INTO support_type_config (id, document, updated_by)
        VALUES ('default', $1, $2)
        ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document, updated_by = EXCLUDED.updated_by`,
       [JSON.stringify(types), ctx.user.id],
     );
+    await saveQueueWebhookEdits(webhookEdits,sql);
+    });
   } catch {
     return noStore(res);
   }
-  res.json({ ok: true, types });
+  const settings = await loadSupportWebhooks();
+  res.json({ ok: true, types:types.map(t=>({...t,webhookConfigured:Boolean(settings.deptWebhooks[t.id])})) });
 });
 
 router.post('/:id/participants',async(req,res)=>{

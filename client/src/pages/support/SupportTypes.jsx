@@ -133,7 +133,11 @@ export default function SupportTypes() {
 
     setSaving(true);
     try {
-      const result = await api.saveSupportTypes(normalized);
+      const payload = normalized.map(t=>{
+        const raw = list.find(r=>r.id===t.id);
+        return typeof raw?.webhookUrl === 'string' ? {...t,webhookUrl:raw.webhookUrl} : t;
+      });
+      const result = await api.saveSupportTypes(payload);
       if (result?.ok) {
         setDraft(clone(result.types ?? normalized));
         setSavedAt(Date.now());
@@ -370,6 +374,17 @@ function TypeEditor({ type, onChange, onRemove, onTemplate }) {
             central support team sees it too. Turn on for something like a report about staff.</span>
           </span>
         </label>
+      </div>
+
+      <div className="space-y-3 rounded-xl bg-black/20 p-4 ring-1 ring-inset ring-white/[0.06]">
+        <p className="text-sm font-medium text-slate-200">Queue notifications</p>
+        <p className="text-xs text-slate-400">New tickets send an embed with the ticket name, opener, and a link. The Discord roles selected under Worked by are pinged above it.</p>
+        <label className="block text-sm text-slate-300">Discord webhook URL
+          <input type="password" autoComplete="new-password" aria-label="Queue webhook URL" value={type.webhookUrl ?? ''} onChange={e=>onChange({webhookUrl:e.target.value})} placeholder={type.webhookConfigured ? 'Webhook saved — paste a replacement to change it' : 'Paste the webhook for this queue’s Discord channel'} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 p-3 text-white" />
+        </label>
+        <p className="text-xs text-slate-400">{type.webhookConfigured ? 'A webhook is saved. Its URL stays hidden.' : 'No queue webhook saved yet.'} Changes apply when you select Save changes.</p>
+        {type.webhookConfigured && <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={type.webhookUrl === ''} onChange={e=>onChange({webhookUrl:e.target.checked ? '' : undefined})} />Remove this queue’s webhook</label>}
+        {!(type.workRoleIds || []).length && <p className="text-xs text-amber-300">Select Discord roles under Worked by to enable role pings for this queue.</p>}
       </div>
 
       {/* Intake fields ----------------------------------------------------- */}

@@ -25,7 +25,7 @@ export function SupportConfigProvider({ children }) {
       .supportTypes()
       .then((result) => {
         if (!active) return;
-        const types = normalizeTicketTypes(result?.types).map(t=>({...t, workAllowed:result?.types?.find(raw=>raw.id===t.id)?.workAllowed === true}));
+        const types = normalizeTicketTypes(result?.types).map(t=>({...t, webhookConfigured:result?.types?.find(raw=>raw.id===t.id)?.webhookConfigured === true, workAllowed:result?.types?.find(raw=>raw.id===t.id)?.workAllowed === true}));
         setState({
           types: types.length ? types : DEFAULT_TICKET_TYPES,
           canConfigure: result?.canConfigure === true,
