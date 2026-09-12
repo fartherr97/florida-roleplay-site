@@ -1,3 +1,4 @@
+import { ensureParticipants, managesParticipants, isParticipant, changeParticipant } from "../lib/supportParticipants.js";
 import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
 import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildDisplayName.js";
 /**
@@ -109,7 +110,9 @@ const TICKET_COLUMNS = `
   id, type, subject, status, priority, details,
   opened_by_discord_id AS "openedByDiscordId", opened_by_name AS "openedByName",
   assigned_to_discord_id AS "assignedToDiscordId", assigned_to_name AS "assignedToName",
-  history, last_message_at AS "lastMessageAt", created_at AS "createdAt", updated_at AS "updatedAt"`;
+  history, last_message_at AS "lastMessageAt", created_at AS "createdAt", updated_at AS "updatedAt",
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('discordId',p.discord_id,'name',p.display_name) ORDER BY p.added_at)
+    FROM support_ticket_participants p WHERE p.ticket_id=support_tickets.id), '[]'::jsonb) AS participants`;
 
 function shapeTicket(row) {
   return { ...row, details: parseJson(row.details, {}), history: parseJson(row.history, []) };
@@ -117,6 +120,7 @@ function shapeTicket(row) {
 
 async function loadTickets() {
   try {
+    await ensureParticipants();
     const rows = await query(`SELECT ${TICKET_COLUMNS} FROM support_tickets ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT 1000`,
     );
     if (rows.length) return rows.map(shapeTicket);
@@ -127,7 +131,11 @@ async function loadTickets() {
 }
 
 async function loadTicket(id) {
-  return (await loadTickets()).find((ticket) => ticket.id === id) ?? null;
+  try {
+    await ensureParticipants();
+    const rows = await query(`SELECT ${TICKET_COLUMNS} FROM support_tickets WHERE id=$1`, [id]);
+    return rows[0] ? shapeTicket(rows[0]) : null;
+  } catch { return null; }
 }
 
 function noStore(res) {
@@ -159,7 +167,7 @@ router.get("/", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
 
   const all = await loadTickets();
-  const mine = all.filter((t) => t.openedByDiscordId === ctx.user.id);
+  const mine = all.filter((t) => t.openedByDiscordId === ctx.user.id || isParticipant(t,ctx.user.id));
   const agent = isAgent(ctx, ctx.types);
 
   if (req.query.scope === "mine" || !agent) {
@@ -222,7 +230,7 @@ router.get("/:id", async (req, res) => {
   }
   res.json({
     ticket,
-    can: { work: canWorkTicket(ticket, ctx, ctx.types), lead: isSupportLead(ctx) },
+    can: { participants:managesParticipants(ticket,ctx), work: canWorkTicket(ticket, ctx, ctx.types), lead: isSupportLead(ctx) },
   });
 });
 
@@ -715,6 +723,16 @@ router.put("/config/ticket-types", async (req, res) => {
     return noStore(res);
   }
   res.json({ ok: true, types });
+});
+
+router.post('/:id/participants',async(req,res)=>{
+  const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
+  try{
+    const ticket=await loadTicket(str(req.params.id));
+    if(!ticket || !managesParticipants(ticket,ctx))return res.status(403).json({message:'Only the opener or support team can manage participants.'});
+    if(!['add','remove'].includes(req.body?.action))return res.status(400).json({message:'Choose add or remove.'});
+    res.json(await changeParticipant(ticket.id,str(req.body?.discordId,24).trim(),req.body.action,ctx));
+  }catch(e){res.status(e.status || 503).json({message:e.status ? e.message : 'Unable to update participants.'});}
 });
 
 export default router;

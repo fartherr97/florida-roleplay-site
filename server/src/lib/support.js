@@ -347,6 +347,7 @@ export function canViewTicket(ticket, ctx = {}, types = DEFAULT_TICKET_TYPES) {
   if (!ticket) return false;
   const perms = permSet(ctx.permissions);
   if (ticket.openedByDiscordId && ticket.openedByDiscordId === ctx.user?.id) return true;
+  if (ctx.user && ticket.participants?.some(p=>p.discordId===ctx.user.id)) return true;
   return canWorkType(typeMapOf(types)[ticket.type], perms);
 }
 

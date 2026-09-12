@@ -1,6 +1,7 @@
+import DevAssignees from "../../components/support/DevAssignees";
 import { createElement, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Inbox, MessageSquare, Search, UserPlus, Wrench } from "lucide-react";
+import { ArrowRight, Inbox, MessageSquare, Search, Wrench } from "lucide-react";
 import Section from "../../components/layout/Section";
 import PageHeader from "../../components/layout/PageHeader";
 import Card from "../../components/ui/Card";
@@ -70,7 +71,7 @@ export default function DevQueue() {
       if (tab === "open" && !OPEN_DEV_STATUSES.includes(r.status)) return false;
       if (tab === "pending" && r.status !== "pending") return false;
       if (tab === "in_progress" && r.status !== "in_progress") return false;
-      if (tab === "mine" && r.assignedToDiscordId !== user?.id) return false;
+      if (tab === "mine" && !r.assignees?.some(p=>p.discordId===user?.id)) return false;
       if (!needle) return true;
       return [r.subject, r.id, r.openedByName, r.assignedToName, r.department].join(" ").toLowerCase().includes(needle);
     });
@@ -81,7 +82,7 @@ export default function DevQueue() {
       open: requests.filter((r) => OPEN_DEV_STATUSES.includes(r.status)).length,
       pending: requests.filter((r) => r.status === "pending").length,
       in_progress: requests.filter((r) => r.status === "in_progress").length,
-      mine: requests.filter((r) => r.assignedToDiscordId === user?.id).length,
+      mine: requests.filter((r) => r.assignees?.some(p=>p.discordId===user?.id)).length,
       all: requests.length,
       feedback: feedback?.length ?? 0,
     }),
@@ -97,12 +98,6 @@ export default function DevQueue() {
 
   if (!(hasPermission("development.work") || user?.roles?.some(r => ["fhp_colonel","bso_sheriff","mpd_chief","directorship","ownership"].includes(r)))) return <AccessDenied reason="role" />;
 
-  const take = async (request) => {
-    const result = await api.updateDevRequest(request.id, { assign: "me" });
-    if (result?.ok) {
-      setData((prev) => (prev ? { ...prev, requests: prev.requests.map((r) => (r.id === request.id ? result.request : r)) } : prev));
-    }
-  };
 
   return (
     <Section className="max-w-5xl">
@@ -185,7 +180,7 @@ export default function DevQueue() {
         <div className="space-y-3">
           {shown.map((request) => {
             const type = typeMap[request.type];
-            const mine = request.assignedToDiscordId === user?.id;
+            const mine = request.assignees?.some(p=>p.discordId===user?.id);
             return (
               <Card key={request.id} className="flex flex-wrap items-center gap-4 p-5">
                 <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset", toneTile(type?.tone ?? "violet"))}>
@@ -220,12 +215,7 @@ export default function DevQueue() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {!mine && (
-                    <Button size="sm" variant="ghost" onClick={() => take(request)}>
-                      <UserPlus className="size-4" />
-                      Take it
-                    </Button>
-                  )}
+                  {(hasPermission("development.work") || hasPermission("development.manage") || mine) && <DevAssignees request={request} onChange={() => api.devRequests().then(setData)} />}
                   <Button as={Link} to={`/development/requests/${request.id}`} size="sm" variant="secondary">
                     Open
                     <ArrowRight className="size-4" />

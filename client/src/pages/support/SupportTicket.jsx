@@ -1,3 +1,4 @@
+import DevParticipants from "../../components/support/DevParticipants";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Check, GitBranch, Info, Link2, MessageSquare, UserPlus } from "lucide-react";
@@ -222,6 +223,7 @@ export default function SupportTicket() {
         )}
       </p>
 
+      <DevParticipants kind="support" request={ticket} canManage={can.participants} onChange={() => Promise.all([load(),loadMessages()])} />
       {/* The staff toolbar — the controls, on top, where a phone can reach them. */}
       {can.work ? (
         <Card className="mt-5 p-4">

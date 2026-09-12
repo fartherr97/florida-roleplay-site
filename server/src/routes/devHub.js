@@ -1,3 +1,5 @@
+import { ticketStaff, validateTicketStaff } from "../lib/ticketStaff.js";
+import { ensureParticipants, managesParticipants, isParticipant, changeParticipant } from "../lib/devParticipants.js";
 import { devWebhookStatus, saveDevWebhook, notifyDevTicketOpened } from "../lib/devWebhooks.js";
 import { vehicleAssignments } from "../lib/vehicleAssignments.js";
 import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
@@ -102,17 +104,21 @@ async function loadTypes() {
  * ------------------------------------------------------------------ */
 
 const REQUEST_COLUMNS = `
-  id, type, subject, status, priority, department, details,
+  id, type, subject, status, priority, department, details, assignees,
   opened_by_discord_id AS "openedByDiscordId", opened_by_name AS "openedByName",
   assigned_to_discord_id AS "assignedToDiscordId", assigned_to_name AS "assignedToName",
-  history, last_message_at AS "lastMessageAt", created_at AS "createdAt", updated_at AS "updatedAt"`;
+  history, last_message_at AS "lastMessageAt", created_at AS "createdAt", updated_at AS "updatedAt",
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('discordId',p.discord_id,'name',p.display_name) ORDER BY p.added_at)
+    FROM dev_request_participants p WHERE p.request_id=dev_requests.id), '[]'::jsonb) AS participants`;
 
 function shapeRequest(row) {
-  return { ...row, details: parseJson(row.details, {}), history: parseJson(row.history, []) };
+  const assignees = parseJson(row.assignees, []);
+  return { ...row, assignees, assignedToName: assignees.map(p => p.name).join(', ') || row.assignedToName, details: parseJson(row.details, {}), history: parseJson(row.history, []) };
 }
 
 async function loadRequests() {
   try {
+    await ensureParticipants();
     const rows = await query(
       `SELECT ${REQUEST_COLUMNS} FROM dev_requests ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT 1000`,
     );
@@ -124,14 +130,21 @@ async function loadRequests() {
 }
 
 async function loadRequest(id) {
-  return (await loadRequests()).find((r) => r.id === id) ?? null;
+  try {
+    await ensureParticipants();
+    const rows = await query(`SELECT ${REQUEST_COLUMNS} FROM dev_requests WHERE id=$1`, [id]);
+    return rows[0] ? shapeRequest(rows[0]) : null;
+  } catch { return null; }
 }
 
 /** Whether this caller may see a request: the opener, or the dev team. */
+function canWorkRequest(request, ctx) {
+  return isDevTeam(ctx) || Boolean(ctx.user && request?.assignees?.some(p=>p.discordId===ctx.user.id));
+}
 function canViewRequest(request, ctx) {
   if (!request) return false;
   if (request.openedByDiscordId && request.openedByDiscordId === ctx.user?.id) return true;
-  return isDevTeam(ctx) || approvalViewer(request,ctx);
+  return isParticipant(request,ctx.user?.id) || canWorkRequest(request,ctx) || approvalViewer(request,ctx);
 }
 
 function withHistory(request, entry) {
@@ -144,7 +157,7 @@ router.get("/", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
 
   const all = await loadRequests();
-  const mine = all.filter((r) => r.openedByDiscordId === ctx.user.id);
+  const mine = all.filter((r) => r.openedByDiscordId === ctx.user.id || isParticipant(r,ctx.user.id) || r.assignees?.some(p=>p.discordId===ctx.user.id));
   const team = isDevTeam(ctx) || liveryApprover(ctx);
 
   if (req.query.scope === "mine" || !team) {
@@ -164,7 +177,7 @@ router.get("/requests/:id", async (req, res) => {
   }
   try {
     const review = await approvalData(request.id);
-    res.json({request,...review,can:{work:isDevTeam(ctx),manage:canManageDev(ctx),approveModel:modelApprover(ctx),approveLiveries:liveryApprover(ctx)}});
+    res.json({request,...review,can:{participants:managesParticipants(request,ctx),work:canWorkRequest(request,ctx),manage:canManageDev(ctx),approveModel:modelApprover(ctx),approveLiveries:liveryApprover(ctx)}});
   } catch { return noStore(res); }
 });
 
@@ -248,13 +261,50 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.post('/requests/:id/participants', async (req,res) => {
+  const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
+  try {
+    const ticket=await loadRequest(str(req.params.id,40));
+    if(!ticket || !managesParticipants(ticket,ctx))return res.status(403).json({message:'Only the ticket opener or development team can manage participants.'});
+    const action=req.body?.action;
+    if(!['add','remove'].includes(action))return res.status(400).json({message:'Choose add or remove.'});
+    res.json(await changeParticipant(ticket.id,str(req.body?.discordId,24).trim(),action,ctx));
+  } catch(error) {res.status(error.status || 503).json({message:error.status ? error.message : 'Could not update ticket participants.'});}
+});
+
+router.get('/requests/:id/assignable', async(req,res)=>{
+  const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
+  const request=await loadRequest(str(req.params.id));
+  if(!request || !canWorkRequest(request,ctx))return res.status(403).json({message:'Development team access required.'});
+  try{res.json({members:await ticketStaff('dev')});}catch{res.status(503).json({message:'Unable to load the Discord developer list.'});}
+});
+router.put('/requests/:id/assignees', async(req,res)=>{
+  const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
+  try{
+    const request=await loadRequest(str(req.params.id));
+    if(!request || !canWorkRequest(request,ctx))return res.status(403).json({message:'Development team access required.'});
+    const ids=req.body?.discordIds;
+    if(!Array.isArray(ids) || ids.length>20 || ids.some(id=>typeof id!=='string'))return res.status(400).json({message:'Choose up to 20 developers.'});
+    const assignees=[];
+    for(const id of new Set(ids))assignees.push(await validateTicketStaff(id,'dev'));
+    const actor=await rosterNameFor(ctx.user);
+    await transaction(async sql=>{
+      const [current]=await sql('SELECT * FROM dev_requests WHERE id=$1 FOR UPDATE',[request.id]);
+      if(!current || !canWorkRequest({...current,assignees:current.assignees},ctx))throw Object.assign(new Error('Ticket access changed.'),{status:403});
+      const history=withHistory(current,{action:'assigned',actor,details:assignees.length ? 'Assigned to '+assignees.map(p=>`${p.name} (${p.discordId})`).join(', ') : 'Cleared developer assignments'});
+      await sql('UPDATE dev_requests SET assignees=$1, assigned_to_discord_id=$2, assigned_to_name=$3, history=$4, updated_at=CURRENT_TIMESTAMP WHERE id=$5',[JSON.stringify(assignees),assignees[0]?.discordId || null,assignees[0]?.name || null,JSON.stringify(history),request.id]);
+    });
+    res.json({ok:true});
+  }catch(e){res.status(e.status || 503).json({message:e.status ? e.message : 'Unable to update assignments.'});}
+});
+
 /** Status, priority and assignment — the dev team's rail. */
 router.patch("/requests/:id", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
   const request = await loadRequest(str(req.params.id));
   if (!request) return res.status(404).json({ ok: false, message: "No such request." });
-  if (!isDevTeam(ctx)) {
+  if (!canWorkRequest(request,ctx)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Only the dev team changes a request." });
   }
 
@@ -278,20 +328,12 @@ router.patch("/requests/:id", async (req, res) => {
     next.priority = body.priority;
     history = withHistory({ history }, { action: "priority", actor, details: `set to ${DEV_PRIORITY_MAP[body.priority].label}` });
   }
-  if (body.assign === "me") {
-    next.assignedToDiscordId = ctx.user.id;
-    next.assignedToName = await rosterNameFor(ctx.user);
-    history = withHistory({ history }, { action: "assigned", actor, details: "took the request" });
-  } else if (body.assign === "none") {
-    next.assignedToDiscordId = null;
-    next.assignedToName = null;
-    history = withHistory({ history }, { action: "assigned", actor, details: "put it back in the queue" });
-  }
+  if (body.assign) return res.status(400).json({message:'Use the developer assignment picker.'});
 
   try {
     const result = await execute(
-      `UPDATE dev_requests SET status = $1, priority = $2, assigned_to_discord_id = $3, assigned_to_name = $4, history = $5 WHERE id = $6`,
-      [next.status, next.priority, next.assignedToDiscordId, next.assignedToName, JSON.stringify(history), request.id],
+      `UPDATE dev_requests SET status = $1, priority = $2, history = COALESCE(history, '[]'::jsonb) || $3::jsonb WHERE id = $4`,
+      [next.status, next.priority, JSON.stringify(history.slice((request.history ?? []).length)), request.id],
     );
     if (!changedRows(result)) return res.status(404).json({ ok: false, message: "Nothing was updated." });
   } catch {
@@ -313,7 +355,7 @@ router.get("/requests/:id/messages", async (req, res) => {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That request is not yours." });
   }
 
-  const internal = isDevTeam(ctx);
+  const internal = canWorkRequest(request,ctx);
   try {
     await ensureMessageEdits("development");
     const rows = await query(
@@ -339,7 +381,7 @@ router.post("/requests/:id/messages", async (req, res) => {
   if (!canViewRequest(request, ctx)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That request is not yours." });
   }
-  if (request.status === "closed" && !isDevTeam(ctx)) {
+  if (request.status === "closed" && !canWorkRequest(request,ctx)) {
     return res.status(409).json({ ok: false, code: "DEV_CLOSED", message: "This request is closed. Open a new one and reference this ID." });
   }
 
@@ -347,7 +389,7 @@ router.post("/requests/:id/messages", async (req, res) => {
   if (!body) return res.status(400).json({ ok: false, message: "The message is empty." });
 
   const wantsInternal = req.body?.internal === true;
-  if (wantsInternal && !isDevTeam(ctx)) {
+  if (wantsInternal && !canWorkRequest(request,ctx)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "Internal notes are for the dev team." });
   }
 
@@ -806,7 +848,7 @@ router.patch('/requests/:id/messages/:messageId',async(req,res)=>{
  const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
  const request=await loadRequest(str(req.params.id));
  if(!request || !canViewRequest(request,ctx))return res.status(403).json({ok:false,message:'This ticket is not available to you.'});
- const work=isDevTeam(ctx);
+ const work=canWorkRequest(request,ctx);
  if(request.status==='closed' && !work)return res.status(409).json({ok:false,message:'This ticket is closed.'});
  try{res.json(await editMessage('development',request.id,str(req.params.messageId,48),ctx.user.id,req.body?.body,req.body?.originalBody,work));}
  catch(error){res.status(error.status || 503).json({ok:false,message:error.status ? error.message : 'Message could not be saved.'});}

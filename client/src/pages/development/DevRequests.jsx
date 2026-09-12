@@ -38,7 +38,7 @@ export default function DevRequests() {
       <PageHeader
         eyebrow="Development"
         title="My requests"
-        subtitle="Everything you've opened, newest first."
+        subtitle="Tickets you've opened or been added to, newest first."
         actions={
           <Button as={Link} to="/development/new" size="sm">
             <Plus className="size-4" />

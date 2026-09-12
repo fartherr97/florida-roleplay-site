@@ -861,6 +861,10 @@ export const api = {
       message: "The API is unreachable, so that message was not posted.",
     })),
 
+  devAssignable: id => request(`/development/requests/${encodeURIComponent(id)}/assignable`),
+  assignDevelopers: (id,discordIds) => request(`/development/requests/${encodeURIComponent(id)}/assignees`, {method:'PUT',body:JSON.stringify({discordIds})}),
+  changeTicketParticipant: (kind,id,discordId,action) => request(kind==='support' ? `/support/${encodeURIComponent(id)}/participants` : `/development/requests/${encodeURIComponent(id)}/participants`,{method:'POST',body:JSON.stringify({discordId,action})}),
+  changeDevParticipant: (id, discordId, action) => request(`/development/requests/${encodeURIComponent(id)}/participants`, {method:'POST', body:JSON.stringify({discordId,action})}),
   devWebhookStatus: () => request('/development/webhook-settings'),
   saveDevWebhook: url => request('/development/webhook-settings', {method:'PUT', body:JSON.stringify({url})}),
   devAssignments: (search, page) => request(`/development/assigned-vehicles?search=${encodeURIComponent(search)}&page=${page}`),

@@ -1,0 +1,35 @@
+import { test, mock, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { PGlite } from '@electric-sql/pglite';
+import { readFile } from 'node:fs/promises';
+const db = new PGlite();
+after(() => db.close());
+const schema=await readFile(new URL('../src/schema.sql',import.meta.url),'utf8');
+for(const table of ['dev_requests','dev_request_messages']) await db.exec(schema.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n\\);`))[0]);
+const query=async(sql,args=[]) => (await db.query(sql,args)).rows;
+mock.module('../src/db.js',{namedExports:{query,transaction:fn=>db.transaction(tx=>fn(async(sql,args=[]) => (await tx.query(sql,args)).rows))}});
+mock.module('../src/lib/guildDisplayName.js',{namedExports:{guildDisplayName:async u=>u.displayName || u.id}});
+const {changeParticipant,isParticipant,managesParticipants}=await import('../src/lib/devParticipants.js');
+const opener='111111111111111111', guest='222222222222222222';
+const ctx=(id,permissions=[])=>({user:{id,displayName:'Test member'},permissions:new Set(permissions)});
+await query("INSERT INTO dev_requests(id,type,subject,status,opened_by_discord_id,opened_by_name) VALUES('ticket','department_work','Test','pending',$1,'Opener')",[opener]);
+test('opener can invite a user before first website login; duplicate, self and outsider requests are denied',async()=>{
+ await assert.rejects(changeParticipant('ticket',guest,'add',ctx(guest)),{status:403});
+ await assert.rejects(changeParticipant('ticket','invalid','add',ctx(opener)),{status:400});
+ await assert.rejects(changeParticipant('ticket',opener,'add',ctx(opener)),{status:409});
+ await changeParticipant('ticket',guest,'add',ctx(opener));
+ await assert.rejects(changeParticipant('ticket',guest,'add',ctx(opener)),{status:409});
+ const participants=(await query('SELECT discord_id AS "discordId" FROM dev_request_participants'));
+ assert(isParticipant({participants},guest));assert(!isParticipant({participants},opener));
+ assert(!managesParticipants({openedByDiscordId:opener,participants},ctx(guest)));
+ assert(managesParticipants({openedByDiscordId:opener},ctx(guest,['development.work'])));
+});
+test('removal revokes membership and records immutable history, including on closed tickets',async()=>{
+ await query("UPDATE dev_requests SET status='closed' WHERE id='ticket'");
+ await assert.rejects(changeParticipant('ticket','333333333333333333','add',ctx(opener)),{status:409});
+ await changeParticipant('ticket',guest,'remove',ctx(opener));
+ assert.equal((await query('SELECT * FROM dev_request_participants')).length,0);
+ const logs=await query('SELECT * FROM dev_request_messages ORDER BY created_at');
+ assert.equal(logs.length,2);assert(logs.every(m=>m.system_generated && !m.internal));
+ assert(logs[0].body.includes('added'));assert(logs[1].body.includes('removed'));
+});

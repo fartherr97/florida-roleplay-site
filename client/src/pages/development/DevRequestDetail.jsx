@@ -1,7 +1,9 @@
+import DevAssignees from "../../components/support/DevAssignees";
+import DevParticipants from "../../components/support/DevParticipants";
 import DevApprovals from "../../components/support/DevApprovals";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, MessageSquare, UserPlus } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare } from "lucide-react";
 import Section from "../../components/layout/Section";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -94,7 +96,6 @@ export default function DevRequestDetail() {
     return result;
   }
 
-  const mine = request.assignedToDiscordId === user?.id;
   const details = Object.entries(request.details ?? {});
 
   return (
@@ -131,6 +132,8 @@ export default function DevRequestDetail() {
         )}
       </p>
 
+      <DevParticipants request={request} canManage={can.participants} onChange={() => Promise.all([load(),loadMessages()])} />
+
       {/* Controls + info. */}
       <Card className="mt-5 p-4">
         {can.work ? (
@@ -149,16 +152,7 @@ export default function DevRequestDetail() {
                 onChange={(priority) => patch({ priority })}
               />
             </div>
-            {mine ? (
-              <Button variant="ghost" size="sm" onClick={() => patch({ assign: "none" })}>
-                Release
-              </Button>
-            ) : (
-              <Button variant="secondary" size="sm" onClick={() => patch({ assign: "me" })}>
-                <UserPlus className="size-4" />
-                Take it
-              </Button>
-            )}
+            <DevAssignees request={request} onChange={load} />
           </div>
         ) : (
           <p className="text-sm leading-relaxed text-slate-400">
