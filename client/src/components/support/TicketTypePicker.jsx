@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown, Shield, LifeBuoy } from "lucide-react";
 
+import { api } from "../../lib/api";
 import { DEPARTMENTS, departmentOf } from "../../lib/supportDepartments";
 
 export default function TicketTypePicker({ types, onSelect }) {
   const [expanded, setExpanded] = useState(null);
+  const [branding, setBranding] = useState([]);
+  useEffect(() => {
+    let active = true;
+    api.recruitment().then(result => {
+      if (active) setBranding(result?.departments || []);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const logoFor = dept => branding.find(entry => entry.id === dept.id || entry.id === `ad-${dept.id}` || entry.shortName?.toLowerCase() === dept.short.toLowerCase())?.logoUrl || dept.logo;
   const general = types.filter(type => !departmentOf(type));
   const groups = DEPARTMENTS.map(dept => ({ ...dept, queues: types.filter(type => departmentOf(type) === dept.id) })).filter(dept => dept.queues.length);
   const option = type => (
@@ -17,11 +27,13 @@ export default function TicketTypePicker({ types, onSelect }) {
     {groups.length > 0 && <div><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-300"><Shield className="size-4" />Department support</h2>
       <div className="grid items-start gap-3 sm:grid-cols-2">{groups.map(dept => <div key={dept.id} className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
         <button type="button" aria-expanded={expanded === dept.id} aria-controls={`queues-${dept.id}`} onClick={() => setExpanded(expanded === dept.id ? null : dept.id)} className="flex w-full items-center gap-4 p-5 text-left hover:bg-white/[0.03] focus-visible:outline-2 focus-visible:outline-brand-400">
-          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand-400/10 text-sm font-bold text-brand-300">{dept.short}</span>
+          <img src={logoFor(dept)} alt="" className="size-14 shrink-0 object-contain drop-shadow-md" onError={event => { if (!event.currentTarget.src.endsWith("/logo.png")) event.currentTarget.src = "/logo.png"; }} />
           <span className="flex-1"><span className="block font-semibold text-white">{dept.label}</span><span className="mt-1 block text-xs text-slate-400">{dept.queues.length} ticket {dept.queues.length === 1 ? 'option' : 'options'} · Choose a queue</span></span>
-          <ChevronDown className={`size-4 shrink-0 text-slate-400 transition-transform ${expanded === dept.id ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`size-4 shrink-0 text-slate-400 transition-transform duration-300 motion-reduce:transition-none ${expanded === dept.id ? 'rotate-180' : ''}`} />
         </button>
-        {expanded === dept.id && <div id={`queues-${dept.id}`} className="space-y-2 border-t border-white/10 p-3">{dept.queues.map(option)}</div>}
+        <div id={`queues-${dept.id}`} aria-hidden={expanded !== dept.id} inert={expanded !== dept.id} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${expanded === dept.id ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="min-h-0 overflow-hidden"><div className="space-y-2 border-t border-white/10 p-3">{dept.queues.map(option)}</div></div>
+        </div>
       </div>)}</div>
     </div>}
     {groups.length > 0 && general.length > 0 && <div role="separator" aria-label="Community support section" className="relative py-1">
