@@ -1520,3 +1520,6 @@ CREATE TRIGGER touch_fivem_weapons BEFORE UPDATE ON fivem_weapons
 DROP TRIGGER IF EXISTS touch_fivem_vehicles ON fivem_vehicles;
 CREATE TRIGGER touch_fivem_vehicles BEFORE UPDATE ON fivem_vehicles
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- Transferee identity is distinct from the person filing the request. Legacy rows require confirmation.
+ALTER TABLE transfers ADD COLUMN IF NOT EXISTS subject_discord_id VARCHAR(20);

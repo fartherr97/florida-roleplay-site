@@ -1,3 +1,4 @@
+import EmploymentHistory from '../../components/EmploymentHistory';
 // ─────────────────────────────────────────────────────────────────────────────
 // Transfer Portal — the ticket detail view
 //
@@ -396,8 +397,9 @@ function ProcessTransferModal({ transfer, onClose, onConfirm, busy }) {
 
   const [assignedRank, setAssignedRank] = useState("");
   const [employmentType, setEmploymentType] = useState("fulltime");
+  const [subjectDiscordId,setSubjectDiscordId] = useState(transfer.subjectDiscordId || "");
 
-  const canSubmit = assignedRank.trim().length > 0;
+  const canSubmit = assignedRank.trim().length > 0 && /^\d{17,20}$/.test(subjectDiscordId);
 
   return (
     <ModalShell
@@ -407,6 +409,11 @@ function ProcessTransferModal({ transfer, onClose, onConfirm, busy }) {
       width="max-w-md"
     >
       <div className="space-y-4 px-5 py-5">
+        <label className="flex flex-col gap-1.5 text-sm text-slate-300">
+          Transferee Discord ID
+          <input aria-label="Transferee Discord ID" value={subjectDiscordId} readOnly={Boolean(transfer.subjectDiscordId)} onChange={e=>setSubjectDiscordId(e.target.value.trim())} className="rounded-xl border border-white/20 bg-black/30 p-3 text-white" />
+          {!transfer.subjectDiscordId && <span className="text-xs text-amber-200">This older ticket needs a confirmed Discord ID. Verify it belongs to {transfer.member}.</span>}
+        </label>
         {/* Rank */}
         <label className="flex flex-col gap-1.5">
           <span className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
@@ -470,7 +477,7 @@ function ProcessTransferModal({ transfer, onClose, onConfirm, busy }) {
             variant="complete"
             size="sm"
             disabled={!canSubmit || busy}
-            onClick={() => onConfirm({ assignedRank, employmentType })}
+            onClick={() => onConfirm({ assignedRank, employmentType, subjectDiscordId })}
           >
             {busy ? "Processing..." : "Process Transfer"}
           </Btn>
@@ -740,6 +747,7 @@ function BgCheckModal({ transfer, onClose }) {
 
             <BgSection label="Non-verbal" list={[...nonVerbal].sort(sortByDate)} />
             <BgSection label="Verbal" list={[...verbal].sort(sortByDate)} />
+            <EmploymentHistory entries={bg.employment} />
           </>
         )}
       </div>
@@ -942,8 +950,9 @@ export default function TicketView({ ticketId, user, onBack }) {
       setBusy(true);
       try {
         await fn(...args);
-      } catch {
-        toast(errMsg, "error");
+      } catch (error) {
+        if (error.transfer) setTransfer(error.transfer);
+        toast(error.message || errMsg, "error");
       } finally {
         actionInFlight.current = false;
         setBusy(false);
@@ -985,8 +994,8 @@ export default function TicketView({ ticketId, user, onBack }) {
     toast("Transfer rejected.", "error");
   }, "Failed to reject transfer.");
 
-  const handleProcess = withGuard(async ({ assignedRank, employmentType }) => {
-    setTransfer(await patch({ action: "process", assignedRank, employmentType }));
+  const handleProcess = withGuard(async ({ assignedRank, employmentType, subjectDiscordId }) => {
+    setTransfer(await patch({ action: "process", assignedRank, employmentType, subjectDiscordId }));
     setShowProcess(false);
     setChatRefresh((n) => n + 1);
     toast("Transfer processed and completed.", "success");
@@ -1176,7 +1185,7 @@ export default function TicketView({ ticketId, user, onBack }) {
                 {/* Row 2 — Process Transfer (once both approved) + Reject. */}
                 {(transfer.status === "pending" || transfer.status === "approved") && (
                   <div className="flex gap-2">
-                    {(bothApproved || user?.isManagement) && (
+                    {(bothApproved && user?.isManagement) && (
                       <Btn
                         size="sm"
                         variant="complete"

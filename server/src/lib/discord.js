@@ -117,6 +117,7 @@ export async function fetchGuildRoles(guildId = process.env.DISCORD_GUILD_ID) {
 
   const res = await fetch(`${API_BASE}/guilds/${guildId}/roles`, {
     headers: { Authorization: `Bot ${token}` },
+    signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) {
     throw new Error(`Discord role list failed (${res.status})`);
@@ -187,6 +188,7 @@ export async function fetchGuildMember(guildId, userId) {
   if (!token || !guildId || !userId) return null;
   const res = await fetch(`${API_BASE}/guilds/${guildId}/members/${userId}`, {
     headers: { Authorization: `Bot ${token}` },
+    signal: AbortSignal.timeout(8000),
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Discord member lookup failed (${res.status})`);
@@ -224,9 +226,10 @@ async function editMemberRole(method, guildId, userId, roleId, reason) {
     `${API_BASE}/guilds/${guildId}/members/${userId}/roles/${roleId}`,
     {
       method,
+      signal: AbortSignal.timeout(8000),
       headers: {
         Authorization: `Bot ${token}`,
-        ...(reason ? { "X-Audit-Log-Reason": String(reason).slice(0, 480) } : {}),
+        ...(reason ? { "X-Audit-Log-Reason": encodeURIComponent(String(reason).slice(0, 480)) } : {}),
       },
     },
   );

@@ -1,29 +1,9 @@
-/**
- * Applying a processed transfer to Discord.
- *
- * When a transfer ticket is processed at a rank, this strips the outgoing department's
- * roles and grants the incoming department's — but only ONE rank role: the rank the member
- * was processed as, not every rank. The rule:
- *
- *   • remove  = the outgoing department's configured strip set (rank + base membership)
- *   • add     = the incoming department's configured grant set, MINUS every rank role,
- *               PLUS the single rank role matching the assigned rank
- *
- * The strip/grant sets are configured in the bot dashboard (Management → Bot → Transfers)
- * and read from the bot over a token-gated server-to-server call. Which roles are "ranks"
- * (so all-but-one are dropped from the grant) comes from this site's own rank map, keyed by
- * department — the same map the roster is built from, so it never drifts.
- *
- * Departments are separate Discord servers; the strip happens in the outgoing server and
- * the grant in the incoming one, both with the site's bot token. Everything here is
- * best-effort: a role the bot cannot manage, or a member missing from a server, is recorded
- * and skipped — it never aborts the rest or fails the ticket that was already processed.
- */
+/** Apply incoming grants first, then remove outgoing non-staff roles. Failures remain retryable. */
 import { query } from "../db.js";
 import * as seed from "../rosterSeed.js";
 import { DEPARTMENT_CONFIGS } from "../departmentSeed.js";
 import { DEPTS } from "./portal.js";
-import { addMemberRole, removeMemberRole } from "./discord.js";
+import { addMemberRole, removeMemberRole, fetchGuildMember } from "./discord.js";
 
 const SNOWFLAKE = /^\d{17,20}$/;
 
@@ -105,6 +85,7 @@ async function loadBotTransferConfig() {
       if (!gid) continue;
       byGuildId.set(gid, {
         stripRoleIds: (g.stripRoleIds ?? []).map(String),
+        protectedRoleIds: (g.protectedRoleIds ?? []).map(String),
         grantRoleIds: (g.grantRoleIds ?? []).map(String),
       });
     }
@@ -139,7 +120,7 @@ export async function computeTransferRoleChanges({ fromDept, toDept, assignedRan
 
   const fromCfg = cfg.get(fromGuildId);
   const toCfg = cfg.get(toGuildId);
-  if (!fromCfg && !toCfg) return { ok: false, reason: "no_transfer_config" };
+  if (!fromCfg || !toCfg) return { ok: false, reason: "no_transfer_config" };
 
   // Every rank role in the incoming department — all but the chosen one are dropped from
   // the grant so a member joins at a single rank, not all of them.
@@ -158,6 +139,8 @@ export async function computeTransferRoleChanges({ fromDept, toDept, assignedRan
   );
   const chosenRankRoleId = chosen?.roleId ?? null;
 
+  if (!chosenRankRoleId) return {ok:false,reason:'assigned_rank_not_mapped'};
+  if (fromGuildId === toGuildId) return {ok:false,reason:'departments_must_use_distinct_guilds'};
   const grant = (toCfg?.grantRoleIds ?? []).map(String);
   const baseAdd = grant.filter((id) => !toRankRoleIds.has(id));
   const addRoleIds = [...new Set([...baseAdd, ...(chosenRankRoleId ? [chosenRankRoleId] : [])])];
@@ -171,7 +154,9 @@ export async function computeTransferRoleChanges({ fromDept, toDept, assignedRan
     fromGuildId,
     toGuildId,
     removeRoleIds,
+    protectedRoleIds: fromCfg.protectedRoleIds || [],
     addRoleIds,
+    toRankRoleIds: [...toRankRoleIds],
     chosenRankRoleId,
     rankMatched: Boolean(chosenRankRoleId),
     assignedRank,
@@ -180,36 +165,49 @@ export async function computeTransferRoleChanges({ fromDept, toDept, assignedRan
 
 /**
  * Applies a processed transfer to Discord: strips the outgoing roles in the outgoing guild,
- * grants the incoming roles in the incoming guild. Best-effort and never throws.
+ * grants the incoming roles in the incoming guild. Fails closed when configuration or Discord updates are incomplete.
  *
  * @returns {Promise<{applied:boolean, reason?:string, removed:string[], added:string[], failed:Array<{side:string,id:string}>, rankMatched?:boolean}>}
  */
+export function protectedTransferRole(role, protectedIds = []) {
+  const name = String(role.name || '').replace(/[_|\-]/g,' ');
+  return Boolean(role.managed || protectedIds.includes(role.id) || /\b(admin(?:istrator)?|staff|mod|moderator|owner(?:ship)?|director|developer)\b/i.test(name));
+}
+async function guildRoles(guildId) {
+  const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`,{headers:{Authorization:`Bot ${process.env.DISCORD_BOT_TOKEN}`},signal:AbortSignal.timeout(8000)});
+  if(!response.ok)throw new Error('Role list unavailable');
+  return response.json();
+}
 export async function applyProcessedTransfer({ discordUserId, fromDept, toDept, assignedRank, reason }) {
-  if (!discordUserId) return { applied: false, reason: "no_user", removed: [], added: [], failed: [] };
-
-  const plan = await computeTransferRoleChanges({ fromDept, toDept, assignedRank });
-  if (!plan.ok) return { applied: false, reason: plan.reason, removed: [], added: [], failed: [] };
-
-  const auditReason = `FLRP transfer: ${fromDept} → ${toDept}${assignedRank ? ` (${assignedRank})` : ""}`;
-  const removed = [];
-  const added = [];
-  const failed = [];
-
-  for (const roleId of plan.removeRoleIds) {
-    const ok = await removeMemberRole(plan.fromGuildId, discordUserId, roleId, reason || auditReason).catch(
-      () => false,
-    );
-    if (ok) removed.push(roleId);
-    else failed.push({ side: "remove", id: roleId });
+  const empty = {applied:false,removed:[],added:[],failed:[]};
+  if (!SNOWFLAKE.test(discordUserId || '')) return {...empty,reason:'no_user'};
+  const plan = await computeTransferRoleChanges({fromDept,toDept,assignedRank});
+  if(!plan.ok)return {...empty,reason:plan.reason};
+  let outgoing,incoming,roles,toRoles;
+  try {
+    [outgoing,incoming,roles,toRoles]=await Promise.all([fetchGuildMember(plan.fromGuildId,discordUserId),fetchGuildMember(plan.toGuildId,discordUserId),guildRoles(plan.fromGuildId),guildRoles(plan.toGuildId)]);
+  } catch {return {...empty,reason:'discord_preflight_failed'};}
+  if(!outgoing || !incoming)return {...empty,reason:'member_must_join_both_department_guilds'};
+  if(plan.addRoleIds.some(id=>!toRoles.some(r=>r.id===id && !r.managed)))return {...empty,reason:'incoming_role_missing_or_managed'};
+  const auditReason=reason || `FLRP transfer: ${fromDept} to ${toDept} (${assignedRank})`;
+  const removed=[],added=[],failed=[];
+  // Grant first: a failed incoming assignment must never strip the old department.
+  for(const id of plan.addRoleIds) {
+    if(incoming.roles.includes(id))continue;
+    if(await addMemberRole(plan.toGuildId,discordUserId,id,auditReason).catch(()=>false))added.push(id);
+    else failed.push({side:'add',id});
   }
-
-  for (const roleId of plan.addRoleIds) {
-    const ok = await addMemberRole(plan.toGuildId, discordUserId, roleId, reason || auditReason).catch(
-      () => false,
-    );
-    if (ok) added.push(roleId);
-    else failed.push({ side: "add", id: roleId });
+  if(failed.length)return {applied:false,reason:'incoming_role_update_failed',removed,added,failed,rankMatched:true};
+  // Clear old incoming ranks while preserving any role that also grants staff access.
+  for(const role of toRoles.filter(r=>incoming.roles.includes(r.id) && plan.toRankRoleIds.includes(r.id) && r.id!==plan.chosenRankRoleId && !protectedTransferRole(r))) {
+    if(await removeMemberRole(plan.toGuildId,discordUserId,role.id,auditReason).catch(()=>false))removed.push(role.id);
+    else failed.push({side:'incoming-rank-remove',id:role.id});
   }
-
-  return { applied: true, removed, added, failed, rankMatched: plan.rankMatched };
+  if(failed.length)return {applied:false,reason:'incoming_rank_update_failed',removed,added,failed,rankMatched:true};
+  const removals=roles.filter(r=>outgoing.roles.includes(r.id) && r.id!==plan.fromGuildId && !protectedTransferRole(r,plan.protectedRoleIds));
+  for(const role of removals) {
+    if(await removeMemberRole(plan.fromGuildId,discordUserId,role.id,auditReason).catch(()=>false))removed.push(role.id);
+    else failed.push({side:'remove',id:role.id});
+  }
+  return {applied:failed.length===0,reason:failed.length?'outgoing_role_update_failed':undefined,removed,added,failed,rankMatched:true};
 }

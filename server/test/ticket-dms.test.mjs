@@ -5,11 +5,11 @@ const db=new PGlite();const query=async(sql,args=[]) => (await db.query(sql,args
 const originalFetch=globalThis.fetch,oldToken=process.env.DISCORD_BOT_TOKEN;
 after(async()=>{globalThis.fetch=originalFetch;if(oldToken===undefined)delete process.env.DISCORD_BOT_TOKEN;else process.env.DISCORD_BOT_TOKEN=oldToken;await db.close();});
 process.env.DISCORD_BOT_TOKEN='mock-token';
-mock.module('../src/db.js',{namedExports:{query}});
+mock.module('../src/db.js',{namedExports:{execute:query,query}});
 mock.module('../src/lib/roleSync.js',{namedExports:{resolveRoleKeys:async roles=>roles}});
 mock.module('../src/middleware/requirePermission.js',{namedExports:{loadGrants:async()=>({})}});
 mock.module('../src/permissions.js',{namedExports:{permissionsFor:roles=>new Set(roles)}});
-mock.module('../src/lib/discord.js',{namedExports:{fetchGuildMember:async(g,id)=>({roles:id==='555555555555555555'?[]:['1542499913957376140','support.work']})}});
+mock.module('../src/lib/discord.js',{namedExports:{fetchGuildMember:async(g,id)=>({roles:id==='555555555555555555'?[]:['1542499913957376140','support.work',...(id==='222222222222222222'?['ownership']:[])]})}});
 mock.module('../src/lib/supportQueueRoles.js',{namedExports:{grantQueueRoles:async()=>{}}});
 const {ensureTicketDms,enqueueTicketDms,replyRecipients,drainTicketDms}=await import('../src/lib/ticketDms.js');
 await db.exec(`CREATE TABLE dev_requests(id text primary key,subject text,opened_by_discord_id text,assigned_to_discord_id text,assignees jsonb);
@@ -38,4 +38,17 @@ test('removed participants are rechecked before delivery and blocked DMs do not 
 test('network errors remain queued for retry instead of dropping notifications',async()=>{await queue('m4',true);globalThis.fetch=async()=>{throw Error('offline');};await drainTicketDms();assert.equal((await query("SELECT status FROM ticket_dm_outbox WHERE message_id='m4' AND recipient_id=$1",[worker]))[0].status,'pending');await query("UPDATE ticket_dm_outbox SET available_at=CURRENT_TIMESTAMP WHERE message_id='m4'");accept();await drainTicketDms();assert.equal((await query("SELECT status FROM ticket_dm_outbox WHERE message_id='m4' AND recipient_id=$1",[worker]))[0].status,'sent');});
 test('support replies notify opener and assigned worker with support ticket link',async()=>{
  await query('INSERT INTO support_tickets VALUES($1,$2,$3,$4,$5)',['S1','general','Support test',opener,worker]);await query('INSERT INTO support_messages VALUES($1,$2,false,$3,$4,$5)',['s1','S1',sender,'Writer','Help']);await enqueueTicketDms('support',{id:'S1',openedByDiscordId:opener,assignedToDiscordId:worker},{id:'s1',authorId:sender},query);posts=[];accept();await drainTicketDms();assert.equal(posts.length,2);assert(posts.every(p=>p.body.embeds[0].url.endsWith('/support/S1')));
+});
+
+test('transfer public DMs include creator and subject; internal DMs recheck staff and never expose notes to transferee',async()=>{
+ await db.exec('CREATE TABLE transfers(id text,member_name text,from_dept text,to_dept text,created_by_id text,subject_discord_id text); CREATE TABLE transfer_messages(id text,transfer_id text,author_id text,author_name text,body text,internal boolean);');
+ await query('INSERT INTO transfers VALUES($1,$2,$3,$4,$5,$6)',['TR1','Member','FHP','BSO',opener,guest]);
+ const transfer={id:'TR1',openedByDiscordId:opener,participants:[{discordId:guest}],assignees:[{discordId:worker},{discordId:revoked},{discordId:guest}]};
+ for(const internal of [false,true]) {
+   const id=internal?'ti':'tp';
+   await query('INSERT INTO transfer_messages VALUES($1,$2,$3,$4,$5,$6)',[id,'TR1',sender,'Author','Transfer update',internal]);
+   await enqueueTicketDms('transfer',transfer,{id,internal,authorId:sender},query);posts=[];accept();await drainTicketDms();
+   assert.equal(posts.length,internal?1:3);assert(posts.every(p=>p.body.embeds[0].url.endsWith('/transfers/t/TR1')));
+   if(internal)assert(posts[0].url.includes(worker));
+ }
 });

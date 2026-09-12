@@ -1,3 +1,4 @@
+import { sessionFrom, canViewTicket, canUseInternal } from './portal.js';
 import { query } from '../db.js';
 import { fetchGuildMember } from './discord.js';
 import { resolveRoleKeys } from './roleSync.js';
@@ -27,6 +28,19 @@ export async function enqueueTicketDms(kind,ticket,message,sql) {
     VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[kind,ticket.id,message.id,id]);
 }
 async function deliveryContext(job) {
+  if(job.kind==='transfer') {
+    const [ticket]=await query('SELECT * FROM transfers WHERE id=$1',[job.ticket_id]);
+    const [message]=await query('SELECT * FROM transfer_messages WHERE id=$1 AND transfer_id=$2',[job.message_id,job.ticket_id]);
+    if(!ticket || !message || message.author_id===job.recipient_id) return null;
+    const transfer={createdById:ticket.created_by_id,subjectDiscordId:ticket.subject_discord_id,fromDept:ticket.from_dept,toDept:ticket.to_dept};
+    let allowed=!message.internal && [transfer.createdById,transfer.subjectDiscordId].includes(job.recipient_id);
+    if(!allowed) {
+      const member=await fetchGuildMember(process.env.DISCORD_GUILD_ID,job.recipient_id);
+      const session=sessionFrom({id:job.recipient_id,roles:await resolveRoleKeys(member?.roles || [])});
+      allowed=member && (message.internal ? canUseInternal(session,transfer) : canViewTicket(session,transfer));
+    }
+    return allowed ? {ticket:{...ticket,subject:`${ticket.member_name}: ${ticket.from_dept} → ${ticket.to_dept}`},message} : null;
+  }
   const dev=job.kind==='development';
   const [ticket]=await query(`SELECT * FROM ${dev?'dev_requests':'support_tickets'} WHERE id=$1`,[job.ticket_id]);
   const [message]=await query(`SELECT * FROM ${dev?'dev_request_messages':'support_messages'} WHERE id=$1 AND ${dev?'request_id':'ticket_id'}=$2`,[job.message_id,job.ticket_id]);
@@ -56,12 +70,12 @@ async function deliveryContext(job) {
 }
 export function replyDmPayload(kind,ticket,message,nonce) {
   const origin=new URL(process.env.SITE_URL || process.env.PUBLIC_SITE_URL || 'https://www.flrp.us').origin;
-  const link=origin+(kind==='development'?'/development/requests/':'/support/')+encodeURIComponent(ticket.id);
+  const link=origin+(kind==='development'?'/development/requests/':kind==='transfer'?'/transfers/t/':'/support/')+encodeURIComponent(ticket.id);
   const plain=v=>String(v || '').replace(/[\\*_`~|<>]/g,'\\$&');
   return {nonce,enforce_nonce:true,allowed_mentions:{parse:[],users:[],roles:[]},embeds:[{
     title:String(ticket.subject || 'Ticket reply').slice(0,256),url:link,color:0xf59e0b,
     description:`**${plain(message.author_name).slice(0,200)}** posted ${message.internal?'an internal reply':'a reply'}.\n\n${plain(message.body).slice(0,1200)}\n\n[Open ticket](${link})`,
-    footer:{text:`${kind==='development'?'Development':'Support'} · ${ticket.id}`},timestamp:new Date().toISOString(),
+    footer:{text:`${kind==='development'?'Development':kind==='transfer'?'ES Transfer':'Support'} · ${ticket.id}`},timestamp:new Date().toISOString(),
   }]};
 }
 async function discordPost(path,body) {

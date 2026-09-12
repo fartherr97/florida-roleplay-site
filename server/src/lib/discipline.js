@@ -394,6 +394,7 @@ export function buildBackgroundEmbed(background, { memberName, meta } = {}) {
       value: `**${background.total}** active · **${background.voided.length}** revoked`,
       inline: false,
     },
+    ...((background.employment || []).length ? [{name:'Department employment history',value:clamp(background.employment.slice(0,5).map(e=>`${e.type} · ${e.department.toUpperCase()} · ${embedDate(e.createdAt)}: ${e.reason}`).join('\n')),inline:false}] : []),
     ...sectionFields("Department Disciplinary Logs", `Last ${months} months`, department),
     ...sectionFields("Staff Disciplinary Logs", `Last ${months} months`, staff),
   ];

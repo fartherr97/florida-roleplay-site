@@ -85,6 +85,7 @@ export function isStaff(session) {
  */
 export function isOwnTicket(session, transfer) {
   if (!session || !transfer) return false;
+  if (transfer.subjectDiscordId && transfer.subjectDiscordId === session.id) return true;
   if (transfer.createdById) return !!session.id && transfer.createdById === session.id;
   const u = session.username?.toLowerCase();
   const d = session.displayName?.toLowerCase();

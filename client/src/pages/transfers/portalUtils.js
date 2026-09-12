@@ -22,7 +22,9 @@ export async function api(path, opts) {
     // The status is carried on the error because callers act on it — a 409 from
     // the request form means "you already have one open", which has its own
     // screen rather than a generic retry message.
-    const err = new Error(`${path} → ${r.status}`);
+    const details = await r.json().catch(()=>({}));
+    const err = new Error(details.error || `Request failed (${r.status})`);
+    err.transfer = details.transfer;
     err.status = r.status;
     throw err;
   }

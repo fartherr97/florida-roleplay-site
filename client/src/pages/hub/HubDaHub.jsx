@@ -1,3 +1,4 @@
+import EmploymentHistory from '../../components/EmploymentHistory';
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, Loader2, Plus, Search, ShieldAlert, TriangleAlert, UserRound, X } from "lucide-react";
 import HubPageHeader from "../../components/hub/HubPageHeader";
@@ -470,6 +471,7 @@ export function BackgroundPanel({ background }) {
         Background check
       </p>
       <p className="mt-2 text-sm text-slate-300">{background.headline}</p>
+      <EmploymentHistory entries={background.employment} />
       <p className="mt-0.5 text-xs text-slate-500">
         Last {background.windowDays} days · {background.verbal.total} verbal ·{" "}
         {background.nonVerbal.total} non-verbal

@@ -1,3 +1,4 @@
+import { withEmploymentHistory } from '../lib/transferRecords.js';
 /**
  * The /api/discipline router — the DA Hub's store, and the record `/bgcheck`
  * reads in Discord.
@@ -98,7 +99,7 @@ router.get("/background/:discordId", async (req, res) => {
   }
   const windowDays = clampWindow(req.query.days);
   const actions = await loadActions({ targetDiscordId: discordId });
-  res.json({ background: backgroundFor(actions, { discordId, windowDays }) });
+  res.json({ background: await withEmploymentHistory(backgroundFor(actions, { discordId, windowDays })) });
 });
 
 function clampWindow(value) {
@@ -354,7 +355,7 @@ router.get("/bot/background/:discordId", requireBot, async (req, res) => {
   }
   const windowDays = clampWindow(req.query.days);
   const actions = await loadActions({ targetDiscordId: discordId });
-  const background = backgroundFor(actions, { discordId, windowDays });
+  const background = await withEmploymentHistory(backgroundFor(actions, { discordId, windowDays }));
 
   // The name off the most recent action, so the embed has something to title
   // itself with even when the bot only had an id to go on.

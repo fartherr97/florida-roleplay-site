@@ -38,7 +38,7 @@
  * The named routes are declared before `/:id` so no ticket id can shadow them.
  */
 import { Router } from "express";
-import { query } from "../db.js";
+import { query, transaction } from "../db.js";
 import { resolveUser } from "../middleware/requireRole.js";
 import { str } from "../validate.js";
 import { loadActions } from "../lib/disciplineData.js";
@@ -59,7 +59,16 @@ import {
   visibleTransfers,
 } from "../lib/portal.js";
 
+import { ensureTicketDms, enqueueTicketDms, drainTicketDms } from '../lib/ticketDms.js';
+import { recordTransfer, notifyTransferRecords, withEmploymentHistory } from '../lib/transferRecords.js';
 const router = Router();
+let subjectColumn;
+async function ensureSubjectColumn() {
+  subjectColumn ??= query('ALTER TABLE transfers ADD COLUMN IF NOT EXISTS subject_discord_id VARCHAR(20)').catch(e=>{subjectColumn=null;throw e;});
+  await subjectColumn;
+}
+router.use(async (req,res,next)=>{try {await ensureSubjectColumn(); next();} catch {res.status(503).json({error:'Transfer database unavailable'});}});
+
 
 /** A viewer counts as present while their last heartbeat is inside this. */
 const PRESENCE_TTL_SECONDS = 15;
@@ -92,6 +101,7 @@ function rowToTransfer(row) {
     member: row.member_name,
     discord: row.discord_username,
     createdById: row.created_by_id ?? null,
+    subjectDiscordId: row.subject_discord_id ?? null,
     rank: row.current_rank,
     fromDept: row.from_dept,
     toDept: row.to_dept,
@@ -140,8 +150,8 @@ async function listTransfers() {
   return rows.map(rowToTransfer);
 }
 
-async function getTransfer(id) {
-  const rows = await query("SELECT * FROM transfers WHERE id = $1 LIMIT 1", [id]);
+async function getTransfer(id, sql = query) {
+  const rows = await sql("SELECT * FROM transfers WHERE id = $1 LIMIT 1", [id]);
   return rows[0] ? rowToTransfer(rows[0]) : null;
 }
 
@@ -171,7 +181,7 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-async function saveApprovals(id, approvals, history, status) {
+async function saveApprovals(id, approvals, history, status, query) {
   if (status) {
     await query("UPDATE transfers SET approvals = $1, history = $2, status = $3 WHERE id = $4",
       [JSON.stringify(approvals), JSON.stringify(history), status, id],
@@ -185,39 +195,24 @@ async function saveApprovals(id, approvals, history, status) {
   ]);
 }
 
-/** Chat messages are informational — never let a failure here block an action. */
-async function tryAddMessage(args) {
-  try {
-    await addMessage(args);
-  } catch (err) {
-    console.error("[transfers] addMessage failed:", err?.message);
-  }
-}
-
-async function addMessage({
-  transferId,
-  internal = false,
-  authorId = null,
-  author,
-  authorAvatar = null,
-  message,
-}) {
-  const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await query(`INSERT INTO transfer_messages
-       (id, transfer_id, internal, author_id, author_name, author_avatar, body)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, transferId, Boolean(internal), authorId, author, authorAvatar, message],
-  );
-  return {
-    id,
-    transferId,
-    internal: !!internal,
-    authorId,
-    author,
-    authorAvatar,
-    message,
-    createdAt: nowIso(),
+async function addMessage({transferId,internal=false,authorId=null,author,authorAvatar=null,message}, sql) {
+  const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const saved = {id,transferId,internal:!!internal,authorId,author,authorAvatar,message,createdAt:nowIso()};
+  const write = async q => {
+    await q(`INSERT INTO transfer_messages(id,transfer_id,internal,author_id,author_name,author_avatar,body)
+      VALUES($1,$2,$3,$4,$5,$6,$7)`,[id,transferId,!!internal,authorId,author,authorAvatar,message]);
+    const transfer = await getTransfer(transferId,q);
+    const authors = await q('SELECT DISTINCT author_id FROM transfer_messages WHERE transfer_id=$1 AND author_id IS NOT NULL',[transferId]);
+    const workers = [...authors.map(a=>a.author_id),...(transfer.approvals || []).map(a=>a.dhId)];
+    await enqueueTicketDms('transfer',{id:transferId,openedByDiscordId:transfer.createdById,
+      participants:[{discordId:transfer.subjectDiscordId}],assignees:workers.map(discordId=>({discordId}))},saved,q);
+    return saved;
   };
+  if(sql) return write(sql);
+  await ensureTicketDms();
+  await transaction(write);
+  void drainTicketDms();
+  return saved;
 }
 
 async function loadSettings() {
@@ -278,6 +273,7 @@ router.post("/", async (req, res) => {
 
   const body = req.body ?? {};
   const member = str(body.member);
+  const subjectDiscordId = isStaff(session) ? str(body.subjectDiscordId || session.id) : session.id;
   const discord = str(body.discord);
   const rank = str(body.rank);
   const fromDept = str(body.fromDept);
@@ -285,6 +281,7 @@ router.post("/", async (req, res) => {
   const reason = str(body.reason);
 
   const errors = {};
+  if (!/^\d{17,20}$/.test(subjectDiscordId)) errors.subjectDiscordId = "Enter the transferee Discord ID.";
   if (!member) errors.member = "Who is transferring?";
   if (!discord) errors.discord = "A Discord username is required.";
   if (!rank) errors.rank = "What rank do they hold?";
@@ -312,8 +309,8 @@ router.post("/", async (req, res) => {
     await query(`INSERT INTO transfers
          (id, member_name, discord_username, created_by_id, current_rank, from_dept, to_dept,
           reason, status, remove_roles, assign_visitor_pass, assign_retired,
-          require_bot_confirm, approvals, history)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, '[]', '[]')`,
+          require_bot_confirm, approvals, history, subject_discord_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, '[]', '[]', $13)`,
       [
         id,
         member,
@@ -327,6 +324,7 @@ router.post("/", async (req, res) => {
         Boolean(body.assignVisitorPass),
         Boolean(body.assignRetired),
         Boolean(body.requireBotConfirm),
+        subjectDiscordId,
       ],
     );
 
@@ -492,7 +490,8 @@ router.post("/chat", async (req, res) => {
   // Only staff with internal access may post internal notes. The flag is
   // re-decided here rather than trusted: the composer hides the toggle, which
   // has never stopped anybody sending the request without it.
-  const isInternal = Boolean(req.body?.internal) && canUseInternal(session, transfer);
+  if (req.body?.internal && !canUseInternal(session, transfer)) return forbidden(res);
+  const isInternal = Boolean(req.body?.internal);
 
   const saved = await addMessage({
     transferId,
@@ -616,7 +615,7 @@ router.get("/:id/bgcheck", async (req, res) => {
   if (!transfer) return res.status(404).json({ error: "not found" });
   if (!canManageTicket(session, transfer)) return forbidden(res);
 
-  const discordId = str(transfer.createdById).trim();
+  const discordId = str(transfer.subjectDiscordId).trim();
   const member = transfer.member || transfer.discord || null;
   if (!/^\d{17,20}$/.test(discordId)) {
     // Tickets opened before the submitter's id was recorded have only the free-text
@@ -625,23 +624,30 @@ router.get("/:id/bgcheck", async (req, res) => {
   }
 
   const actions = await loadActions({ targetDiscordId: discordId });
-  return res.json({ background: backgroundFor(actions, { discordId }), member });
+  return res.json({ background: await withEmploymentHistory(backgroundFor(actions, { discordId })), member });
 });
 
 /* ─── PATCH /:id ─── approve · revoke · reject · close · reopen · process ─── */
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", async (req, response) => {
   const session = await sessionFor(req);
-  if (!session) return unauthorized(res);
+  if (!session) return unauthorized(response);
+  await ensureTicketDms();
+  const notifications = [];
+  const result = await transaction(async query => {
+  const res = {code:200,status(code){this.code=code;return this;},json(body){return {code:this.code,body};}};
+  await query("SELECT id FROM transfers WHERE id=$1 FOR UPDATE",[req.params.id]);
 
   const id = req.params.id;
-  const transfer = await getTransfer(id).catch(() => null);
+  const transfer = await getTransfer(id, query).catch(() => null);
   if (!transfer) return res.status(404).json({ error: "not found" });
 
   const body = req.body ?? {};
 
   // All actions require staff.
   if (!canManageTicket(session, transfer)) return forbidden(res);
+  if ((transfer.status === 'completed' || transfer.history.some(h=>h.action==='completed')) && body.action!=='close') return res.status(409).json({error:'This transfer has already been processed.'});
+  if (TERMINAL.includes(transfer.status) && !['reopen','close'].includes(body.action)) return res.status(409).json({error:'Reopen this ticket before changing it.'});
 
   const actorName = session.displayName || session.username;
   const approvals = [...(transfer.approvals ?? [])];
@@ -690,8 +696,8 @@ router.patch("/:id", async (req, res) => {
       approvals.some((a) => a.dept === transfer.fromDept) &&
       approvals.some((a) => a.dept === transfer.toDept);
     const bump = bothApproved && !TERMINAL.includes(transfer.status) ? "approved" : null;
-    await saveApprovals(id, approvals, history, bump);
-    return res.json(await getTransfer(id));
+    await saveApprovals(id, approvals, history, bump, query);
+    return res.json(await getTransfer(id, query));
   }
 
   /* ── Revoke approval ─────────────────────────────────────────────────── */
@@ -728,8 +734,8 @@ router.patch("/:id", async (req, res) => {
     if (!removed) return res.json(transfer);
 
     const revert = transfer.status === "approved" ? "pending" : null;
-    await saveApprovals(id, approvals, history, revert);
-    return res.json(await getTransfer(id));
+    await saveApprovals(id, approvals, history, revert, query);
+    return res.json(await getTransfer(id, query));
   }
 
   /* ── Reject ──────────────────────────────────────────────────────────── */
@@ -750,15 +756,15 @@ router.patch("/:id", async (req, res) => {
     await query("UPDATE transfers SET status = 'rejected', rejection_reason = $1, history = $2 WHERE id = $3",
       [reason, JSON.stringify(history), id],
     );
-    await tryAddMessage({
+    await addMessage({
       transferId: id,
       internal: false,
       authorId: null,
       author: "System",
       authorAvatar: null,
       message: `Hey @${transfer.member},\n\nYour transfer request has been denied by ${deptName} for the following reason:\n\n${reason}\n\nIf you have any questions, please ask them here. Otherwise this ticket will be closed.`,
-    });
-    return res.json(await getTransfer(id));
+    }, query);
+    return res.json(await getTransfer(id, query));
   }
 
   /* ── Close / Reopen (management only) ────────────────────────────────── */
@@ -778,11 +784,15 @@ router.patch("/:id", async (req, res) => {
       JSON.stringify(history),
       id,
     ]);
-    return res.json(await getTransfer(id));
+    return res.json(await getTransfer(id, query));
   }
 
   /* ── Process ─────────────────────────────────────────────────────────── */
   if (body.action === "process") {
+    if (!session.isManagement) return forbidden(res);
+    const subjectDiscordId = transfer.subjectDiscordId || str(body.subjectDiscordId);
+    if (!/^\d{17,20}$/.test(subjectDiscordId)) return res.status(400).json({error:'Confirm the transferee Discord ID before processing this legacy ticket.'});
+    transfer.subjectDiscordId = subjectDiscordId;
     const assignedRank = str(body.assignedRank);
     const employmentType = body.employmentType === "parttime" ? "parttime" : "fulltime";
     if (!assignedRank) return res.status(400).json({ error: "assignedRank required" });
@@ -797,21 +807,10 @@ router.patch("/:id", async (req, res) => {
     }
 
     const empLabel = employmentType === "parttime" ? "Part Time" : "Full Time";
-    history.push({
-      action: "completed",
-      actor: actorName,
-      details: `Processed by ${actorName} · assigned rank: ${assignedRank || "N/A"}, ${empLabel}`,
-      timestamp: nowIso(),
-    });
-
-    // Apply the Discord roles: strip the outgoing department, grant the incoming one — but
-    // only the single rank the member was processed as, not every rank. Best-effort: a
-    // Discord hiccup must never leave the ticket stuck un-processed, so its result is
-    // recorded in the history rather than thrown.
     let roleResult = null;
     try {
       roleResult = await applyProcessedTransfer({
-        discordUserId: transfer.createdById,
+        discordUserId: subjectDiscordId,
         fromDept: transfer.fromDept,
         toDept: transfer.toDept,
         assignedRank,
@@ -821,43 +820,31 @@ router.patch("/:id", async (req, res) => {
       roleResult = { applied: false, reason: "error" };
     }
 
-    if (roleResult?.applied) {
-      history.push({
-        action: "roles_applied",
-        actor: "System",
-        details:
-          `Roles updated: removed ${roleResult.removed.length}, added ${roleResult.added.length}` +
-          (roleResult.rankMatched ? "" : " · rank role not matched") +
-          (roleResult.failed.length ? ` · ${roleResult.failed.length} failed` : ""),
-        timestamp: nowIso(),
-      });
-    } else {
-      history.push({
-        action: "roles_skipped",
-        actor: "System",
-        details: `Roles not applied automatically (${roleResult?.reason ?? "unknown"}); apply them manually.`,
-        timestamp: nowIso(),
-      });
+    if (!roleResult?.applied) {
+      history.push({action:'roles_failed',actor:actorName,details:`Role update incomplete: ${roleResult?.reason || 'unknown'}. Removed ${roleResult?.removed?.length || 0}, added ${roleResult?.added?.length || 0}. Retry after resolving the Discord configuration or permissions.`,timestamp:nowIso()});
+      await query('UPDATE transfers SET history=$1,subject_discord_id=$2 WHERE id=$3',[JSON.stringify(history),subjectDiscordId,id]);
+      return res.status(409).json({error:`Transfer not completed: ${roleResult?.reason || 'Discord role update failed'}`,transfer:await getTransfer(id,query)});
     }
-
+    notifications.push(...await recordTransfer(query,transfer,session,assignedRank,employmentType));
+    history.push({action:'completed',actor:actorName,actorId:session.id,details:`Processed as ${assignedRank}, ${empLabel}. Removed ${roleResult.removed.length}, added ${roleResult.added.length}.`,timestamp:nowIso()});
     await query(`UPDATE transfers
           SET status = 'completed', assigned_rank = $1, retired_member = FALSE,
-              employment_type = $2, history = $3
+              employment_type = $2, history = $3, subject_discord_id = $5
         WHERE id = $4`,
-      [assignedRank, employmentType, JSON.stringify(history), id],
+      [assignedRank, employmentType, JSON.stringify(history), id, subjectDiscordId],
     );
     const rolesLine = roleResult?.applied
       ? "Your roles have been updated"
       : "Your roles will be updated by management shortly";
-    await tryAddMessage({
+    await addMessage({
       transferId: id,
       internal: false,
       authorId: null,
       author: "System",
       authorAvatar: null,
       message: `Hey @${transfer.member},\n\nYour transfer has been processed as **${assignedRank}**. ${rolesLine}. Welcome to ${transfer.toDept}!\n\nThis ticket will now be closed out by management.`,
-    });
-    return res.json(await getTransfer(id));
+    }, query);
+    return res.json(await getTransfer(id, query));
   }
 
   // No generic status setter: every legitimate transition has its own guarded
@@ -867,6 +854,10 @@ router.patch("/:id", async (req, res) => {
   // straight to completed/closed/approved, bypassing every one of those guards
   // and leaving no history entry, so it is deliberately not offered.
   return res.status(400).json({ error: "unknown action" });
+  });
+  notifyTransferRecords(notifications);
+  void drainTicketDms();
+  return response.status(result.code).json(result.body);
 });
 
 /* ─── Presence ─────────────────────────────────────────────────────────────── */

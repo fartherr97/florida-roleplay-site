@@ -483,7 +483,7 @@ export function RequestTab({ onOpenTicket, isStaff, session }) {
   const [seededFor, setSeededFor] = useState(undefined);
   if (session && sessionKey !== seededFor) {
     setSeededFor(sessionKey);
-    const patch = {};
+    const patch = {subjectDiscordId:session.id};
     const lock = {};
     if (session.displayName) {
       patch.member = session.displayName;
@@ -502,7 +502,7 @@ export function RequestTab({ onOpenTicket, isStaff, session }) {
       lock.fromDept = true;
     }
     setForm((prev) => ({ ...prev, ...patch }));
-    setLocked(lock);
+    setLocked(isStaff ? {} : lock);
   }
 
   function set(field, val) {
@@ -515,6 +515,7 @@ export function RequestTab({ onOpenTicket, isStaff, session }) {
   const sameDept = form.fromDept && form.toDept && form.fromDept === form.toDept;
   const reasonTooShort = form.reason.trim().length > 0 && form.reason.trim().length < MIN_REASON;
   const canSubmit =
+    (!isStaff || /^\d{17,20}$/.test(form.subjectDiscordId || "")) &&
     form.member &&
     form.discord &&
     form.rank &&
@@ -644,6 +645,7 @@ export function RequestTab({ onOpenTicket, isStaff, session }) {
             Your information
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
+            {isStaff && <Input label="Transferee Discord ID" value={form.subjectDiscordId || ""} onChange={handle("subjectDiscordId")} required />}
             <Input label="Full RP name" placeholder="First Last" value={form.member} onChange={handle("member")} required readOnly={locked.member} />
             <Input label="Discord username" placeholder="username" value={form.discord} onChange={handle("discord")} required readOnly={locked.discord} />
           </div>
