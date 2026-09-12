@@ -809,6 +809,7 @@ export const api = {
   deleteSupportFlow: (id) =>
     del(`/support/flows/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
 
+  supportQueueRoles: (guildId) => request(`/support/config/discord-roles${guildId ? '?guildId='+encodeURIComponent(guildId) : ''}`),
   supportTypes: () =>
     request("/support/config/ticket-types"),
 

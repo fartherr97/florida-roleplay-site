@@ -85,7 +85,7 @@ function SupportDrawer({ open, onClose }) {
   // central team, or anyone holding a department's work permission.
   const isAgent = useMemo(() => {
     if (hasPermission("support.work") || hasPermission("support.manage")) return true;
-    return (types ?? []).some((t) => (t.workPermissions ?? []).some((p) => hasPermission(p)));
+    return (types ?? []).some((t) => t.workAllowed === true || (!t.workGuildId && (t.workPermissions ?? []).some((p) => hasPermission(p))));
   }, [types, hasPermission]);
   const isLead = hasPermission("support.manage");
   const canWebhooks = hasPermission("support.webhooks");

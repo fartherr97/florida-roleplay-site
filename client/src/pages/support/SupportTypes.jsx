@@ -1,3 +1,4 @@
+import QueueRolePicker from "../../components/support/QueueRolePicker";
 import { createElement, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -207,7 +208,7 @@ export default function SupportTypes() {
                     {type.label || "Untitled"}
                   </span>
                   <span className="block truncate text-xs text-slate-500">
-                    {(type.workPermissions ?? []).length > 0
+                    {((type.workRoleIds ?? []).length > 0 || (type.workPermissions ?? []).length > 0)
                       ? workedByLabel(type)
                       : type.exclusive
                         ? "Restricted"
@@ -272,6 +273,7 @@ export default function SupportTypes() {
 }
 
 function workedByLabel(type) {
+  if (type.workGuildId) return (type.workRoleIds || []).map(id=>type.workRoleNames?.[id] || id).join(', ');
   const names = (type.workPermissions ?? []).map(
     (key) => QUEUE_PERMISSIONS.find((p) => p.key === key)?.label ?? key,
   );
@@ -285,13 +287,6 @@ function TypeEditor({ type, onChange, onRemove, onTemplate }) {
   };
   const addField = () => onChange({ fields: [...type.fields, blankTicketField()] });
   const removeField = (index) => onChange({ fields: type.fields.filter((_, i) => i !== index) });
-
-  const toggleWork = (key) => {
-    const held = type.workPermissions ?? [];
-    onChange({
-      workPermissions: held.includes(key) ? held.filter((k) => k !== key) : [...held, key],
-    });
-  };
 
   return (
     <Card className="space-y-6 p-6">
@@ -360,26 +355,7 @@ function TypeEditor({ type, onChange, onRemove, onTemplate }) {
             The teams that see and work this queue. A department category routes to that
             department&apos;s command.
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {QUEUE_PERMISSIONS.map((permission) => {
-              const on = (type.workPermissions ?? []).includes(permission.key);
-              return (
-                <button
-                  key={permission.key}
-                  type="button"
-                  onClick={() => toggleWork(permission.key)}
-                  className={cn(
-                    "rounded-lg px-2.5 py-1 text-xs font-semibold ring-1 ring-inset transition",
-                    on
-                      ? "bg-brand-500/15 text-white ring-brand-400/40"
-                      : "bg-black/20 text-slate-400 ring-white/[0.06] hover:text-white",
-                  )}
-                >
-                  {permission.label}
-                </button>
-              );
-            })}
-          </div>
+          <QueueRolePicker type={type} onChange={onChange} />
         </div>
 
         <label className="flex items-start gap-2.5 text-sm text-slate-300">

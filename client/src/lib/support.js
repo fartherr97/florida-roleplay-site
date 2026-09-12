@@ -300,7 +300,7 @@ export function canOpenType(type, permissions) {
 export function canWorkType(type, permissions) {
   if (!type) return false;
   const perms = permSet(permissions);
-  const listed = (type.workPermissions ?? []).some((key) => perms.has(key));
+  const listed = type.workGuildId ? perms.has('support.discordqueue.'+type.id) : (type.workPermissions ?? []).some((key) => perms.has(key));
   if (type.exclusive) return listed;
   return listed || perms.has("support.work") || perms.has("support.manage");
 }
@@ -324,7 +324,7 @@ export function typesFor({ permissions = new Set(), types = DEFAULT_TICKET_TYPES
 export function isAgent({ permissions = new Set() } = {}, types = DEFAULT_TICKET_TYPES) {
   const perms = permSet(permissions);
   if (perms.has("support.work") || perms.has("support.manage")) return true;
-  return (types ?? []).some((type) => (type.workPermissions ?? []).some((key) => perms.has(key)));
+  return (types ?? []).some((type) => canWorkType(type, perms));
 }
 
 /** The senior tier: staff reports, reassignment across the team, flow editing. */
@@ -489,6 +489,9 @@ export function normalizeTicketType(raw, index = 0) {
     blurb: str(raw?.blurb, 240),
     enabled: raw?.enabled !== false,
     openPermission: open || (legacy || null),
+    workGuildId: str(raw?.workGuildId, 20).trim(),
+    workRoleIds: Array.isArray(raw?.workRoleIds) ? [...new Set(raw.workRoleIds.map(id=>str(id,20).trim()))].slice(0,50) : [],
+    workRoleNames: raw?.workRoleNames && typeof raw.workRoleNames === 'object' ? raw.workRoleNames : {},
     workPermissions: Array.isArray(raw?.workPermissions)
       ? [...new Set(raw.workPermissions.map((k) => str(k, 64).trim()).filter(Boolean))].slice(0, 12)
       : legacy
@@ -520,7 +523,8 @@ export function validateTicketType(type) {
       problems.push(`"${field.label || "A dropdown"}" has no options.`);
     }
   }
-  if (type.exclusive && (type.workPermissions ?? []).length === 0) {
+  if (type.workGuildId && (!/^\d{17,20}$/.test(type.workGuildId) || !type.workRoleIds?.length || type.workRoleIds.some(id=>!/^\d{17,20}$/.test(id)))) problems.push('Choose a guild and at least one valid Discord role.');
+  if (type.exclusive && !type.workGuildId && (type.workPermissions ?? []).length === 0) {
     problems.push(
       `"${type.label || "This category"}" is restricted but names no role that can work it — nobody but Ownership would see it.`,
     );

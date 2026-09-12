@@ -1,3 +1,4 @@
+import { queueGuilds, queueRoles, grantQueueRoles, validateQueueRoles } from '../lib/supportQueueRoles.js';
 import { ensureParticipants, managesParticipants, isParticipant, changeParticipant } from "../lib/supportParticipants.js";
 import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
 import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildDisplayName.js";
@@ -35,6 +36,7 @@ import {
   canOpenType,
   canViewTicket,
   canWorkTicket,
+  canWorkType,
   cleanDetails,
   isAgent,
   isSupportLead,
@@ -57,13 +59,16 @@ async function contextFor(req) {
   const user = req.user ?? (await resolveUser(req));
   req.user = user;
   const roleKeys = user?.roles ?? [];
+  const types = await loadTypes();
+  const permissions = permissionsFor(roleKeys, await loadGrants());
+  await grantQueueRoles(user,types,permissions);
   return {
     user,
     roleKeys,
-    permissions: permissionsFor(roleKeys, await loadGrants()),
+    permissions,
     // The live ticket-category catalogue, so routing honours a renamed or newly
     // added department queue rather than only the built-in defaults.
-    types: await loadTypes(),
+    types,
   };
 }
 
@@ -688,10 +693,19 @@ router.delete("/flows/:id", async (req, res) => {
  * gated on `support.configure`. A two-segment path keeps it clear of the
  * `/:id` ticket route.
  */
+router.get('/config/discord-roles',async(req,res)=>{
+  const ctx=await contextFor(req);
+  if(!ctx.user || !canConfigureTypes(ctx))return res.status(403).json({message:'Queue configuration access required.'});
+  try {
+    if(req.query.guildId)return res.json({roles:await queueRoles(String(req.query.guildId))});
+    res.json({guilds:await queueGuilds()});
+  } catch(e){res.status(e.status || 503).json({message:e.status ? e.message : 'Unable to load Discord roles. Please retry.'});}
+});
+
 router.get("/config/ticket-types", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
-  res.json({ types: ctx.types, canConfigure: canConfigureTypes(ctx) });
+  res.json({ types: ctx.types.map(t=>({...t,workAllowed:canWorkType(t,ctx.permissions)})), canConfigure: canConfigureTypes(ctx) });
 });
 
 router.put("/config/ticket-types", async (req, res) => {
@@ -705,6 +719,7 @@ router.put("/config/ticket-types", async (req, res) => {
   if (types.length === 0) {
     return res.status(400).json({ ok: false, code: "SUPPORT_TYPES_EMPTY", message: "Keep at least one ticket category." });
   }
+  try { await validateQueueRoles(types); } catch(e) { return res.status(e.status || 503).json({message:e.status ? e.message : 'Unable to verify Discord roles. Nothing was saved.'}); }
   // An enabled category must be valid; a disabled one may be a work-in-progress.
   const problems = types.flatMap((type) =>
     type.enabled ? validateTicketType(type).map((p) => `${type.label || type.id}: ${p}`) : [],

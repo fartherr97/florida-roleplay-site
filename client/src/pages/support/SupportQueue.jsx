@@ -208,7 +208,7 @@ export default function SupportQueue() {
     );
   }, []);
 
-  if (!hasPermission("support.work") && !hasPermission("support.escalated")) {
+  if (data !== null && !data?.agent && !hasPermission("support.work") && !hasPermission("support.escalated")) {
     return <AccessDenied reason="role" />;
   }
 
