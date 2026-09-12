@@ -174,7 +174,7 @@ router.get('/claim-targets', async (req,res) => {
 });
 router.post('/requests/:id/approvals', async(req,res) => {
   const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
-  try {res.json(await approveTicket(ctx,str(req.params.id,40),str(req.body?.kind,16)));}
+  try {res.json(await approveTicket(ctx,str(req.params.id,40),str(req.body?.kind,16),str(req.body?.action || 'approve',16),str(req.body?.approvalId,40)));}
   catch(error){res.status(error.status || 503).json({ok:false,message:error.status ? error.message : 'Approval could not be saved.'});}
 });
 

@@ -35,8 +35,12 @@ export default function DevApprovals({request,can,claim,approvals=[],mine,onChan
       <Select value={selected} onChange={setSelected} options={[{value:'',label:vehicles === null ? 'Loading vehicles...' : 'Select an available model'},...(vehicles || []).map(v=>({value:v.id,label:v.name}))]}/>
       <Button disabled={busy || !vehicles?.some(v=>v.id===selected)} onClick={()=>run(()=>api.claimDevVehicle(selected,'',request.id))}>Claim model for approval</Button>
     </div>}
-    {active && <div className="flex flex-wrap gap-3">{[['model','Approve Model',can.approveModel],['liveries','Approve Liveries',can.approveLiveries]].map(([kind,label,allowed])=>allowed && <Button key={kind} disabled={busy || approvals.some(a=>a.kind===kind && a.targetKey===target)} onClick={()=>run(()=>api.approveDevRequest(request.id,kind))}>{approvals.some(a=>a.kind===kind && a.targetKey===target) ? `${kind === 'model' ? 'Model' : 'Liveries'} approved` : label}</Button>)}</div>}
+    <div className="flex flex-wrap gap-3">{[['model','Model',can.approveModel],['liveries','Liveries',can.approveLiveries]].map(([kind,label,allowed])=>{
+      const current=approvals.find(a=>a.kind===kind && a.targetKey===target && !a.revokedAt);
+      if(!allowed || (!active && !current))return null;
+      return <Button key={kind} variant={current ? 'secondary' : 'primary'} disabled={busy} onClick={()=>run(()=>api.approveDevRequest(request.id,kind,current ? 'revoke' : 'approve',current?.id))}>{current ? 'Revoke' : 'Approve'} {label}</Button>;
+    })}</div>
     {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
-    {approvals.length>0 && <div className="border-t border-white/10 pt-3"><h3 className="text-xs font-bold uppercase text-slate-400">Approval log</h3><ul className="mt-2 space-y-2 text-sm text-slate-300">{approvals.map(a=><li key={a.id}>{a.kind === 'model' ? 'Model' : 'Liveries'} approved by <strong>{a.actorName}</strong> · {formatDateTimeLocal(a.createdAt)}<span className="block text-xs text-slate-500">{a.targetKey === 'external' ? 'Original request' : `Claim ${a.targetKey}`} · Discord ID {a.actorId}</span></li>)}</ul></div>}
+    {approvals.length>0 && <div className="border-t border-white/10 pt-3"><h3 className="text-xs font-bold uppercase text-slate-400">Approval log</h3><ul className="mt-2 space-y-2 text-sm text-slate-300">{approvals.map(a=><li key={a.id}>{a.kind === 'model' ? 'Model' : 'Liveries'} approved by <strong>{a.actorName}</strong> · {formatDateTimeLocal(a.createdAt)}<span className="block text-xs text-slate-500">{a.targetKey === 'external' ? 'Original request' : `Claim ${a.targetKey}`} · Discord ID {a.actorId}</span>{a.revokedAt && <span className="mt-1 block text-amber-300">Revoked by <strong>{a.revokedByName}</strong> · {formatDateTimeLocal(a.revokedAt)} · Discord ID {a.revokedById}</span>}</li>)}</ul></div>}
   </Card>;
 }

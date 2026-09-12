@@ -11,3 +11,5 @@ Support and development message names resolve against DISCORD_GUILD_ID with a fi
 An idempotent migration runs on first workflow access. It adds a nullable claim request_id and dev_request_approvals, preserving existing data. The database user needs ALTER/CREATE rights.
 
 Validation: Node 24 `node --experimental-test-module-mocks --test server/test/*.test.mjs`, production client build and mocked browser checks. SQL tests use PGlite with production table definitions. Live database migration and Discord integration need deployment verification.
+
+Approved buttons become Revoke Model/Revoke Liveries with the same role gates. Revocation preserves the original approval and adds the revoker ID, name and time plus a public thread message. Model revocation returns the linked claim to pending and hides its spawn code from the claimant through the existing library rules. Reapproval creates a new approval row. Stale revocation requests cannot revoke a newer decision. Revocation is available even on closed tickets; new approval requires an active ticket.

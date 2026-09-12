@@ -37,5 +37,22 @@ test('claims are ticket-owned, transactional and approved once with immutable ac
  const data=await approvalData('ticket');assert.equal(data.claim.status,'active');assert.equal(data.approvals.length,2);
  assert(data.approvals.every(a=>a.actorId==='111111111111111111' && a.actorName==='Main Guild Name' && a.targetKey===claim.id));
  const messages=await query('SELECT * FROM dev_request_messages WHERE request_id=$1',['ticket']);assert.equal(messages.length,3);
+ const model=data.approvals.find(a=>a.kind==='model');
+ await assert.rejects(approveTicket(ctx(['mpd_chief']),'ticket','model','revoke',model.id),{status:403});
+ await approveTicket(ctx(['ownership']),'ticket','model','revoke',model.id);
+ const revoked=await approvalData('ticket');assert.equal(revoked.claim.status,'pending');
+ assert(revoked.approvals.find(a=>a.id===model.id).revokedAt);
+ assert.equal(revoked.approvals.find(a=>a.id===model.id).revokedByName,'Main Guild Name');
+ await assert.rejects(approveTicket(ctx(['ownership']),'ticket','model','revoke',model.id),{status:409});
+ await approveTicket(ctx(['directorship']),'ticket','model');
+ await assert.rejects(approveTicket(ctx(['ownership']),'ticket','model','revoke',model.id),{status:409});
+ const again=await approvalData('ticket');assert.equal(again.claim.status,'active');assert.equal(again.approvals.length,3);
+ const livery=again.approvals.find(a=>a.kind==='liveries');
+ await query("UPDATE dev_requests SET status='closed' WHERE id='ticket'");
+ await approveTicket(ctx(['mpd_chief']),'ticket','liveries','revoke',livery.id);
+ assert.equal((await approvalData('ticket')).claim.status,'active');
+ await assert.rejects(approveTicket(ctx(['mpd_chief']),'ticket','liveries'),{status:409});
+ assert.equal((await query('SELECT * FROM dev_request_messages WHERE request_id=$1',['ticket'])).length,6);
+
 });
 after(()=>db.close());

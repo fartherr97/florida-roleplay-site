@@ -873,7 +873,7 @@ export const api = {
    * pretends when the API is unreachable.
    */
   devClaimTargets: () => request('/development/claim-targets'),
-  approveDevRequest: (id, kind) => request(`/development/requests/${encodeURIComponent(id)}/approvals`, {method:'POST',body:JSON.stringify({kind})}),
+  approveDevRequest: (id, kind, action = 'approve', approvalId = null) => request(`/development/requests/${encodeURIComponent(id)}/approvals`, {method:'POST',body:JSON.stringify({kind,action,approvalId})}),
   claimDevVehicle: (id, note = "", requestId = "") =>
     post(`/development/vehicles/${encodeURIComponent(id)}/claim`, { note, requestId }, () => ({
       ok: false,
