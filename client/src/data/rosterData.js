@@ -91,6 +91,7 @@ export const ROLE_MAP = [
  * "everything tied to a Discord role" means these too.
  */
 export const SPECIAL_ROLES = [
+  { roleId: "1542499913957376140", key: "developer", kind: "base", label: "Developer", detail: "Development team; can view assigned vehicles." },
   // TODO: replace every roleId with the real Discord snowflake.
   { roleId: "100000000000000801", key: "member", kind: "base", label: "Member", detail: "Anyone in the Discord server." },
   { roleId: "100000000000000802", key: "whitelisted", kind: "base", label: "Whitelisted", detail: "Approved onto the game server." },

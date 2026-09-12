@@ -45,6 +45,10 @@ export async function resolveRoleKeys(discordRoleIds) {
   const ids = discordRoleIds.map(String);
   if (!ids.length) return [...held];
 
+  // Confirmed main-guild Developer role. Resolve it even on existing installs
+  // whose stored role map predates the Assigned Vehicles permission.
+  if (ids.includes("1542499913957376140")) held.add("developer");
+
   try {
     const rows = await query(
       `SELECT DISTINCT role_key FROM roster_role_map WHERE role_id = ANY($1)`,
