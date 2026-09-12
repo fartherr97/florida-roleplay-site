@@ -1,3 +1,4 @@
+import DevApprovals from "../../components/support/DevApprovals";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ExternalLink, MessageSquare, UserPlus } from "lucide-react";
@@ -56,7 +57,7 @@ export default function DevRequestDetail() {
     const controller = new AbortController();
     load(controller.signal);
     loadMessages(controller.signal);
-    const timer = setInterval(() => loadMessages(controller.signal), 12_000);
+    const timer = setInterval(() => { loadMessages(controller.signal); load(controller.signal); }, 12_000);
     api.devRequestTypes().then((r) => r?.types?.length && setTypes(r.types)).catch(() => {});
     return () => {
       controller.abort();
@@ -204,6 +205,7 @@ export default function DevRequestDetail() {
         )}
       </Card>
 
+      <DevApprovals request={request} can={can} claim={state.data?.claim} approvals={state.data?.approvals} mine={request.openedByDiscordId === user?.id} onChange={() => Promise.all([load(),loadMessages()])} />
       <Card className="mt-5 p-5 sm:p-6">
         <TicketThread
           messages={messages}

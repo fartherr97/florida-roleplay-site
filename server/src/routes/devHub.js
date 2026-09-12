@@ -1,3 +1,5 @@
+import { personalTypes, activeStatuses, modelApprover, liveryApprover, approvalViewer, approvalData, approveTicket, claimInTicket, ensureApprovals } from "../lib/devApprovals.js";
+import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildDisplayName.js";
 /**
  * The /api/development router.
  *
@@ -23,7 +25,6 @@ import {
   DEFAULT_REQUEST_TYPES,
   DEV_PRIORITY_MAP,
   VEHICLE_LIBRARIES,
-  canActivateClaims,
   vehicleDisplayName,
   DEV_STATUS_MAP,
   FEEDBACK_TYPE_MAP,
@@ -76,21 +77,6 @@ function parseJson(value, fallback) {
 }
 
 /** The member's guild display name — "100 | Owner | Mike" — for thread posts. */
-async function rosterNameFor(user) {
-  const fallback = user?.displayName ?? user?.username ?? "Unknown";
-  try {
-    const rows = await query(
-      `SELECT display_name AS "displayName" FROM roster_members
-        WHERE discord_id = $1 AND display_name IS NOT NULL AND display_name <> ''
-        ORDER BY synced_at DESC LIMIT 1`,
-      [user.id],
-    );
-    if (rows[0]?.displayName) return rows[0].displayName;
-  } catch {
-    /* no database */
-  }
-  return fallback;
-}
 
 /**
  * The live request-type catalogue: the stored document if the manager has edited
@@ -142,7 +128,7 @@ async function loadRequest(id) {
 function canViewRequest(request, ctx) {
   if (!request) return false;
   if (request.openedByDiscordId && request.openedByDiscordId === ctx.user?.id) return true;
-  return isDevTeam(ctx);
+  return isDevTeam(ctx) || approvalViewer(request,ctx);
 }
 
 function withHistory(request, entry) {
@@ -156,12 +142,12 @@ router.get("/", async (req, res) => {
 
   const all = await loadRequests();
   const mine = all.filter((r) => r.openedByDiscordId === ctx.user.id);
-  const team = isDevTeam(ctx);
+  const team = isDevTeam(ctx) || liveryApprover(ctx);
 
   if (req.query.scope === "mine" || !team) {
     return res.json({ requests: mine, scope: "mine", team });
   }
-  res.json({ requests: all, mine, scope: "queue", team: true });
+  res.json({ requests: all.filter(r => canViewRequest(r,ctx)), mine, scope: "queue", team: true });
 });
 
 /** One request, with what this caller may do to it. */
@@ -173,7 +159,23 @@ router.get("/requests/:id", async (req, res) => {
   if (!canViewRequest(request, ctx)) {
     return res.status(403).json({ ok: false, code: "AUTH_ROLE_MISSING", message: "That request is not yours." });
   }
-  res.json({ request, can: { work: isDevTeam(ctx), manage: canManageDev(ctx) } });
+  try {
+    const review = await approvalData(request.id);
+    res.json({request,...review,can:{work:isDevTeam(ctx),manage:canManageDev(ctx),approveModel:modelApprover(ctx),approveLiveries:liveryApprover(ctx)}});
+  } catch { return noStore(res); }
+});
+
+router.get('/claim-targets', async (req,res) => {
+  const ctx=await contextFor(req); if(requireSignIn(ctx,res))return;
+  try {
+    const rows=await query(`SELECT id,subject,type FROM dev_requests WHERE opened_by_discord_id=$1 AND type=ANY($2::text[]) AND status=ANY($3::text[]) ORDER BY created_at DESC`,[ctx.user.id,personalTypes,activeStatuses]);
+    res.json({requests:rows});
+  } catch { return noStore(res); }
+});
+router.post('/requests/:id/approvals', async(req,res) => {
+  const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
+  try {res.json(await approveTicket(ctx,str(req.params.id,40),str(req.body?.kind,16)));}
+  catch(error){res.status(error.status || 503).json({ok:false,message:error.status ? error.message : 'Approval could not be saved.'});}
 });
 
 /** Open a request. */
@@ -314,7 +316,7 @@ router.get("/requests/:id/messages", async (req, res) => {
         ORDER BY created_at ASC LIMIT 500`,
       [request.id],
     );
-    return res.json({ messages: rows.map((row) => ({ ...row, internal: Boolean(row.internal) })) });
+    return res.json({ messages: await withGuildNames(rows) });
   } catch {
     return res.json({ messages: seed.MESSAGES.filter((m) => m.requestId === request.id && (internal || !m.internal)) });
   }
@@ -378,7 +380,7 @@ const VEHICLE_COLUMNS = `
   image_url AS "image", source_url AS "source", sort_order AS "sortOrder"`;
 
 const CLAIM_COLUMNS = `
-  c.id, c.vehicle_id AS "vehicleId", c.discord_id AS "discordId", c.member_name AS "memberName",
+  c.request_id AS "requestId", c.id, c.vehicle_id AS "vehicleId", c.discord_id AS "discordId", c.member_name AS "memberName",
   c.status, c.note, c.decision_note AS "decisionNote", c.decided_by_name AS "decidedByName",
   c.decided_at AS "decidedAt", c.created_at AS "createdAt"`;
 
@@ -475,8 +477,9 @@ router.get("/vehicles", async (req, res) => {
   if (requireSignIn(ctx, res)) return;
 
   const canManage = canManageDev(ctx);
-  const canActivate = canActivateClaims(ctx);
+  const canActivate = modelApprover(ctx);
   const privileged = canManage || canActivate;
+  try { await ensureApprovals(); } catch { return noStore(res); }
   const [vehicles, open, mine] = await Promise.all([loadVehicles(), loadOpenClaims(), loadClaimsFor(ctx.user.id)]);
   const byId = new Map(vehicles.map((v) => [v.id, v]));
   const openByVehicle = new Map(open.map((c) => [c.vehicleId, c]));
@@ -528,42 +531,11 @@ router.post("/vehicles/:id/claim", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
 
-  const vehicle = await loadVehicle(clip(req.params.id, 64));
-  if (!vehicle) return res.status(404).json({ ok: false, message: "No such vehicle." });
-  if (!vehicle.claimable || !vehicle.available) {
-    return res.status(400).json({ ok: false, code: "CLAIM_NOT_CLAIMABLE", message: "That vehicle is not open to claims." });
-  }
-  const open = (await loadOpenClaims()).find((c) => c.vehicleId === vehicle.id);
-  if (open) {
-    const mine = open.discordId === ctx.user.id;
-    return res.status(409).json({
-      ok: false,
-      code: "CLAIM_TAKEN",
-      message: mine ? "You have already claimed this vehicle." : "Somebody else has already claimed this vehicle.",
-    });
-  }
-
-  const claim = {
-    id: `vc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-    vehicleId: vehicle.id,
-    memberName: await rosterNameFor(ctx.user),
-    status: "pending",
-    note: clip(req.body?.note, 500),
-  };
   try {
-    await query(
-      `INSERT INTO dev_vehicle_claims (id, vehicle_id, discord_id, member_name, status, note)
-       VALUES ($1, $2, $3, $4, 'pending', $5)`,
-      [claim.id, claim.vehicleId, ctx.user.id, claim.memberName, claim.note || null],
-    );
-  } catch (err) {
-    // The partial unique index: two members raced for the same car and the other won.
-    if (err?.code === "23505") {
-      return res.status(409).json({ ok: false, code: "CLAIM_TAKEN", message: "Somebody else has just claimed this vehicle." });
-    }
-    return noStore(res);
-  }
-  res.status(201).json({ ok: true, claim });
+    const claim = await claimInTicket(ctx,clip(req.params.id,64),clip(req.body?.requestId,40),clip(req.body?.note,500));
+    res.status(201).json({ok:true,claim});
+  } catch(error) { res.status(error.status || (error.code === '23505' ? 409 : 503)).json({ok:false,message:error.status ? error.message : 'Could not reserve this vehicle. Refresh and try again.'}); }
+
 });
 
 /** Withdraw your own pending claim. An activated claim is released by a Director or Owner. */
@@ -595,7 +567,7 @@ const CLAIM_ACTIONS = {
 router.post("/vehicles/claims/:claimId", async (req, res) => {
   const ctx = await contextFor(req);
   if (requireSignIn(ctx, res)) return;
-  if (!canActivateClaims(ctx)) {
+  if (!modelApprover(ctx)) {
     return res.status(403).json({
       ok: false,
       code: "AUTH_ROLE_MISSING",
@@ -605,6 +577,7 @@ router.post("/vehicles/claims/:claimId", async (req, res) => {
   const action = CLAIM_ACTIONS[str(req.body?.action)];
   if (!action) return res.status(400).json({ ok: false, message: "Unknown claim action." });
 
+  try { await ensureApprovals(); } catch { return noStore(res); }
   const claim = await loadClaim(clip(req.params.claimId, 40));
   if (!claim) return res.status(404).json({ ok: false, message: "No such claim." });
   if (!action.from.includes(claim.status)) {
@@ -615,15 +588,20 @@ router.post("/vehicles/claims/:claimId", async (req, res) => {
     });
   }
 
+  if (action.to === 'active' && claim.requestId) {
+    try { return res.json(await approveTicket(ctx,claim.requestId,'model')); }
+    catch(error) { return res.status(error.status || 503).json({ok:false,message:error.message}); }
+  }
   const decidedBy = await rosterNameFor(ctx.user);
   try {
-    await query(
+    const updated = await query(
       `UPDATE dev_vehicle_claims
           SET status = $2, decision_note = $3, decided_by_id = $4, decided_by_name = $5,
               decided_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1`,
-      [claim.id, action.to, clip(req.body?.note, 500) || null, ctx.user.id, decidedBy],
+        WHERE id = $1 AND status = ANY($6::text[]) RETURNING id`,
+      [claim.id, action.to, clip(req.body?.note, 500) || null, ctx.user.id, decidedBy, action.from],
     );
+    if (!updated.length) return res.status(409).json({ok:false,message:'This claim changed. Refresh before deciding.'});
   } catch {
     return noStore(res);
   }

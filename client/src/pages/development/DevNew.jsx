@@ -43,7 +43,7 @@ export default function DevNew() {
 
   // Deep-linked from the landing with ?type=<id>; if it names a category the
   // member cannot open, no row expands and they simply pick another.
-  const [draft, setDraft] = useState(() => ({ type: params.get("type") ?? "", subject: "", body: "", details: {} }));
+  const [draft, setDraft] = useState(() => ({ type: params.get("type") ?? "", subject: "", body: "", details: params.get("vehicle") ? {vehicle_link: `${window.location.origin}/development/library?vehicle=${encodeURIComponent(params.get("vehicle"))}`} : {} }));
   const [errors, setErrors] = useState({});
   const [failure, setFailure] = useState(null);
   const [sending, setSending] = useState(false);
@@ -68,7 +68,7 @@ export default function DevNew() {
     try {
       const result = await api.openDevRequest(draft);
       if (result?.ok) {
-        navigate(`/development/requests/${result.request.id}`);
+        navigate(`/development/requests/${result.request.id}${params.get("vehicle") ? `?vehicle=${encodeURIComponent(params.get("vehicle"))}` : ""}`);
         return;
       }
       setFailure(result?.message ?? "That was not submitted.");

@@ -872,8 +872,10 @@ export const api = {
    * the car for everyone else), so like every write here it refuses rather than
    * pretends when the API is unreachable.
    */
-  claimDevVehicle: (id, note = "") =>
-    post(`/development/vehicles/${encodeURIComponent(id)}/claim`, { note }, () => ({
+  devClaimTargets: () => request('/development/claim-targets'),
+  approveDevRequest: (id, kind) => request(`/development/requests/${encodeURIComponent(id)}/approvals`, {method:'POST',body:JSON.stringify({kind})}),
+  claimDevVehicle: (id, note = "", requestId = "") =>
+    post(`/development/vehicles/${encodeURIComponent(id)}/claim`, { note, requestId }, () => ({
       ok: false,
       message: "The API is unreachable, so the claim was not recorded.",
     })),

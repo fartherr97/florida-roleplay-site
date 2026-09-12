@@ -1,3 +1,4 @@
+import { Link, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Car,
@@ -60,6 +61,7 @@ function sortVehicles(list) {
 }
 
 export default function DevLibrary() {
+  const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [data, setData] = useState(null);
   const [tab, setTab] = useState(VEHICLE_LIBRARIES[0].id);
@@ -123,8 +125,10 @@ export default function DevLibrary() {
 
   async function run(action, success) {
     setBusy(true);
-    const result = await action();
-    setBusy(false);
+    let result;
+    try { result = await action(); }
+    catch (error) { result = {ok:false,message:error.message || 'That did not go through.'}; }
+    finally { setBusy(false); }
     if (result?.ok) {
       setNotice({ tone: "green", text: success });
       reload();
@@ -258,9 +262,9 @@ export default function DevLibrary() {
           vehicle={claiming}
           busy={busy}
           onClose={() => setClaiming(null)}
-          onConfirm={async (note) => {
-            const ok = await run(() => api.claimDevVehicle(claiming.id, note), `${claiming.name} claimed — waiting on a Director or Owner.`);
-            if (ok) setClaiming(null);
+          onConfirm={async (note, requestId) => {
+            const ok = await run(() => api.claimDevVehicle(claiming.id, note, requestId), `${claiming.name} claimed — waiting on a Director or Owner.`);
+            if (ok) { setClaiming(null); navigate(`/development/requests/${requestId}`); }
           }}
         />
       )}
@@ -538,27 +542,28 @@ function VehicleCard({ vehicle, canManage, canActivate, busy, onClaim, onWithdra
  * ------------------------------------------------------------------ */
 
 function ClaimDialog({ vehicle, busy, onClose, onConfirm }) {
-  const [note, setNote] = useState("");
-  return (
-    <Modal open onClose={onClose} title="Claim this vehicle" subtitle={vehicle.name}>
-      <p className="text-sm leading-relaxed text-slate-300">
-        This puts the vehicle on hold for you and sends the claim to a Director or Owner. Once they activate it, the spawn code
-        appears under <span className="font-semibold text-white">My vehicles</span> at the top of the library.
-      </p>
-      <Field label="Note for the activator" hint="Optional — your character, department or why this one." className="mt-4">
-        <TextArea rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
-      </Field>
-      <div className="mt-6 flex justify-end gap-3">
-        <Button variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button disabled={busy} onClick={() => onConfirm(note)}>
-          <KeyRound className="size-4" />
-          Claim vehicle
-        </Button>
-      </div>
-    </Modal>
-  );
+  const [note,setNote]=useState('');
+  const [targets,setTargets]=useState(null);
+  const [requestId,setRequestId]=useState('');
+  const [error,setError]=useState('');
+  useEffect(() => {
+    let active=true;
+    api.devClaimTargets().then(result => {if(active){setTargets(result.requests);setRequestId(result.requests[0]?.id || '');}}).catch(() => active && setError('Could not load your tickets. Close this dialog and try again.'));
+    return () => {active=false;};
+  },[]);
+  return <Modal open onClose={onClose} title="Request this model" subtitle={vehicle.name}>
+    <p className="text-sm text-slate-300">Add this claim to a personal ticket for Director or Owner approval. The vehicle is reserved only after you confirm.</p>
+    {error && <p role="alert" className="mt-3 text-rose-300">{error}</p>}
+    {!targets && !error && <p role="status">Checking your active personal tickets...</p>}
+    {targets?.length > 0 && <Field label="Add to an existing personal ticket?" className="mt-4"><Select value={requestId} onChange={setRequestId} options={targets.map(t => ({value:t.id,label:`${t.id} - ${t.subject}`}))}/></Field>}
+    {targets?.length === 0 && <p className="mt-4 text-sm text-slate-400">You do not have an active personal ticket. Start one below to request this vehicle.</p>}
+    <Field label="Note" className="mt-4"><TextArea value={note} onChange={e=>setNote(e.target.value)} maxLength={500}/></Field>
+    <div className="mt-5 flex flex-wrap gap-3">
+      <Button disabled={busy || !requestId || Boolean(error)} onClick={()=>onConfirm(note,requestId)}>Add claim to ticket</Button>
+      <Button as={Link} variant="secondary" to={`/development/new?type=${vehicle.library === 'leo' ? 'leo_personal' : 'civ_personal'}&vehicle=${encodeURIComponent(vehicle.id)}`}>Start a new personal ticket</Button>
+      <Button variant="ghost" onClick={onClose}>Cancel</Button>
+    </div>
+  </Modal>;
 }
 
 function DecisionDialog({ claim, action, busy, onClose, onConfirm }) {

@@ -1,3 +1,4 @@
+import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildDisplayName.js";
 /**
  * The /api/support router.
  *
@@ -87,22 +88,6 @@ async function loadTypes() {
  * that is the one source of truth here. Best-effort: with no roster row (or no
  * database) it falls back to the member's profile name, so nothing renders blank.
  */
-async function rosterNameFor(user) {
-  const fallback = user?.displayName ?? user?.username ?? "Unknown";
-  try {
-    const rows = await query(
-      `SELECT display_name AS "displayName"
-         FROM roster_members
-        WHERE discord_id = $1 AND display_name IS NOT NULL AND display_name <> ''
-        ORDER BY synced_at DESC LIMIT 1`,
-      [user.id],
-    );
-    if (rows[0]?.displayName) return rows[0].displayName;
-  } catch {
-    // No database — the profile name stands.
-  }
-  return fallback;
-}
 
 function requireSignIn(ctx, res) {
   if (ctx.user) return false;
@@ -387,7 +372,7 @@ router.get("/:id/messages", async (req, res) => {
         LIMIT 500`,
       [ticket.id],
     );
-    return res.json({ messages: rows.map((row) => ({ ...row, internal: Boolean(row.internal) })) });
+    return res.json({ messages: await withGuildNames(rows) });
   } catch {
     return res.json({
       messages: seed.MESSAGES.filter((m) => m.ticketId === ticket.id && (internal || !m.internal)),

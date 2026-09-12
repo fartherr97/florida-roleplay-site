@@ -95,7 +95,7 @@ export default function DevQueue() {
     return list.filter((f) => `${f.title} ${f.body} ${f.openedByName ?? ""}`.toLowerCase().includes(needle));
   }, [feedback, query]);
 
-  if (!hasPermission("development.work")) return <AccessDenied reason="role" />;
+  if (!(hasPermission("development.work") || user?.roles?.some(r => ["fhp_colonel","bso_sheriff","mpd_chief","directorship","ownership"].includes(r)))) return <AccessDenied reason="role" />;
 
   const take = async (request) => {
     const result = await api.updateDevRequest(request.id, { assign: "me" });
