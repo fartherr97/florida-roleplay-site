@@ -112,7 +112,8 @@ export async function notifyTicketOpened(ticket, type) {
 
     // A department queue with its own webhook goes there, silently (no ping). Everything
     // else is a support-team ticket: the support webhook, pinging the support role.
-    const url = deptUrl || settings.supportWebhookUrl;
+    // Confidential queues must never fall back to the general support channel.
+    const url = deptUrl || (type?.exclusive ? "" : settings.supportWebhookUrl);
     if (!url) return;
     const ping = deptUrl ? "" : settings.supportPingRoleId;
 

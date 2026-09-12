@@ -6,7 +6,7 @@ import DeptTopBar from "./DeptTopBar";
 import AccessDenied from "../auth/AccessDenied";
 import NotFound from "../auth/NotFound";
 import RequireRole from "../auth/RequireRole";
-import { DeptConfigProvider } from "../../context/DeptConfigContext";
+import { DeptConfigProvider } from "../../context/DeptConfigContext.jsx";
 import { useDeptConfig } from "../../context/useDeptConfig";
 import { useAuth } from "../../context/useAuth";
 import { canOpenPage, navFor, resolvePage, themeVars } from "../../lib/departmentConfig";

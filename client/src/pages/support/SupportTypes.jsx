@@ -24,6 +24,7 @@ import { useSupportConfig } from "../../context/useSupportConfig";
 import { iconFor } from "../../lib/icons";
 import { cn } from "../../lib/cn";
 import { PERMISSION_GROUPS } from "../../data/permissions";
+import { DEPARTMENTS, departmentOf } from "../../lib/supportDepartments";
 import {
   FIELD_TYPES,
   TICKET_ICON_CHOICES,
@@ -64,7 +65,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
  */
 export default function SupportTypes() {
   const { hasPermission } = useAuth();
-  const { types, reload } = useSupportConfig();
+  const { types, reload, loading: configLoading, error: configError } = useSupportConfig();
 
   const [draft, setDraft] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -77,7 +78,7 @@ export default function SupportTypes() {
   // editing never mutates the shared context list. Adjusting state during render
   // (guarded so it runs once) is React's escape hatch for exactly this and, unlike
   // an effect, does not paint a stale first frame.
-  if (!seeded && Array.isArray(types) && types.length) {
+  if (!seeded && !configLoading && !configError && Array.isArray(types) && types.length) {
     setDraft(clone(types));
     setSelectedId(types[0]?.id ?? null);
     setSeeded(true);
@@ -85,6 +86,8 @@ export default function SupportTypes() {
 
   const canConfigure = hasPermission("support.configure");
   if (!canConfigure) return <AccessDenied reason="role" />;
+  if (configLoading) return <Section><p>Loading ticket queues…</p></Section>;
+  if (configError) return <Section><p>Queue settings could not be loaded.</p><Button onClick={reload}>Retry</Button></Section>;
 
   const list = draft ?? [];
   const selected = list.find((type) => type.id === selectedId) ?? null;
@@ -93,8 +96,8 @@ export default function SupportTypes() {
     setDraft((prev) => prev.map((type) => (type.id === id ? { ...type, ...patch } : type)));
 
   const addType = () => {
-    const created = blankTicketType({ label: "New category" });
-    setDraft((prev) => [...prev, created]);
+    const created = blankTicketType({ label: "New queue", department: departmentOf(selected || {}) });
+    setDraft((prev) => [...(prev || []), created]);
     setSelectedId(created.id);
     setProblems([]);
   };
@@ -155,7 +158,7 @@ export default function SupportTypes() {
 
       <PageHeader
         eyebrow="Support · Directorship"
-        title="Ticket categories"
+        title="Departments & ticket queues"
         subtitle="What a member picks when they open a ticket — who may open each, and which team works it."
         actions={
           <div className="flex items-center gap-2">
@@ -236,7 +239,7 @@ export default function SupportTypes() {
           </div>
           <Button variant="secondary" size="sm" className="w-full" onClick={addType}>
             <Plus className="size-4" />
-            Add category
+            Add ticket queue
           </Button>
         </div>
 
@@ -246,6 +249,17 @@ export default function SupportTypes() {
             type={selected}
             onChange={(patch) => replace(selected.id, patch)}
             onRemove={() => removeType(selected.id)}
+            onTemplate={(kind) => {
+              const department = departmentOf(selected);
+              const created = blankTicketType({
+                label: kind === 'ia' ? 'Internal Affairs' : 'Recruitment', department,
+                icon: kind === 'ia' ? 'Shield' : 'Users',
+                blurb: kind === 'ia' ? 'Submit a confidential conduct report for review.' : 'Ask about joining this department.',
+                workPermissions: kind === 'ia' ? ['support.escalated'] : [`support.${department}`],
+                exclusive: kind === 'ia',
+              });
+              setDraft(prev => [...prev, created]); setSelectedId(created.id);
+            }}
           />
         ) : (
           <Card className="grid place-items-center p-10 text-sm text-slate-400">
@@ -264,7 +278,7 @@ function workedByLabel(type) {
   return names.join(", ");
 }
 
-function TypeEditor({ type, onChange, onRemove }) {
+function TypeEditor({ type, onChange, onRemove, onTemplate }) {
   const setField = (index, patch) => {
     const fields = type.fields.map((field, i) => (i === index ? { ...field, ...patch } : field));
     onChange({ fields });
@@ -314,6 +328,15 @@ function TypeEditor({ type, onChange, onRemove }) {
       <Field label="Blurb" hint="The one line shown under the category on the picker.">
         <TextArea rows={2} value={type.blurb} onChange={(e) => onChange({ blurb: e.target.value })} />
       </Field>
+
+      <Field label="Department" hint="Department queues appear when a member expands that department. Community support appears separately.">
+        <Select value={departmentOf(type)} options={[{ value: '', label: 'Community support' }, ...DEPARTMENTS.map(d => ({ value: d.id, label: d.label }))]} onChange={department => onChange({ department })} />
+      </Field>
+      {departmentOf(type) && <div className="rounded-xl border border-white/10 p-4">
+        <p className="mb-3 text-sm text-slate-300">Add another queue to this department</p>
+        <div className="flex flex-wrap gap-2"><Button variant="secondary" size="sm" onClick={() => onTemplate('recruitment')}>+ Recruitment</Button><Button variant="secondary" size="sm" onClick={() => onTemplate('ia')}>+ Internal Affairs</Button></div>
+        <p className="mt-3 text-xs text-slate-400">Internal Affairs starts restricted to escalated support. Review “Worked by” before saving; general support does not receive access.</p>
+      </div>}
 
       <Field label="Accent colour">
         <Select value={type.tone} options={TONE_OPTIONS} onChange={(value) => onChange({ tone: value })} />

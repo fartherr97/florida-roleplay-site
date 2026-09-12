@@ -2,8 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import PublicLayout from "./components/layout/PublicLayout";
 import AccessDenied from "./components/auth/AccessDenied";
 import NotFound from "./components/auth/NotFound";
-import { AuthProvider } from "./context/AuthContext";
-import { BotAuthProvider } from "./context/BotAuthContext";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { BotAuthProvider } from "./context/BotAuthContext.jsx";
 
 import Landing from "./pages/Landing";
 import Rules from "./pages/Rules";

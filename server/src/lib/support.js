@@ -483,6 +483,7 @@ export function normalizeTicketType(raw, index = 0) {
   return {
     id: slugId(raw?.id, `type_${index + 1}`),
     label: str(raw?.label, 80),
+    department: ["fhp", "bso", "mpd", "civilian"].includes(raw?.department) ? raw.department : (raw?.department === "" ? "" : ({ dept_fhp: "fhp", dept_bso: "bso", dept_mpd: "mpd", dept_civilian: "civilian" }[raw?.id] || "")),
     icon,
     tone,
     blurb: str(raw?.blurb, 240),

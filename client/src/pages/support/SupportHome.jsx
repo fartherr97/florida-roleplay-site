@@ -1,5 +1,6 @@
+import TicketTypePicker from "../../components/support/TicketTypePicker";
 import { createElement, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Inbox, SlidersHorizontal } from "lucide-react";
 import Section from "../../components/layout/Section";
 import PageHeader from "../../components/layout/PageHeader";
@@ -10,30 +11,14 @@ import AccessDenied from "../../components/auth/AccessDenied";
 import { api } from "../../lib/api";
 import { useAuth } from "../../context/useAuth";
 import { iconFor } from "../../lib/icons";
-import { toneTile } from "../../lib/tones";
 import { formatDateTimeLocal } from "../../lib/format";
-import { cn } from "../../lib/cn";
 import { PRIORITY_MAP, statusLabel, statusTone } from "../../lib/support";
 import { useSupportConfig } from "../../context/useSupportConfig";
 
-/** Department categories that show their emblem instead of a toned icon tile. */
-const DEPT_LOGOS = {
-  dept_fhp: "https://www.flrp.us/images/480f8f75e967b7e4.png",
-  dept_bso: "https://www.flrp.us/images/c45e2a2852eba7fb.png",
-  dept_mpd: "https://www.flrp.us/images/72517584c4a23ba3.png",
-};
-
-/**
- * The support landing: pick what you need help with.
- *
- * Every category a member may open is a card — the departments carry their
- * emblem — and choosing one drops straight into that category's form. Their own
- * open tickets sit underneath, so the page answers both "start something" and
- * "where did mine get to" without a detour.
- */
 export default function SupportHome() {
+  const navigate = useNavigate();
   const { user, hasPermission, loading } = useAuth();
-  const { types: catalogue, canConfigure } = useSupportConfig();
+  const { types: catalogue, canConfigure, loading: configLoading, error: configError, reload } = useSupportConfig();
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -76,7 +61,7 @@ export default function SupportHome() {
             {canConfigure && (
               <Button as={Link} to="/support/types" variant="ghost" size="sm">
                 <SlidersHorizontal className="size-4" />
-                Categories
+                Manage queues
               </Button>
             )}
             {data?.agent && (
@@ -89,50 +74,7 @@ export default function SupportHome() {
         }
       />
 
-      {/* Category picker — one card per openable category, department emblems included. */}
-      {types.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-sm text-slate-400">There are no ticket categories open to you right now.</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {types.map((type) => {
-            const logo = DEPT_LOGOS[type.id];
-            return (
-              <Card
-                key={type.id}
-                as={Link}
-                to={`/support/new?type=${encodeURIComponent(type.id)}`}
-                hover
-                className="group flex aspect-square flex-col items-center justify-center gap-3 p-4 text-center"
-              >
-                {logo ? (
-                  <img
-                    src={logo}
-                    alt=""
-                    className="size-16 shrink-0 object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:-translate-y-0.5"
-                  />
-                ) : (
-                  <span
-                    className={cn(
-                      "grid size-16 shrink-0 place-items-center rounded-2xl ring-1 ring-inset transition-transform duration-300 group-hover:-translate-y-0.5",
-                      toneTile(type.tone),
-                    )}
-                  >
-                    {createElement(iconFor(type.icon), { className: "size-7" })}
-                  </span>
-                )}
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-white">{type.label}</div>
-                  {type.blurb && (
-                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">{type.blurb}</p>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {configLoading ? <p role="status">Loading ticket queues...</p> : configError ? <div role="alert">Ticket queues could not be loaded. <Button onClick={reload}>Retry</Button></div> : <TicketTypePicker types={types} onSelect={type => navigate(`/support/new?type=${encodeURIComponent(type.id)}`)} />}
 
       {/* Their own tickets, if any — start here, but see where things got to too. */}
       <div className="mt-10">

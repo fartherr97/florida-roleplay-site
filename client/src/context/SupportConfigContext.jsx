@@ -7,8 +7,8 @@
  * it here, once, keeps every screen consistent and saves each one its own fetch.
  *
  * The catalogue is not sensitive to read (a member needs it to open a ticket and
- * to see a category's name on their own), so this loads for anyone signed in and
- * falls back to the built-in defaults when the API is unreachable.
+ * to see a category's name on their own), so this loads for anyone signed in. Editing and opening tickets stop when
+ * the catalogue cannot be loaded, rather than saving fallback configuration.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SupportConfigContext from "./supportConfigContext";
@@ -32,7 +32,7 @@ export function SupportConfigProvider({ children }) {
           loading: false,
         });
       })
-      .catch(() => active && setState((prev) => ({ ...prev, loading: false })));
+      .catch(() => active && setState((prev) => ({ ...prev, loading: false, error: true })));
     return () => {
       active = false;
     };
@@ -46,6 +46,7 @@ export function SupportConfigProvider({ children }) {
       typeMap: typeMapOf(state.types),
       canConfigure: state.canConfigure,
       loading: state.loading,
+      error: state.error === true,
       reload,
     }),
     [state, reload],

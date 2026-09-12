@@ -1,4 +1,5 @@
-import { createElement, useMemo, useState } from "react";
+import TicketTypePicker from "../../components/support/TicketTypePicker";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Loader2, Send } from "lucide-react";
 import Section from "../../components/layout/Section";
@@ -35,7 +36,7 @@ export default function SupportNew() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { user, hasPermission, loading } = useAuth();
-  const { types: catalogue } = useSupportConfig();
+  const { types: catalogue, loading: configLoading, error: configError, reload } = useSupportConfig();
 
   // The categories this member may open: enabled, and either open to everyone or
   // gated on a permission they hold. The server re-checks on submit.
@@ -56,6 +57,13 @@ export default function SupportNew() {
     body: "",
     details: {},
   });
+  const appliedLink = useRef(false);
+  useEffect(() => {
+    if (!appliedLink.current && types.some(t => t.id === preselect)) {
+      appliedLink.current = true;
+      setDraft(prev => prev.type ? prev : { ...prev, type: preselect });
+    }
+  }, [types, preselect]);
   const [errors, setErrors] = useState({});
   const [failure, setFailure] = useState(null);
   const [sending, setSending] = useState(false);
@@ -68,6 +76,8 @@ export default function SupportNew() {
 
   if (loading) return null;
   if (!user) return <AccessDenied reason="signed-out" />;
+  if (configLoading) return <Section><p role="status">Loading ticket queues...</p></Section>;
+  if (configError) return <Section><p role="alert">Ticket queues could not be loaded.</p><Button onClick={reload}>Retry</Button></Section>;
 
   async function submit(event) {
     event.preventDefault();
@@ -113,7 +123,8 @@ export default function SupportNew() {
         {/* Each category is a row that expands in place to its own ticket form —
             click a department and its form opens right there. */}
         <div className="space-y-3">
-          {types.map((entry) => {
+          {!types.some(entry => entry.id === draft.type) && <TicketTypePicker types={types} onSelect={entry => set({ type: entry.id, details: {} })} />}
+          {types.filter(entry => entry.id === draft.type).map((entry) => {
             const expanded = draft.type === entry.id;
             return (
               <div

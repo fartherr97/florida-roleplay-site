@@ -14,7 +14,6 @@ import * as disciplineSeed from "../data/disciplineSeed";
 import * as supportSeed from "../data/supportSeed";
 import * as devSeed from "../data/devHubData";
 import { gradeSubmission } from "./forms";
-import { DEFAULT_TICKET_TYPES } from "./support";
 import { DEFAULT_REQUEST_TYPES } from "./devhub";
 import { normalizeConfig, summarize } from "./departmentConfig";
 import { projectRoster } from "./deptRoster";
@@ -809,14 +808,10 @@ export const api = {
     del(`/support/flows/${encodeURIComponent(id)}`, () => ({ ok: true, message: NOT_PERSISTED })),
 
   supportTypes: () =>
-    get("/support/config/ticket-types", { types: DEFAULT_TICKET_TYPES, canConfigure: false }),
+    request("/support/config/ticket-types"),
 
   saveSupportTypes: (types) =>
-    put("/support/config/ticket-types", { types }, () => ({
-      ok: true,
-      types,
-      message: NOT_PERSISTED,
-    })),
+    request("/support/config/ticket-types", { method: "PUT", body: JSON.stringify({ types }) }),
 
   /** The ticket-announcement webhook settings and the queue list (ownership only). */
   supportWebhooks: () =>

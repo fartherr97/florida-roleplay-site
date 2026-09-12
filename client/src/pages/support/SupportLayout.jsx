@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
-import { SupportConfigProvider } from "../../context/SupportConfigContext";
+import { SupportConfigProvider } from "../../context/SupportConfigContext.jsx";
 import { useSupportConfig } from "../../context/useSupportConfig";
 import { useAuth } from "../../context/useAuth";
 import { cn } from "../../lib/cn";
