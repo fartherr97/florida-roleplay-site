@@ -67,7 +67,7 @@ export const navGroups = [
       { label: "My Requests", to: "/development/requests", icon: "Ticket" },
       { label: "Dev Team Roster", to: "/development/roster", icon: "Users" },
       { label: "Vehicle Library", to: "/development/library", icon: "Car" },
-      { label: "Help Center", to: "/development/help", icon: "LifeBuoy" },
+      { label: "Assigned Vehicles", to: "/development/assigned-vehicles", icon: "Car" },
       { label: "Suggestions & Bugs", to: "/development/feedback", icon: "MessageSquare" },
       { label: "Dev Queue", to: "/development/queue", icon: "Wrench" },
       { label: "Request Categories", to: "/development/types", icon: "SlidersHorizontal" },

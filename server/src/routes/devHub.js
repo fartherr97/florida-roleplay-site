@@ -1,3 +1,4 @@
+import { vehicleAssignments } from "../lib/vehicleAssignments.js";
 import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
 import { personalTypes, activeStatuses, modelApprover, liveryApprover, approvalViewer, approvalData, approveTicket, claimInTicket, ensureApprovals } from "../lib/devApprovals.js";
 import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildDisplayName.js";
@@ -766,6 +767,16 @@ router.put("/config/request-types", async (req, res) => {
     return noStore(res);
   }
   res.json({ ok: true, types });
+});
+
+router.get('/assigned-vehicles', async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!ctx.permissions.has('development.assignments.view')) return res.status(403).json({ok:false, message:'Viewing assigned vehicles requires Developer, Director or Owner access.'});
+  try {
+    await ensureApprovals();
+    res.json(await vehicleAssignments(req.query.search, req.query.page));
+  } catch { return noStore(res); }
 });
 
 export default router;

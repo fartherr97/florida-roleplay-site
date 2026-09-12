@@ -366,6 +366,11 @@ export const PERMISSION_GROUPS = [
       "Requests members open for personal vehicles, department work and builds. Anyone signed in can open one — these decide who works them and who maintains the hub.",
     permissions: [
       {
+        key: "development.assignments.view",
+        label: "View assigned vehicles",
+        detail: "See approved personal vehicles and their assigned members.",
+      },
+      {
         key: "development.work",
         label: "Work the dev queue",
         detail:
@@ -463,6 +468,7 @@ export const PERMISSIONS = Object.fromEntries(
  * grantable like any other role so the baseline stays configurable.
  */
 export const BASE_ROLES = [
+  { key: "developer", label: "Developer", detail: "Development team; mapped to the main guild Developer role." },
   { key: "member", label: "Member", detail: "Anyone in the Discord server." },
   { key: "whitelisted", label: "Whitelisted", detail: "Approved onto the game server." },
 ];
@@ -595,6 +601,7 @@ export const DEFAULT_GRANTS = {
   // The dev team works development requests; department command see their own
   // department's work. Managing the hub (vehicle library, request categories)
   // sits higher. Opening a request needs nothing but a Discord account.
+  "development.assignments.view": ["developer", "directorship", "ownership"],
   "development.work": [...staffFrom("admin"), "fhp_colonel", "bso_sheriff", "mpd_chief"],
   "development.manage": ["head_admin", "directorship", "ownership"],
   "development.claims.manage": ["directorship", "ownership"],

@@ -861,6 +861,7 @@ export const api = {
       message: "The API is unreachable, so that message was not posted.",
     })),
 
+  devAssignments: (search, page) => request(`/development/assigned-vehicles?search=${encodeURIComponent(search)}&page=${page}`),
   devVehicles: () => get("/development/vehicles", { vehicles: devSeed.VEHICLES, canManage: false }),
 
   saveDevVehicle: (id, vehicle) =>

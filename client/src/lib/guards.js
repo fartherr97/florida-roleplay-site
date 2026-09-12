@@ -63,6 +63,7 @@ export const GUARDS = [
   // Development Hub — the queue is the dev team's; the member-facing pages
   // (hub, create, requests, library, help, feedback) need only a sign-in and
   // gate themselves.
+  { path: "/development/assigned-vehicles", permission: "development.assignments.view" },
   { path: "/development/queue", permission: "development.work" },
   { path: "/development/types", permission: "development.manage" },
 
