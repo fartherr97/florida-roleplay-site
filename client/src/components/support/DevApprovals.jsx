@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
-import Select from '../ui/Select';
+import VehicleModelPicker from './VehicleModelPicker';
 import {api} from '../../lib/api';
 import {formatDateTimeLocal} from '../../lib/format';
 export default function DevApprovals({request,can,claim,approvals=[],mine,onChange}) {
@@ -32,7 +32,7 @@ export default function DevApprovals({request,can,claim,approvals=[],mine,onChan
     {claim && <p className="text-sm text-slate-300">Requested model: <strong>{claim.name}</strong> · {claim.status === 'active' ? 'Approved' : 'Awaiting model approval'}</p>}
     {mine && personal && active && !claim && <div className="space-y-3">
       <p className="text-sm text-slate-400">Choose an available personal vehicle to request approval in this ticket.</p>
-      <Select value={selected} onChange={setSelected} options={[{value:'',label:vehicles === null ? 'Loading vehicles...' : 'Select an available model'},...(vehicles || []).map(v=>({value:v.id,label:v.name}))]}/>
+      <VehicleModelPicker vehicles={vehicles} value={selected} onChange={setSelected} disabled={busy}/>
       <Button disabled={busy || !vehicles?.some(v=>v.id===selected)} onClick={()=>run(()=>api.claimDevVehicle(selected,'',request.id))}>Claim model for approval</Button>
     </div>}
     <div className="flex flex-wrap gap-3">{[['model','Model',can.approveModel],['liveries','Liveries',can.approveLiveries]].map(([kind,label,allowed])=>{
