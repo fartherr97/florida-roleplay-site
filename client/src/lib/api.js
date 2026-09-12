@@ -861,6 +861,8 @@ export const api = {
       message: "The API is unreachable, so that message was not posted.",
     })),
 
+  devWebhookStatus: () => request('/development/webhook-settings'),
+  saveDevWebhook: url => request('/development/webhook-settings', {method:'PUT', body:JSON.stringify({url})}),
   devAssignments: (search, page) => request(`/development/assigned-vehicles?search=${encodeURIComponent(search)}&page=${page}`),
   devVehicles: () => get("/development/vehicles", { vehicles: devSeed.VEHICLES, canManage: false }),
 

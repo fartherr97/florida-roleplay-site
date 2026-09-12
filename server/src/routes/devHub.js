@@ -1,3 +1,4 @@
+import { devWebhookStatus, saveDevWebhook, notifyDevTicketOpened } from "../lib/devWebhooks.js";
 import { vehicleAssignments } from "../lib/vehicleAssignments.js";
 import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
 import { personalTypes, activeStatuses, modelApprover, liveryApprover, approvalViewer, approvalData, approveTicket, claimInTicket, ensureApprovals } from "../lib/devApprovals.js";
@@ -17,7 +18,7 @@ import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildD
  * already leaked.
  */
 import { Router } from "express";
-import { execute, query, changedRows } from "../db.js";
+import { execute, query, changedRows, transaction } from "../db.js";
 import * as seed from "../devHubSeed.js";
 import { loadGrants } from "../middleware/requirePermission.js";
 import { rankFor, resolveUser } from "../middleware/requireRole.js";
@@ -215,6 +216,7 @@ router.post("/", async (req, res) => {
     `We'll review it and reply here.`;
 
   try {
+    await transaction(async query => {
     await query(
       `INSERT INTO dev_requests
          (id, type, subject, status, priority, department, details, opened_by_discord_id, opened_by_name, history, last_message_at)
@@ -232,9 +234,13 @@ router.post("/", async (req, res) => {
        VALUES ($1, $2, false, NULL, $3, $4)`,
       [`drm-${Date.now().toString(36)}-b`, id, "FLRP Dev Hub", greeting],
     );
+    });
   } catch {
     return noStore(res);
   }
+
+  void notifyDevTicketOpened({id, subject:draft.subject, category:type.label,
+    openedByName:speakerName, openedByDiscordId:ctx.user.id});
 
   res.status(201).json({
     ok: true,
@@ -777,6 +783,21 @@ router.get('/assigned-vehicles', async (req, res) => {
     await ensureApprovals();
     res.json(await vehicleAssignments(req.query.search, req.query.page));
   } catch { return noStore(res); }
+});
+
+router.get('/webhook-settings', async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!ctx.roleKeys.includes('ownership')) return res.status(403).json({message:'Ownership only.'});
+  try { res.json(await devWebhookStatus()); }
+  catch { res.status(503).json({message:'Webhook settings unavailable.'}); }
+});
+router.put('/webhook-settings', async (req, res) => {
+  const ctx = await contextFor(req);
+  if (requireSignIn(ctx, res)) return;
+  if (!ctx.roleKeys.includes('ownership')) return res.status(403).json({message:'Ownership only.'});
+  try { res.json(await saveDevWebhook(req.body?.url, ctx.user.id)); }
+  catch (error) { res.status(error.status || 503).json({message:error.status ? error.message : 'Webhook settings could not be saved.'}); }
 });
 
 export default router;

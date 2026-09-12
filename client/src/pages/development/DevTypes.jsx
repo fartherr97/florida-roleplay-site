@@ -1,3 +1,4 @@
+import DevWebhookSettings from "../../components/support/DevWebhookSettings";
 import { createElement, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronUp, GripVertical, Plus, Save, Trash2, Wrench } from "lucide-react";
@@ -124,6 +125,7 @@ export default function DevTypes() {
 
   return (
     <Section className="max-w-6xl">
+      {user.roles?.includes("ownership") && <DevWebhookSettings />}
       <Button as={Link} to="/development" variant="ghost" size="sm" className="mb-4">
         <ArrowLeft className="size-4" />
         Development Hub
