@@ -1,3 +1,4 @@
+import {ensureMessageEdits} from './messageEdits.js';
 import { query, transaction } from '../db.js';
 import { randomUUID } from 'node:crypto';
 import { guildDisplayName } from './guildDisplayName.js';
@@ -9,6 +10,7 @@ export const approvalViewer = (request,ctx) => (personalTypes.includes(request.t
 let ready;
 export function ensureApprovals() {
   if (!ready) ready = (async () => {
+    await ensureMessageEdits('development');
     await query('ALTER TABLE dev_vehicle_claims ADD COLUMN IF NOT EXISTS request_id VARCHAR(40) REFERENCES dev_requests(id)');
     await query(`CREATE TABLE IF NOT EXISTS dev_request_approvals (
       id UUID PRIMARY KEY, request_id VARCHAR(40) NOT NULL REFERENCES dev_requests(id),
@@ -38,7 +40,7 @@ export async function claimInTicket(ctx, vehicleId, requestId, note) {
     if (occupied.length) throw fail(409,'This vehicle or ticket already has an open claim. Withdraw or release it before choosing another.');
     const id = `vc-${randomUUID()}`;
     await q(`INSERT INTO dev_vehicle_claims(id,vehicle_id,discord_id,member_name,status,note,request_id) VALUES($1,$2,$3,$4,'pending',$5,$6)`,[id,vehicleId,ctx.user.id,actor,note,requestId]);
-    await q(`INSERT INTO dev_request_messages(id,request_id,internal,author_id,author_name,body) VALUES($1,$2,false,$3,$4,$5)`,[`msg-${randomUUID()}`,requestId,ctx.user.id,actor,`Requested model approval: ${vehicle.name}. ${note || ''}`]);
+    await q(`INSERT INTO dev_request_messages(id,request_id,internal,author_id,author_name,body,system_generated) VALUES($1,$2,false,$3,$4,$5,true)`,[`msg-${randomUUID()}`,requestId,ctx.user.id,actor,`Requested model approval: ${vehicle.name}. ${note || ''}`]);
     await q('UPDATE dev_requests SET last_message_at=CURRENT_TIMESTAMP WHERE id=$1',[requestId]);
     return {id,requestId,vehicleId,status:'pending'};
   });
@@ -71,7 +73,7 @@ export async function approveTicket(ctx, requestId, kind, action = 'approve', ap
     if (kind === 'model' && claim) {
       await q("UPDATE dev_vehicle_claims SET status=$4,decided_by_id=$2,decided_by_name=$3,decided_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1",[claim.id,ctx.user.id,actor,action === 'revoke' ? 'pending' : 'active']);
     }
-    await q(`INSERT INTO dev_request_messages(id,request_id,internal,author_id,author_name,body) VALUES($1,$2,false,$3,$4,$5)`,[`msg-${randomUUID()}`,requestId,ctx.user.id,actor,`${action === 'revoke' ? 'Revoked approval of' : 'Approved'} ${kind === 'model' ? 'model' : 'liveries'}${claim ? ` for claim ${claim.id}` : ' for this request'}.`]);
+    await q(`INSERT INTO dev_request_messages(id,request_id,internal,author_id,author_name,body,system_generated) VALUES($1,$2,false,$3,$4,$5,true)`,[`msg-${randomUUID()}`,requestId,ctx.user.id,actor,`${action === 'revoke' ? 'Revoked approval of' : 'Approved'} ${kind === 'model' ? 'model' : 'liveries'}${claim ? ` for claim ${claim.id}` : ' for this request'}.`]);
     await q('UPDATE dev_requests SET last_message_at=CURRENT_TIMESTAMP WHERE id=$1',[requestId]);
     return {ok:true};
   });

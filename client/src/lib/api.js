@@ -781,6 +781,8 @@ export const api = {
       messages: supportSeed.MESSAGES.filter((m) => m.ticketId === id && !m.internal),
     }),
 
+  editSupportMessage: (id,messageId,payload) => request(`/support/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`,{method:'PATCH',body:JSON.stringify(payload)}),
+  editDevMessage: (id,messageId,payload) => request(`/development/requests/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`,{method:'PATCH',body:JSON.stringify(payload)}),
   postSupportMessage: (id, payload) =>
     post(`/support/${encodeURIComponent(id)}/messages`, payload, () => ({
       ok: false,

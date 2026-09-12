@@ -213,6 +213,11 @@ export default function DevRequestDetail() {
           canInternal={can.work}
           greetingName={request.openedByName}
           onSend={send}
+          onEdit={async (messageId,payload)=>{
+            const result=await api.editDevMessage(request.id,messageId,payload);
+            if(result.ok)setMessages(previous=>previous.map(message=>message.id===messageId ? {...message,body:result.body,editedAt:result.editedAt} : message));
+            return result;
+          }}
           disabled={request.status === "closed" && !can.work}
           composerRef={composerRef}
           draft={draft}

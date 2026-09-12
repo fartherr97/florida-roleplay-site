@@ -375,6 +375,11 @@ export default function SupportTicket() {
           viewers={viewers}
           onTyping={markTyping}
           onSend={send}
+          onEdit={async (messageId,payload)=>{
+            const result=await api.editSupportMessage(ticket.id,messageId,payload);
+            if(result.ok)setMessages(previous=>previous.map(message=>message.id===messageId ? {...message,body:result.body,editedAt:result.editedAt} : message));
+            return result;
+          }}
           disabled={ticket.status === "closed" && !can.work}
           composerRef={composerRef}
           draft={draft}

@@ -55,4 +55,22 @@ test('claims are ticket-owned, transactional and approved once with immutable ac
  assert.equal((await query('SELECT * FROM dev_request_messages WHERE request_id=$1',['ticket'])).length,6);
 
 });
+test('own messages edit safely in support and development, without changing system logs',async()=>{
+ const {editMessage,ensureMessageEdits}=await import('../src/lib/messageEdits.js');
+ await db.exec('CREATE TABLE support_messages (LIKE dev_request_messages INCLUDING ALL); ALTER TABLE support_messages RENAME COLUMN request_id TO ticket_id;');
+ for(const [kind,table,parent] of [['support','support_messages','ticket_id'],['development','dev_request_messages','request_id']]){
+  await ensureMessageEdits(kind);
+  await query(`INSERT INTO ${table}(id,${parent},author_id,author_name,body) VALUES('editable','ticket','111111111111111111','Name','Original')`);
+  await assert.rejects(editMessage(kind,'ticket','editable','222222222222222222','Changed','Original',true),{status:403});
+  await assert.rejects(editMessage(kind,'wrong','editable','111111111111111111','Changed','Original',true),{status:403});
+  await assert.rejects(editMessage(kind,'ticket','editable','111111111111111111','  ','Original',true),{status:400});
+  const result=await editMessage(kind,'ticket','editable','111111111111111111','Corrected','Original',false);assert(result.editedAt);assert.equal(result.body,'Corrected');
+  await assert.rejects(editMessage(kind,'ticket','editable','111111111111111111','Stale overwrite','Original',true),{status:409});
+  const [stored]=await query(`SELECT * FROM ${table} WHERE id='editable'`);assert.equal(stored.edit_history[0].body,'Original');assert.equal(stored.internal,false);
+  await query(`UPDATE ${table} SET internal=true WHERE id='editable'`);
+  await assert.rejects(editMessage(kind,'ticket','editable','111111111111111111','Changed','Corrected',false),{status:403});
+  await query(`UPDATE ${table} SET system_generated=true WHERE id='editable'`);
+  await assert.rejects(editMessage(kind,'ticket','editable','111111111111111111','Changed','Corrected',true),{status:403});
+ }
+});
 after(()=>db.close());

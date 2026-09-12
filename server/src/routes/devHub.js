@@ -1,3 +1,4 @@
+import {ensureMessageEdits,editMessage} from "../lib/messageEdits.js";
 import { personalTypes, activeStatuses, modelApprover, liveryApprover, approvalViewer, approvalData, approveTicket, claimInTicket, ensureApprovals } from "../lib/devApprovals.js";
 import { guildDisplayName as rosterNameFor, withGuildNames } from "../lib/guildDisplayName.js";
 /**
@@ -307,10 +308,11 @@ router.get("/requests/:id/messages", async (req, res) => {
 
   const internal = isDevTeam(ctx);
   try {
+    await ensureMessageEdits("development");
     const rows = await query(
       `SELECT id, internal, author_id AS "authorId", author_name AS "authorName",
               author_role AS "authorRole", author_avatar AS "authorAvatar", body,
-              reply_to_id AS "replyToId", created_at AS "createdAt"
+              reply_to_id AS "replyToId", created_at AS "createdAt", edited_at AS "editedAt", NOT system_generated AS editable
          FROM dev_request_messages
         WHERE request_id = $1${internal ? "" : " AND internal = false"}
         ORDER BY created_at ASC LIMIT 500`,
@@ -767,3 +769,13 @@ router.put("/config/request-types", async (req, res) => {
 });
 
 export default router;
+
+router.patch('/requests/:id/messages/:messageId',async(req,res)=>{
+ const ctx=await contextFor(req);if(requireSignIn(ctx,res))return;
+ const request=await loadRequest(str(req.params.id));
+ if(!request || !canViewRequest(request,ctx))return res.status(403).json({ok:false,message:'This ticket is not available to you.'});
+ const work=isDevTeam(ctx);
+ if(request.status==='closed' && !work)return res.status(409).json({ok:false,message:'This ticket is closed.'});
+ try{res.json(await editMessage('development',request.id,str(req.params.messageId,48),ctx.user.id,req.body?.body,req.body?.originalBody,work));}
+ catch(error){res.status(error.status || 503).json({ok:false,message:error.status ? error.message : 'Message could not be saved.'});}
+});

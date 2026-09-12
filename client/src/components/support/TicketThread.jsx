@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CornerUpLeft, Loader2, Send, Sparkles, X } from "lucide-react";
+import { CornerUpLeft, Loader2, Pencil, Send, Sparkles, X } from "lucide-react";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import { TextArea } from "../ui/TextInput";
@@ -53,6 +53,7 @@ export default function TicketThread({
   viewers = [],
   onTyping,
   onSend,
+  onEdit,
   disabled = false,
   composerRef,
   draft,
@@ -124,7 +125,8 @@ export default function TicketThread({
             key={message.id}
             message={message}
             quoted={message.replyToId ? byId[message.replyToId] : null}
-            mine={message.authorId === meId}
+            mine={Boolean(meId) && message.authorId === meId}
+            onEdit={!disabled && message.editable !== false ? onEdit : null}
             onReply={() => setReplyTo(message)}
           />
         ))}
@@ -221,7 +223,20 @@ export default function TicketThread({
   );
 }
 
-function Message({ message, quoted, mine, onReply }) {
+function Message({ message, quoted, mine, onReply, onEdit }) {
+  const [editing,setEditing]=useState(false);
+  const [text,setText]=useState('');
+  const [original,setOriginal]=useState('');
+  const [saving,setSaving]=useState(false);
+  const [failure,setFailure]=useState('');
+  async function save(event){
+    event.preventDefault();setSaving(true);setFailure('');
+    try{
+      const result=await onEdit(message.id,{body:text,originalBody:original});
+      if(!result?.ok)throw new Error(result?.message || 'Message could not be saved.');
+      setEditing(false);
+    }catch(error){setFailure(error.message);}finally{setSaving(false);}
+  }
   const tone = message.internal ? "amber" : roleTone(message.authorRole);
   return (
     <article className="group flex gap-3">
@@ -234,6 +249,7 @@ function Message({ message, quoted, mine, onReply }) {
           {message.internal && <Badge tone="amber">Internal</Badge>}
           {mine && <Badge tone="slate">You</Badge>}
           <span className="text-slate-600">{formatDateTimeLocal(message.createdAt)}</span>
+          {mine && onEdit && !editing && <button type="button" aria-label="Edit message" title="Edit message" onClick={()=>{setText(message.body);setOriginal(message.body);setFailure('');setEditing(true);}} className="rounded p-1 text-slate-400 opacity-100 transition hover:text-white [@media(hover:hover)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100"><Pencil className="size-3.5"/></button>}
           <button
             type="button"
             onClick={onReply}
@@ -250,9 +266,14 @@ function Message({ message, quoted, mine, onReply }) {
           </div>
         )}
 
+        {editing && <form onSubmit={save} className="mt-2 space-y-2" onKeyDown={event=>{if(event.key==='Escape' && !saving){event.preventDefault();setEditing(false);}}}>
+          <TextArea aria-label="Edit message text" autoFocus rows={3} maxLength={8000} disabled={saving} value={text} onChange={event=>setText(event.target.value)}/>
+          {failure && <p role="alert" className="text-xs text-rose-300">{failure}</p>}
+          <div className="flex gap-2"><Button type="submit" size="sm" disabled={saving || !text.trim() || text.trim()===original}>{saving ? 'Saving...' : 'Save changes'}</Button><Button type="button" variant="ghost" size="sm" disabled={saving} onClick={()=>setEditing(false)}>Cancel</Button></div>
+        </form>}
         {/* The bubble hugs its text rather than spanning the column, the way a
             chat app reads — a one-word reply is a one-word bubble. */}
-        <div
+        {!editing && <div
           className={cn(
             "mt-1.5 w-fit max-w-full whitespace-pre-line break-words rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed ring-1 ring-inset",
             message.internal
@@ -261,7 +282,8 @@ function Message({ message, quoted, mine, onReply }) {
           )}
         >
           {message.body}
-        </div>
+        </div>}
+        {message.editedAt && <p className="mt-1 text-[11px] italic text-slate-500" title={`Edited ${formatDateTimeLocal(message.editedAt)}`}>*Edited</p>}
       </div>
     </article>
   );
