@@ -292,10 +292,12 @@ function Message({ message, quoted, mine, onReply, onEdit }) {
 /** A member's real Discord avatar, or their initials on a toned tile. */
 function Avatar({ name, avatar, tone = "slate", size = "md", className }) {
   const box = size === "sm" ? "size-6 text-[0.6rem]" : "size-9 text-[0.7rem]";
-  if (avatar) {
+  const [failedAvatar, setFailedAvatar] = useState(null);
+  if (avatar && failedAvatar !== avatar) {
     return (
       <img
         src={avatar}
+        onError={() => setFailedAvatar(avatar)}
         alt=""
         className={cn("shrink-0 rounded-full object-cover ring-1 ring-inset ring-white/10", box, className)}
       />
